@@ -53,36 +53,9 @@ public actor TypeQuickerDataSource: TypeQuickerDataSourceProtocol {
         baseURL = nil
     }
 
-    public func fetchData(from startDate: Date, to endDate: Date) async throws -> [DataPoint] {
-        let stats = try await fetchStats(from: startDate, to: endDate)
-        return stats.map { stat in
-            DataPoint(
-                goalId: UUID(), // Will be assigned when linked to a goal
-                value: stat.wordsPerMinute,
-                timestamp: stat.date,
-                source: .typeQuicker,
-                metadata: [
-                    "accuracy": String(format: "%.1f", stat.accuracy),
-                    "practiceMinutes": "\(stat.practiceTimeMinutes)",
-                    "sessions": "\(stat.sessionsCount)"
-                ]
-            )
-        }
-    }
-
-    public func fetchLatest() async throws -> DataPoint? {
-        guard let stat = try await fetchLatestStats() else { return nil }
-        return DataPoint(
-            goalId: UUID(),
-            value: stat.wordsPerMinute,
-            timestamp: stat.date,
-            source: .typeQuicker,
-            metadata: [
-                "accuracy": String(format: "%.1f", stat.accuracy),
-                "practiceMinutes": "\(stat.practiceTimeMinutes)",
-                "sessions": "\(stat.sessionsCount)"
-            ]
-        )
+    public func fetchLatestMetricValue(for metricKey: String) async throws -> Double? {
+        guard let stats = try await fetchLatestStats() else { return nil }
+        return metricValue(for: metricKey, from: stats)
     }
 
     public func fetchStats(from startDate: Date, to endDate: Date) async throws -> [TypeQuickerStats] {

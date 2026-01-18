@@ -3,28 +3,24 @@ import Charts
 import GoalsDomain
 import GoalsData
 
-/// Dashboard view showing today's focus and actionable items
+/// Dashboard view showing today's focus and data source stats
 public struct DashboardView: View {
     @Environment(AppContainer.self) private var container
     @State private var goals: [Goal] = []
     @State private var typeQuickerStats: [TypeQuickerStats] = []
     @State private var isLoading = true
     @State private var isLoadingStats = true
-    @State private var showingAddProgress = false
-    @State private var selectedGoal: Goal?
+    @State private var isSyncing = false
 
     public var body: some View {
         NavigationStack {
             ScrollView {
                 VStack(spacing: 20) {
-                    // Today's Focus section
-                    todaysFocusSection
+                    // Goals overview section
+                    goalsOverviewSection
 
                     // TypeQuicker stats widget
                     typeQuickerSection
-
-                    // Goals needing attention
-                    goalsNeedingAttentionSection
 
                     // Quick add section
                     quickAddSection
@@ -32,36 +28,44 @@ public struct DashboardView: View {
                 .padding()
             }
             .navigationTitle("Today")
+            .toolbar {
+                ToolbarItem(placement: .primaryAction) {
+                    Button {
+                        Task {
+                            await syncAllData()
+                        }
+                    } label: {
+                        if isSyncing {
+                            ProgressView()
+                        } else {
+                            Image(systemName: "arrow.triangle.2.circlepath")
+                        }
+                    }
+                    .disabled(isSyncing)
+                }
+            }
             .task {
                 await loadData()
             }
             .refreshable {
+                await syncAllData()
                 await loadData()
-            }
-            .sheet(isPresented: $showingAddProgress) {
-                if let goal = selectedGoal {
-                    NavigationStack {
-                        AddProgressView(goal: goal) {
-                            await loadGoals()
-                        }
-                    }
-                }
             }
         }
     }
 
-    // MARK: - Today's Focus Section
+    // MARK: - Goals Overview Section
 
     @ViewBuilder
-    private var todaysFocusSection: some View {
+    private var goalsOverviewSection: some View {
         VStack(alignment: .leading, spacing: 12) {
             HStack {
-                Image(systemName: "sun.max.fill")
-                    .foregroundStyle(.orange)
-                Text("Today's Focus")
+                Image(systemName: "target")
+                    .foregroundStyle(.blue)
+                Text("Goals Overview")
                     .font(.headline)
                 Spacer()
-                Text(Date(), style: .date)
+                Text("\(goals.count) active")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
@@ -70,37 +74,29 @@ public struct DashboardView: View {
                 ProgressView()
                     .frame(maxWidth: .infinity)
                     .padding()
-            } else if habitsNeedingCheckIn.isEmpty && goalsDueSoon.isEmpty {
+            } else if goals.isEmpty {
                 HStack(spacing: 12) {
-                    Image(systemName: "checkmark.circle.fill")
+                    Image(systemName: "plus.circle.fill")
                         .font(.title)
-                        .foregroundStyle(.green)
+                        .foregroundStyle(.blue)
                     VStack(alignment: .leading) {
-                        Text("All caught up!")
+                        Text("No goals yet")
                             .font(.subheadline)
                             .fontWeight(.medium)
-                        Text("No habits or goals need attention today")
+                        Text("Create a goal to start tracking")
                             .font(.caption)
                             .foregroundStyle(.secondary)
                     }
                     Spacer()
                 }
                 .padding()
-                .background(.green.opacity(0.1))
+                .background(.blue.opacity(0.1))
                 .clipShape(RoundedRectangle(cornerRadius: 12))
             } else {
+                // Show top 3 goals by progress
                 VStack(spacing: 8) {
-                    // Habits needing check-in
-                    ForEach(habitsNeedingCheckIn) { goal in
-                        HabitCheckInRow(goal: goal) {
-                            selectedGoal = goal
-                            showingAddProgress = true
-                        }
-                    }
-
-                    // Goals due soon
-                    ForEach(goalsDueSoon) { goal in
-                        GoalDueSoonRow(goal: goal)
+                    ForEach(goals.sorted { $0.progress > $1.progress }.prefix(3)) { goal in
+                        GoalProgressRow(goal: goal)
                     }
                 }
             }
@@ -177,12 +173,6 @@ public struct DashboardView: View {
                                 y: .value("WPM", stat.wordsPerMinute)
                             )
                             .foregroundStyle(.blue)
-
-                            AreaMark(
-                                x: .value("Date", stat.date, unit: .day),
-                                y: .value("WPM", stat.wordsPerMinute)
-                            )
-                            .foregroundStyle(.blue.opacity(0.1))
                         }
                         .frame(height: 80)
                         .chartXAxis(.hidden)
@@ -192,7 +182,7 @@ public struct DashboardView: View {
 
                 // Sessions count
                 HStack {
-                    Text("\(latestStats.sessionsCount) sessions today")
+                    Text("\(latestStats.sessionsCount) sessions")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                     Spacer()
@@ -220,56 +210,6 @@ public struct DashboardView: View {
         .clipShape(RoundedRectangle(cornerRadius: 16))
     }
 
-    // MARK: - Goals Needing Attention
-
-    @ViewBuilder
-    private var goalsNeedingAttentionSection: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            HStack {
-                Image(systemName: "exclamationmark.triangle.fill")
-                    .foregroundStyle(.yellow)
-                Text("Needs Attention")
-                    .font(.headline)
-                Spacer()
-            }
-
-            if isLoading {
-                ProgressView()
-                    .frame(maxWidth: .infinity)
-                    .padding()
-            } else if streaksAtRisk.isEmpty && staleGoals.isEmpty {
-                HStack(spacing: 12) {
-                    Image(systemName: "hand.thumbsup.fill")
-                        .font(.title2)
-                        .foregroundStyle(.blue)
-                    Text("All goals are on track!")
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
-                    Spacer()
-                }
-                .padding()
-            } else {
-                VStack(spacing: 8) {
-                    // Streaks at risk
-                    ForEach(streaksAtRisk) { goal in
-                        StreakAtRiskRow(goal: goal) {
-                            selectedGoal = goal
-                            showingAddProgress = true
-                        }
-                    }
-
-                    // Stale goals (no progress in a while)
-                    ForEach(staleGoals.prefix(3)) { goal in
-                        StaleGoalRow(goal: goal)
-                    }
-                }
-            }
-        }
-        .padding()
-        .background(.regularMaterial)
-        .clipShape(RoundedRectangle(cornerRadius: 16))
-    }
-
     // MARK: - Quick Add Section
 
     @ViewBuilder
@@ -283,7 +223,9 @@ public struct DashboardView: View {
                 GridItem(.flexible())
             ], spacing: 12) {
                 NavigationLink {
-                    CreateGoalView()
+                    CreateGoalView {
+                        await loadGoals()
+                    }
                 } label: {
                     QuickActionButton(
                         title: "New Goal",
@@ -308,45 +250,6 @@ public struct DashboardView: View {
         .padding()
         .background(.regularMaterial)
         .clipShape(RoundedRectangle(cornerRadius: 16))
-    }
-
-    // MARK: - Computed Properties
-
-    private var habitsNeedingCheckIn: [Goal] {
-        goals.filter { goal in
-            goal.type == .habit && !goal.isArchived && !goal.isAchieved
-        }
-    }
-
-    private var goalsDueSoon: [Goal] {
-        let calendar = Calendar.current
-        let today = Date()
-        let threeDaysFromNow = calendar.date(byAdding: .day, value: 3, to: today)!
-
-        return goals.filter { goal in
-            guard let deadline = goal.deadline, !goal.isArchived, !goal.isAchieved else {
-                return false
-            }
-            return deadline <= threeDaysFromNow && deadline >= today
-        }
-    }
-
-    private var streaksAtRisk: [Goal] {
-        goals.filter { goal in
-            guard goal.type == .habit, !goal.isArchived else { return false }
-            let streak = goal.currentStreak ?? 0
-            return streak > 0 && streak < 3 // Low streaks that could be lost
-        }
-    }
-
-    private var staleGoals: [Goal] {
-        goals.filter { goal in
-            guard !goal.isArchived, !goal.isAchieved, goal.type == .numeric else {
-                return false
-            }
-            // Show goals with low progress (would need lastUpdated field for true staleness)
-            return goal.progress < 0.3
-        }
     }
 
     // MARK: - Data Loading
@@ -399,54 +302,19 @@ public struct DashboardView: View {
         }
     }
 
+    private func syncAllData() async {
+        isSyncing = true
+        _ = try? await container.syncDataSourcesUseCase.syncAll()
+        await loadData()
+        isSyncing = false
+    }
+
     public init() {}
 }
 
 // MARK: - Supporting Views
 
-struct HabitCheckInRow: View {
-    let goal: Goal
-    let onCheckIn: () -> Void
-
-    var body: some View {
-        HStack {
-            Circle()
-                .fill(goal.color.swiftUIColor.opacity(0.2))
-                .frame(width: 40, height: 40)
-                .overlay {
-                    Image(systemName: "repeat.circle")
-                        .foregroundStyle(goal.color.swiftUIColor)
-                }
-
-            VStack(alignment: .leading, spacing: 2) {
-                Text(goal.title)
-                    .font(.subheadline)
-                    .fontWeight(.medium)
-
-                if let streak = goal.currentStreak, streak > 0 {
-                    Text("\(streak) day streak")
-                        .font(.caption)
-                        .foregroundStyle(.orange)
-                } else {
-                    Text("Start your streak!")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
-            }
-
-            Spacer()
-
-            Button(action: onCheckIn) {
-                Image(systemName: "checkmark.circle")
-                    .font(.title2)
-                    .foregroundStyle(.green)
-            }
-        }
-        .padding(.vertical, 4)
-    }
-}
-
-struct GoalDueSoonRow: View {
+struct GoalProgressRow: View {
     let goal: Goal
 
     var body: some View {
@@ -455,7 +323,7 @@ struct GoalDueSoonRow: View {
                 .fill(goal.color.swiftUIColor.opacity(0.2))
                 .frame(width: 40, height: 40)
                 .overlay {
-                    Image(systemName: "calendar.badge.exclamationmark")
+                    Image(systemName: goal.dataSource.iconName)
                         .foregroundStyle(goal.color.swiftUIColor)
                 }
 
@@ -463,83 +331,9 @@ struct GoalDueSoonRow: View {
                 Text(goal.title)
                     .font(.subheadline)
                     .fontWeight(.medium)
+                    .lineLimit(1)
 
-                if let deadline = goal.deadline {
-                    Text("Due \(deadline, style: .relative)")
-                        .font(.caption)
-                        .foregroundStyle(.red)
-                }
-            }
-
-            Spacer()
-
-            Text("\(Int(goal.progress * 100))%")
-                .font(.caption)
-                .fontWeight(.semibold)
-                .foregroundStyle(.secondary)
-        }
-        .padding(.vertical, 4)
-    }
-}
-
-struct StreakAtRiskRow: View {
-    let goal: Goal
-    let onCheckIn: () -> Void
-
-    var body: some View {
-        HStack {
-            Circle()
-                .fill(.orange.opacity(0.2))
-                .frame(width: 40, height: 40)
-                .overlay {
-                    Image(systemName: "flame")
-                        .foregroundStyle(.orange)
-                }
-
-            VStack(alignment: .leading, spacing: 2) {
-                Text(goal.title)
-                    .font(.subheadline)
-                    .fontWeight(.medium)
-
-                Text("Streak at risk!")
-                    .font(.caption)
-                    .foregroundStyle(.orange)
-            }
-
-            Spacer()
-
-            Button(action: onCheckIn) {
-                Text("Check in")
-                    .font(.caption)
-                    .fontWeight(.semibold)
-            }
-            .buttonStyle(.borderedProminent)
-            .tint(.orange)
-            .controlSize(.small)
-        }
-        .padding(.vertical, 4)
-    }
-}
-
-struct StaleGoalRow: View {
-    let goal: Goal
-
-    var body: some View {
-        HStack {
-            Circle()
-                .fill(goal.color.swiftUIColor.opacity(0.2))
-                .frame(width: 40, height: 40)
-                .overlay {
-                    Image(systemName: "clock.arrow.circlepath")
-                        .foregroundStyle(goal.color.swiftUIColor)
-                }
-
-            VStack(alignment: .leading, spacing: 2) {
-                Text(goal.title)
-                    .font(.subheadline)
-                    .fontWeight(.medium)
-
-                Text("Needs progress update")
+                Text("\(Int(goal.currentValue))/\(Int(goal.targetValue)) \(goal.unit)")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
@@ -549,7 +343,7 @@ struct StaleGoalRow: View {
             Text("\(Int(goal.progress * 100))%")
                 .font(.caption)
                 .fontWeight(.semibold)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(goal.progress >= 1.0 ? .green : .secondary)
         }
         .padding(.vertical, 4)
     }

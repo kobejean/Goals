@@ -59,40 +59,9 @@ public actor AtCoderDataSource: AtCoderDataSourceProtocol {
         username = nil
     }
 
-    public func fetchData(from startDate: Date, to endDate: Date) async throws -> [DataPoint] {
-        guard let stats = try await fetchStats() else { return [] }
-
-        return [
-            DataPoint(
-                goalId: UUID(),
-                value: Double(stats.rating),
-                timestamp: stats.date,
-                source: .atCoder,
-                metadata: [
-                    "highestRating": "\(stats.highestRating)",
-                    "contests": "\(stats.contestsParticipated)",
-                    "problemsSolved": "\(stats.problemsSolved)",
-                    "longestStreak": "\(stats.longestStreak ?? 0)"
-                ]
-            )
-        ]
-    }
-
-    public func fetchLatest() async throws -> DataPoint? {
+    public func fetchLatestMetricValue(for metricKey: String) async throws -> Double? {
         guard let stats = try await fetchStats() else { return nil }
-
-        return DataPoint(
-            goalId: UUID(),
-            value: Double(stats.rating),
-            timestamp: stats.date,
-            source: .atCoder,
-            metadata: [
-                "highestRating": "\(stats.highestRating)",
-                "contests": "\(stats.contestsParticipated)",
-                "problemsSolved": "\(stats.problemsSolved)",
-                "longestStreak": "\(stats.longestStreak ?? 0)"
-            ]
-        )
+        return metricValue(for: metricKey, from: stats)
     }
 
     public func fetchStats() async throws -> AtCoderStats? {

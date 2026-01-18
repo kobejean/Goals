@@ -1,36 +1,22 @@
 import Foundation
 import GoalsCore
 
-/// Represents a user's goal with tracking capabilities
+/// Represents a user's goal linked to a data source metric
 public struct Goal: Sendable, Equatable, UUIDIdentifiable {
     public let id: UUID
     public var title: String
     public var description: String?
-    public var type: GoalType
     public var dataSource: DataSourceType
     public var createdAt: Date
     public var updatedAt: Date
 
     // Data source metric key (e.g., "wpm", "accuracy", "rating")
-    public var metricKey: String?
+    public var metricKey: String
 
-    // Numeric goal properties
-    public var targetValue: Double?
-    public var currentValue: Double?
-    public var unit: String?
-
-    // Habit goal properties
-    public var frequency: HabitFrequency?
-    public var targetCount: Int? // e.g., 5 times per week
-    public var currentStreak: Int?
-    public var longestStreak: Int?
-
-    // Milestone goal properties
-    public var isCompleted: Bool
-    public var completedAt: Date?
-
-    // Compound goal properties
-    public var subGoalIds: [UUID]?
+    // Target and current values
+    public var targetValue: Double
+    public var currentValue: Double
+    public var unit: String
 
     // Common properties
     public var deadline: Date?
@@ -41,21 +27,13 @@ public struct Goal: Sendable, Equatable, UUIDIdentifiable {
         id: UUID = UUID(),
         title: String,
         description: String? = nil,
-        type: GoalType,
-        dataSource: DataSourceType = .manual,
+        dataSource: DataSourceType,
         createdAt: Date = Date(),
         updatedAt: Date = Date(),
-        metricKey: String? = nil,
-        targetValue: Double? = nil,
-        currentValue: Double? = nil,
-        unit: String? = nil,
-        frequency: HabitFrequency? = nil,
-        targetCount: Int? = nil,
-        currentStreak: Int? = nil,
-        longestStreak: Int? = nil,
-        isCompleted: Bool = false,
-        completedAt: Date? = nil,
-        subGoalIds: [UUID]? = nil,
+        metricKey: String,
+        targetValue: Double,
+        currentValue: Double = 0,
+        unit: String,
         deadline: Date? = nil,
         isArchived: Bool = false,
         color: GoalColor = .blue
@@ -63,7 +41,6 @@ public struct Goal: Sendable, Equatable, UUIDIdentifiable {
         self.id = id
         self.title = title
         self.description = description
-        self.type = type
         self.dataSource = dataSource
         self.createdAt = createdAt
         self.updatedAt = updatedAt
@@ -71,13 +48,6 @@ public struct Goal: Sendable, Equatable, UUIDIdentifiable {
         self.targetValue = targetValue
         self.currentValue = currentValue
         self.unit = unit
-        self.frequency = frequency
-        self.targetCount = targetCount
-        self.currentStreak = currentStreak
-        self.longestStreak = longestStreak
-        self.isCompleted = isCompleted
-        self.completedAt = completedAt
-        self.subGoalIds = subGoalIds
         self.deadline = deadline
         self.isArchived = isArchived
         self.color = color
@@ -85,47 +55,13 @@ public struct Goal: Sendable, Equatable, UUIDIdentifiable {
 
     /// Progress percentage (0.0 to 1.0)
     public var progress: Double {
-        switch type {
-        case .numeric:
-            guard let target = targetValue, target > 0, let current = currentValue else {
-                return 0
-            }
-            return min(current / target, 1.0)
-
-        case .habit:
-            guard let target = targetCount, target > 0, let streak = currentStreak else {
-                return 0
-            }
-            return min(Double(streak) / Double(target), 1.0)
-
-        case .milestone:
-            return isCompleted ? 1.0 : 0.0
-
-        case .compound:
-            // Progress calculated based on sub-goals (handled at repository level)
-            return 0
-        }
+        guard targetValue > 0 else { return 0 }
+        return min(currentValue / targetValue, 1.0)
     }
 
     /// Returns true if the goal has been achieved
     public var isAchieved: Bool {
-        switch type {
-        case .numeric:
-            return progress >= 1.0
-
-        case .habit:
-            guard let target = targetCount, let streak = currentStreak else {
-                return false
-            }
-            return streak >= target
-
-        case .milestone:
-            return isCompleted
-
-        case .compound:
-            // Achieved when all sub-goals are completed (handled at repository level)
-            return false
-        }
+        progress >= 1.0
     }
 }
 

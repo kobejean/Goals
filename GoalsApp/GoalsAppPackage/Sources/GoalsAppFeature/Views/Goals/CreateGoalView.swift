@@ -13,6 +13,12 @@ public struct CreateGoalView: View {
     @State private var color: GoalColor = .blue
     @State private var isSaving = false
 
+    var onSave: (() async -> Void)?
+
+    public init(onSave: (() async -> Void)? = nil) {
+        self.onSave = onSave
+    }
+
     public var body: some View {
         NavigationStack {
             Form {
@@ -135,8 +141,6 @@ public struct CreateGoalView: View {
             return container.typeQuickerDataSource.availableMetrics
         case .atCoder:
             return container.atCoderDataSource.availableMetrics
-        default:
-            return []
         }
     }
 
@@ -161,7 +165,7 @@ public struct CreateGoalView: View {
         defer { isSaving = false }
 
         do {
-            _ = try await container.createGoalUseCase.createDataSourceGoal(
+            _ = try await container.createGoalUseCase.createGoal(
                 title: "\(metric.name) Goal",
                 dataSource: dataSource,
                 metricKey: metric.key,
@@ -169,13 +173,12 @@ public struct CreateGoalView: View {
                 unit: metric.unit,
                 color: color
             )
+            await onSave?()
             dismiss()
         } catch {
             print("Failed to create goal: \(error)")
         }
     }
-
-    public init() {}
 }
 
 #Preview {

@@ -3,16 +3,13 @@ import Foundation
 /// Use case for syncing data from external data sources
 public struct SyncDataSourcesUseCase: Sendable {
     private let goalRepository: GoalRepositoryProtocol
-    private let dataPointRepository: DataPointRepositoryProtocol
     private let dataSources: [DataSourceType: any DataSourceRepositoryProtocol]
 
     public init(
         goalRepository: GoalRepositoryProtocol,
-        dataPointRepository: DataPointRepositoryProtocol,
         dataSources: [DataSourceType: any DataSourceRepositoryProtocol]
     ) {
         self.goalRepository = goalRepository
-        self.dataPointRepository = dataPointRepository
         self.dataSources = dataSources
     }
 
@@ -25,7 +22,7 @@ public struct SyncDataSourcesUseCase: Sendable {
                 results[sourceType] = SyncSourceResult(
                     dataSource: sourceType,
                     success: false,
-                    dataPointsCreated: 0,
+                    goalsUpdated: 0,
                     error: SyncError.notConfigured
                 )
                 continue
@@ -38,7 +35,7 @@ public struct SyncDataSourcesUseCase: Sendable {
                 results[sourceType] = SyncSourceResult(
                     dataSource: sourceType,
                     success: false,
-                    dataPointsCreated: 0,
+                    goalsUpdated: 0,
                     error: error
                 )
             }
@@ -74,106 +71,26 @@ public struct SyncDataSourcesUseCase: Sendable {
             return SyncSourceResult(
                 dataSource: sourceType,
                 success: true,
-                dataPointsCreated: 0,
+                goalsUpdated: 0,
                 error: nil
             )
         }
 
-        // Fetch data from the source (last 30 days by default)
-        let endDate = Date()
-        let startDate = Calendar.current.date(byAdding: .day, value: -30, to: endDate) ?? endDate
-
-        let dataPoints = try await repository.fetchData(from: startDate, to: endDate)
-
-        // Get the latest stats for metric-based goal updates
-        let latestStats = try await repository.fetchLatest()
-
-        // Create data points for each goal
-        var createdCount = 0
+        // Update each goal's current value based on its metric key
+        var updatedCount = 0
         for goal in goals {
-            let goalDataPoints = dataPoints.map { point in
-                DataPoint(
-                    goalId: goal.id,
-                    value: point.value,
-                    timestamp: point.timestamp,
-                    source: sourceType,
-                    note: point.note,
-                    metadata: point.metadata
-                )
-            }
-
-            let created = try await dataPointRepository.createBatch(goalDataPoints)
-            createdCount += created.count
-
-            // Update goal progress based on metric key or latest data
-            if let metricKey = goal.metricKey, let latestStats {
-                // For metric-based goals, extract the specific metric value
-                let value = extractMetricValue(
-                    from: latestStats,
-                    for: metricKey,
-                    sourceType: sourceType
-                )
-                if let value {
-                    try await goalRepository.updateProgress(
-                        goalId: goal.id,
-                        currentValue: value
-                    )
-                }
-            } else if let latest = created.last {
-                // For non-metric goals, use the latest data point value
-                try await goalRepository.updateProgress(
-                    goalId: goal.id,
-                    currentValue: latest.value
-                )
+            if let value = try await repository.fetchLatestMetricValue(for: goal.metricKey) {
+                try await goalRepository.updateProgress(goalId: goal.id, currentValue: value)
+                updatedCount += 1
             }
         }
 
         return SyncSourceResult(
             dataSource: sourceType,
             success: true,
-            dataPointsCreated: createdCount,
+            goalsUpdated: updatedCount,
             error: nil
         )
-    }
-
-    /// Extract a metric value from a data point
-    private func extractMetricValue(
-        from dataPoint: DataPoint,
-        for metricKey: String,
-        sourceType: DataSourceType
-    ) -> Double? {
-        let metadata = dataPoint.metadata ?? [:]
-
-        switch sourceType {
-        case .typeQuicker:
-            switch metricKey {
-            case "wpm":
-                return dataPoint.value // WPM is the main value
-            case "accuracy":
-                return metadata["accuracy"].flatMap { Double($0) }
-            case "practiceTime":
-                return metadata["practiceMinutes"].flatMap { Double($0) }
-            default:
-                return nil
-            }
-        case .atCoder:
-            switch metricKey {
-            case "rating":
-                return dataPoint.value // Rating is the main value
-            case "highestRating":
-                return metadata["highestRating"].flatMap { Double($0) }
-            case "contestsParticipated":
-                return metadata["contests"].flatMap { Double($0) }
-            case "problemsSolved":
-                return metadata["problemsSolved"].flatMap { Double($0) }
-            case "longestStreak":
-                return metadata["longestStreak"].flatMap { Double($0) }
-            default:
-                return nil
-            }
-        default:
-            return nil
-        }
     }
 }
 
@@ -200,9 +117,9 @@ public struct SyncResult: Sendable {
         sourceResults.values.allSatisfy { $0.success }
     }
 
-    /// Total number of data points created across all sources
-    public var totalDataPointsCreated: Int {
-        sourceResults.values.reduce(0) { $0 + $1.dataPointsCreated }
+    /// Total number of goals updated across all sources
+    public var totalGoalsUpdated: Int {
+        sourceResults.values.reduce(0) { $0 + $1.goalsUpdated }
     }
 }
 
@@ -210,18 +127,18 @@ public struct SyncResult: Sendable {
 public struct SyncSourceResult: Sendable {
     public let dataSource: DataSourceType
     public let success: Bool
-    public let dataPointsCreated: Int
+    public let goalsUpdated: Int
     public let error: Error?
 
     public init(
         dataSource: DataSourceType,
         success: Bool,
-        dataPointsCreated: Int,
+        goalsUpdated: Int,
         error: Error?
     ) {
         self.dataSource = dataSource
         self.success = success
-        self.dataPointsCreated = dataPointsCreated
+        self.goalsUpdated = goalsUpdated
         self.error = error
     }
 }

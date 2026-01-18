@@ -3,13 +3,11 @@ import Charts
 import GoalsDomain
 import GoalsData
 
-/// Detail view for a single goal showing progress and history
+/// Detail view for a single goal showing progress
 public struct GoalDetailView: View {
     @Environment(AppContainer.self) private var container
     @State private var goal: Goal
-    @State private var dataPoints: [DataPoint] = []
-    @State private var isLoading = true
-    @State private var showingAddProgress = false
+    @State private var isLoading = false
 
     public init(goal: Goal) {
         self._goal = State(initialValue: goal)
@@ -21,19 +19,11 @@ public struct GoalDetailView: View {
                 // Progress header
                 progressHeader
 
-                // Progress chart
-                if !dataPoints.isEmpty {
-                    progressChart
-                }
-
                 // Goal details
                 detailsSection
 
-                // Actions
-                actionsSection
-
-                // History
-                historySection
+                // Sync button
+                syncSection
             }
             .padding()
         }
@@ -43,9 +33,12 @@ public struct GoalDetailView: View {
             ToolbarItem(placement: .primaryAction) {
                 Menu {
                     Button {
-                        showingAddProgress = true
+                        Task {
+                            try? await container.syncDataSourcesUseCase.sync(dataSource: goal.dataSource)
+                            await loadData()
+                        }
                     } label: {
-                        Label("Add Progress", systemImage: "plus.circle")
+                        Label("Sync Now", systemImage: "arrow.triangle.2.circlepath")
                     }
 
                     Divider()
@@ -59,13 +52,6 @@ public struct GoalDetailView: View {
                     }
                 } label: {
                     Image(systemName: "ellipsis.circle")
-                }
-            }
-        }
-        .sheet(isPresented: $showingAddProgress) {
-            NavigationStack {
-                AddProgressView(goal: goal) {
-                    await loadData()
                 }
             }
         }
@@ -88,75 +74,14 @@ public struct GoalDetailView: View {
                 .font(.largeTitle)
                 .fontWeight(.bold)
 
-            progressDescription
-        }
-        .padding()
-        .frame(maxWidth: .infinity)
-        .background(.regularMaterial)
-        .clipShape(RoundedRectangle(cornerRadius: 16))
-    }
-
-    @ViewBuilder
-    private var progressDescription: some View {
-        switch goal.type {
-        case .numeric:
-            if let current = goal.currentValue, let target = goal.targetValue, let unit = goal.unit {
-                Text("\(Int(current)) / \(Int(target)) \(unit)")
+            if goal.targetValue > 0 {
+                Text("\(formatValue(goal.currentValue)) / \(formatValue(goal.targetValue)) \(goal.unit)")
                     .font(.headline)
                     .foregroundStyle(.secondary)
             }
-
-        case .habit:
-            if let streak = goal.currentStreak {
-                VStack(spacing: 4) {
-                    Text("\(streak) day streak")
-                        .font(.headline)
-
-                    if let longest = goal.longestStreak, longest > streak {
-                        Text("Best: \(longest) days")
-                            .font(.subheadline)
-                            .foregroundStyle(.secondary)
-                    }
-                }
-            }
-
-        case .milestone:
-            Text(goal.isCompleted ? "Completed!" : "In Progress")
-                .font(.headline)
-                .foregroundStyle(goal.isCompleted ? .green : .secondary)
-
-        case .compound:
-            Text("Compound Goal")
-                .font(.headline)
-                .foregroundStyle(.secondary)
-        }
-    }
-
-    @ViewBuilder
-    private var progressChart: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Text("Progress Over Time")
-                .font(.headline)
-
-            Chart(dataPoints) { point in
-                LineMark(
-                    x: .value("Date", point.timestamp),
-                    y: .value("Value", point.value)
-                )
-                .foregroundStyle(goal.color.swiftUIColor)
-
-                PointMark(
-                    x: .value("Date", point.timestamp),
-                    y: .value("Value", point.value)
-                )
-                .foregroundStyle(goal.color.swiftUIColor)
-            }
-            .frame(height: 200)
-            .chartXAxis {
-                AxisMarks(values: .automatic(desiredCount: 5))
-            }
         }
         .padding()
+        .frame(maxWidth: .infinity)
         .background(.regularMaterial)
         .clipShape(RoundedRectangle(cornerRadius: 16))
     }
@@ -168,8 +93,8 @@ public struct GoalDetailView: View {
                 .font(.headline)
 
             VStack(spacing: 8) {
-                DetailRow(label: "Type", value: goal.type.displayName, icon: goal.type.iconName)
                 DetailRow(label: "Source", value: goal.dataSource.displayName, icon: goal.dataSource.iconName)
+                DetailRow(label: "Metric", value: goal.metricKey.capitalized, icon: "chart.line.uptrend.xyaxis")
 
                 if let deadline = goal.deadline {
                     DetailRow(
@@ -193,111 +118,41 @@ public struct GoalDetailView: View {
     }
 
     @ViewBuilder
-    private var actionsSection: some View {
+    private var syncSection: some View {
         VStack(spacing: 12) {
-            switch goal.type {
-            case .numeric:
-                Button {
-                    showingAddProgress = true
-                } label: {
-                    Label("Update Progress", systemImage: "plus.circle")
+            Button {
+                Task {
+                    isLoading = true
+                    try? await container.syncDataSourcesUseCase.sync(dataSource: goal.dataSource)
+                    await loadData()
+                    isLoading = false
+                }
+            } label: {
+                if isLoading {
+                    ProgressView()
+                        .frame(maxWidth: .infinity)
+                } else {
+                    Label("Sync from \(goal.dataSource.displayName)", systemImage: "arrow.triangle.2.circlepath")
                         .frame(maxWidth: .infinity)
                 }
-                .buttonStyle(.borderedProminent)
-
-            case .habit:
-                Button {
-                    Task {
-                        try? await container.trackProgressUseCase.checkInHabit(goalId: goal.id)
-                        await loadData()
-                    }
-                } label: {
-                    Label("Check In Today", systemImage: "checkmark.circle")
-                        .frame(maxWidth: .infinity)
-                }
-                .buttonStyle(.borderedProminent)
-
-            case .milestone:
-                if !goal.isCompleted {
-                    Button {
-                        Task {
-                            try? await container.trackProgressUseCase.completeMilestone(goalId: goal.id)
-                            await loadData()
-                        }
-                    } label: {
-                        Label("Mark Complete", systemImage: "flag.checkered")
-                            .frame(maxWidth: .infinity)
-                    }
-                    .buttonStyle(.borderedProminent)
-                }
-
-            case .compound:
-                EmptyView()
             }
+            .buttonStyle(.borderedProminent)
+            .disabled(isLoading)
         }
     }
 
-    @ViewBuilder
-    private var historySection: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Text("History")
-                .font(.headline)
-
-            if dataPoints.isEmpty {
-                Text("No progress recorded yet")
-                    .foregroundStyle(.secondary)
-                    .padding()
-            } else {
-                ForEach(dataPoints.prefix(10)) { point in
-                    HStack {
-                        VStack(alignment: .leading) {
-                            Text(point.timestamp.formatted(date: .abbreviated, time: .shortened))
-                                .font(.subheadline)
-
-                            if let note = point.note {
-                                Text(note)
-                                    .font(.caption)
-                                    .foregroundStyle(.secondary)
-                            }
-                        }
-
-                        Spacer()
-
-                        Text("\(Int(point.value))")
-                            .font(.headline)
-                    }
-                    .padding(.vertical, 4)
-
-                    if point.id != dataPoints.prefix(10).last?.id {
-                        Divider()
-                    }
-                }
-            }
+    private func formatValue(_ value: Double) -> String {
+        if value == floor(value) {
+            return String(format: "%.0f", value)
+        } else {
+            return String(format: "%.1f", value)
         }
-        .padding()
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(.regularMaterial)
-        .clipShape(RoundedRectangle(cornerRadius: 16))
     }
 
     private func loadData() async {
-        isLoading = true
-        do {
-            if let updatedGoal = try await container.goalRepository.fetch(id: goal.id) {
-                goal = updatedGoal
-            }
-
-            let endDate = Date()
-            let startDate = Calendar.current.date(byAdding: .month, value: -1, to: endDate) ?? endDate
-            dataPoints = try await container.dataPointRepository.fetch(
-                goalId: goal.id,
-                from: startDate,
-                to: endDate
-            )
-        } catch {
-            print("Failed to load goal data: \(error)")
+        if let updatedGoal = try? await container.goalRepository.fetch(id: goal.id) {
+            goal = updatedGoal
         }
-        isLoading = false
     }
 }
 
@@ -326,11 +181,12 @@ struct DetailRow: View {
 #Preview {
     NavigationStack {
         GoalDetailView(goal: Goal(
-            title: "Save $10,000",
-            type: .numeric,
-            targetValue: 10000,
-            currentValue: 4500,
-            unit: "USD"
+            title: "Reach 50 WPM",
+            dataSource: .typeQuicker,
+            metricKey: "wpm",
+            targetValue: 50,
+            currentValue: 35,
+            unit: "WPM"
         ))
     }
     .environment(try! AppContainer.preview())

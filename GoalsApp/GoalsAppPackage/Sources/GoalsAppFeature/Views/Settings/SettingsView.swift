@@ -167,7 +167,7 @@ public struct SettingsView: View {
             let result = try await container.syncDataSourcesUseCase.syncAll()
 
             if result.allSuccessful {
-                lastSyncResult = "Synced \(result.totalDataPointsCreated) data points"
+                lastSyncResult = "Updated \(result.totalGoalsUpdated) goals"
             } else {
                 let failed = result.sourceResults.filter { !$0.value.success }.keys
                 lastSyncResult = "Some sources failed: \(failed.map { $0.displayName }.joined(separator: ", "))"

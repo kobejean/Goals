@@ -8,7 +8,7 @@ public struct GoalsListView: View {
     @State private var goals: [Goal] = []
     @State private var isLoading = true
     @State private var showingCreateGoal = false
-    @State private var filterType: GoalType? = nil
+    @State private var filterDataSource: DataSourceType? = nil
     @State private var showArchived = false
 
     public var body: some View {
@@ -35,16 +35,26 @@ public struct GoalsListView: View {
                 ToolbarItem(placement: .topBarLeading) {
                     Menu {
                         Button {
-                            filterType = nil
+                            filterDataSource = nil
                         } label: {
-                            Label("All Types", systemImage: filterType == nil ? "checkmark" : "")
+                            HStack {
+                                Text("All Sources")
+                                if filterDataSource == nil {
+                                    Image(systemName: "checkmark")
+                                }
+                            }
                         }
 
-                        ForEach(GoalType.allCases, id: \.self) { type in
+                        ForEach(DataSourceType.allCases, id: \.self) { source in
                             Button {
-                                filterType = type
+                                filterDataSource = source
                             } label: {
-                                Label(type.displayName, systemImage: filterType == type ? "checkmark" : "")
+                                HStack {
+                                    Label(source.displayName, systemImage: source.iconName)
+                                    if filterDataSource == source {
+                                        Image(systemName: "checkmark")
+                                    }
+                                }
                             }
                         }
 
@@ -58,13 +68,17 @@ public struct GoalsListView: View {
             }
             .sheet(isPresented: $showingCreateGoal) {
                 NavigationStack {
-                    CreateGoalView()
+                    CreateGoalView {
+                        await loadGoals()
+                    }
                 }
             }
             .task {
                 await loadGoals()
             }
             .refreshable {
+                // Sync all data sources on pull to refresh
+                _ = try? await container.syncDataSourcesUseCase.syncAll()
                 await loadGoals()
             }
         }
@@ -90,8 +104,8 @@ public struct GoalsListView: View {
         ContentUnavailableView {
             Label("No Goals", systemImage: "target")
         } description: {
-            if filterType != nil {
-                Text("No \(filterType!.displayName.lowercased()) goals found.")
+            if let source = filterDataSource {
+                Text("No \(source.displayName) goals found.")
             } else {
                 Text("Create your first goal to start tracking progress.")
             }
@@ -112,8 +126,8 @@ public struct GoalsListView: View {
             result = result.filter { !$0.isArchived }
         }
 
-        if let filterType = filterType {
-            result = result.filter { $0.type == filterType }
+        if let filterDataSource = filterDataSource {
+            result = result.filter { $0.dataSource == filterDataSource }
         }
 
         return result

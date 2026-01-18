@@ -48,16 +48,6 @@ public final class SwiftDataGoalRepository: GoalRepositoryProtocol {
         return models.first?.toDomain()
     }
 
-    public func fetch(type: GoalType) async throws -> [Goal] {
-        let typeRaw = type.rawValue
-        let descriptor = FetchDescriptor<GoalModel>(
-            predicate: #Predicate { $0.typeRawValue == typeRaw && !$0.isArchived },
-            sortBy: [SortDescriptor(\.createdAt, order: .reverse)]
-        )
-        let models = try modelContext.fetch(descriptor)
-        return models.map { $0.toDomain() }
-    }
-
     public func fetch(dataSource: DataSourceType) async throws -> [Goal] {
         let sourceRaw = dataSource.rawValue
         let descriptor = FetchDescriptor<GoalModel>(
@@ -133,60 +123,6 @@ public final class SwiftDataGoalRepository: GoalRepositoryProtocol {
             throw RepositoryError.notFound
         }
         model.currentValue = currentValue
-        model.updatedAt = Date()
-        try modelContext.save()
-    }
-
-    public func incrementStreak(goalId: UUID) async throws {
-        let descriptor = FetchDescriptor<GoalModel>(
-            predicate: #Predicate { $0.id == goalId }
-        )
-        guard let model = try modelContext.fetch(descriptor).first else {
-            throw RepositoryError.notFound
-        }
-        let newStreak = (model.currentStreak ?? 0) + 1
-        model.currentStreak = newStreak
-        if newStreak > (model.longestStreak ?? 0) {
-            model.longestStreak = newStreak
-        }
-        model.updatedAt = Date()
-        try modelContext.save()
-    }
-
-    public func resetStreak(goalId: UUID) async throws {
-        let descriptor = FetchDescriptor<GoalModel>(
-            predicate: #Predicate { $0.id == goalId }
-        )
-        guard let model = try modelContext.fetch(descriptor).first else {
-            throw RepositoryError.notFound
-        }
-        model.currentStreak = 0
-        model.updatedAt = Date()
-        try modelContext.save()
-    }
-
-    public func markCompleted(goalId: UUID) async throws {
-        let descriptor = FetchDescriptor<GoalModel>(
-            predicate: #Predicate { $0.id == goalId }
-        )
-        guard let model = try modelContext.fetch(descriptor).first else {
-            throw RepositoryError.notFound
-        }
-        model.isCompleted = true
-        model.completedAt = Date()
-        model.updatedAt = Date()
-        try modelContext.save()
-    }
-
-    public func markIncomplete(goalId: UUID) async throws {
-        let descriptor = FetchDescriptor<GoalModel>(
-            predicate: #Predicate { $0.id == goalId }
-        )
-        guard let model = try modelContext.fetch(descriptor).first else {
-            throw RepositoryError.notFound
-        }
-        model.isCompleted = false
-        model.completedAt = nil
         model.updatedAt = Date()
         try modelContext.save()
     }

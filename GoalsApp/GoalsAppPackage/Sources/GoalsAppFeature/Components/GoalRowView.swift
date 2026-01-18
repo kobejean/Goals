@@ -26,8 +26,8 @@ public struct GoalRowView: View {
                     .lineLimit(1)
 
                 HStack(spacing: 8) {
-                    // Type badge
-                    Label(goal.type.displayName, systemImage: goal.type.iconName)
+                    // Data source badge
+                    Label(goal.dataSource.displayName, systemImage: goal.dataSource.iconName)
                         .font(.caption)
                         .foregroundStyle(.secondary)
 
@@ -61,57 +61,41 @@ public struct GoalRowView: View {
     }
 
     private var progressText: String {
-        switch goal.type {
-        case .numeric:
-            if let current = goal.currentValue, let target = goal.targetValue, let unit = goal.unit {
-                return "\(Int(current))/\(Int(target)) \(unit)"
-            }
-            return "\(Int(goal.progress * 100))%"
-
-        case .habit:
-            if let streak = goal.currentStreak {
-                return "\(streak) day streak"
-            }
-            return "No streak"
-
-        case .milestone:
-            return goal.isCompleted ? "Completed" : "In progress"
-
-        case .compound:
-            return "\(Int(goal.progress * 100))% complete"
-        }
+        let current = Int(goal.currentValue)
+        let target = Int(goal.targetValue)
+        return "\(current)/\(target) \(goal.unit)"
     }
 }
 
 #Preview {
     List {
         GoalRowView(goal: Goal(
-            title: "Save $10,000",
-            type: .numeric,
-            targetValue: 10000,
-            currentValue: 4500,
-            unit: "USD"
+            title: "Reach 50 WPM",
+            dataSource: .typeQuicker,
+            metricKey: "wpm",
+            targetValue: 50,
+            currentValue: 35,
+            unit: "WPM"
         ))
 
         GoalRowView(goal: Goal(
-            title: "Exercise Daily",
-            type: .habit,
-            frequency: .daily,
-            targetCount: 7,
-            currentStreak: 5
-        ))
-
-        GoalRowView(goal: Goal(
-            title: "Run a Marathon",
-            type: .milestone,
-            isCompleted: true,
-            color: .green
-        ))
-
-        GoalRowView(goal: Goal(
-            title: "Learn Swift",
-            type: .milestone,
+            title: "Reach 1600 Rating",
+            dataSource: .atCoder,
+            metricKey: "rating",
+            targetValue: 1600,
+            currentValue: 1200,
+            unit: "",
             color: .purple
+        ))
+
+        GoalRowView(goal: Goal(
+            title: "95% Accuracy",
+            dataSource: .typeQuicker,
+            metricKey: "accuracy",
+            targetValue: 95,
+            currentValue: 95.5,
+            unit: "%",
+            color: .green
         ))
     }
 }

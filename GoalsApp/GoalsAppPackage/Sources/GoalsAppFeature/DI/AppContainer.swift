@@ -14,7 +14,6 @@ public final class AppContainer {
     // MARK: - Repositories
 
     public let goalRepository: GoalRepositoryProtocol
-    public let dataPointRepository: DataPointRepositoryProtocol
 
     // MARK: - Data Sources
 
@@ -24,7 +23,6 @@ public final class AppContainer {
     // MARK: - Use Cases
 
     public let createGoalUseCase: CreateGoalUseCase
-    public let trackProgressUseCase: TrackProgressUseCase
     public let syncDataSourcesUseCase: SyncDataSourcesUseCase
 
     // MARK: - Initialization
@@ -33,7 +31,6 @@ public final class AppContainer {
         // Configure SwiftData
         let schema = Schema([
             GoalModel.self,
-            DataPointModel.self,
         ])
 
         let modelConfiguration = ModelConfiguration(
@@ -49,10 +46,7 @@ public final class AppContainer {
 
         // Initialize repositories
         let goalRepo = SwiftDataGoalRepository(modelContainer: modelContainer)
-        let dataPointRepo = SwiftDataDataPointRepository(modelContainer: modelContainer)
-
         self.goalRepository = goalRepo
-        self.dataPointRepository = dataPointRepo
 
         // Initialize data sources
         self.typeQuickerDataSource = TypeQuickerDataSource()
@@ -60,13 +54,8 @@ public final class AppContainer {
 
         // Initialize use cases
         self.createGoalUseCase = CreateGoalUseCase(goalRepository: goalRepo)
-        self.trackProgressUseCase = TrackProgressUseCase(
-            goalRepository: goalRepo,
-            dataPointRepository: dataPointRepo
-        )
         self.syncDataSourcesUseCase = SyncDataSourcesUseCase(
             goalRepository: goalRepo,
-            dataPointRepository: dataPointRepo,
             dataSources: [
                 .typeQuicker: typeQuickerDataSource,
                 .atCoder: atCoderDataSource
@@ -82,7 +71,6 @@ public final class AppContainer {
     private init(inMemory: Bool) throws {
         let schema = Schema([
             GoalModel.self,
-            DataPointModel.self,
         ])
 
         let modelConfiguration = ModelConfiguration(
@@ -97,22 +85,14 @@ public final class AppContainer {
         )
 
         let goalRepo = SwiftDataGoalRepository(modelContainer: modelContainer)
-        let dataPointRepo = SwiftDataDataPointRepository(modelContainer: modelContainer)
-
         self.goalRepository = goalRepo
-        self.dataPointRepository = dataPointRepo
 
         self.typeQuickerDataSource = TypeQuickerDataSource()
         self.atCoderDataSource = AtCoderDataSource()
 
         self.createGoalUseCase = CreateGoalUseCase(goalRepository: goalRepo)
-        self.trackProgressUseCase = TrackProgressUseCase(
-            goalRepository: goalRepo,
-            dataPointRepository: dataPointRepo
-        )
         self.syncDataSourcesUseCase = SyncDataSourcesUseCase(
             goalRepository: goalRepo,
-            dataPointRepository: dataPointRepo,
             dataSources: [
                 .typeQuicker: typeQuickerDataSource,
                 .atCoder: atCoderDataSource

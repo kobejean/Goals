@@ -14,9 +14,6 @@ public protocol GoalRepositoryProtocol: Sendable {
     /// Fetches a goal by its ID
     func fetch(id: UUID) async throws -> Goal?
 
-    /// Fetches goals by type
-    func fetch(type: GoalType) async throws -> [Goal]
-
     /// Fetches goals by data source
     func fetch(dataSource: DataSourceType) async throws -> [Goal]
 
@@ -37,18 +34,6 @@ public protocol GoalRepositoryProtocol: Sendable {
     /// Unarchives a goal
     func unarchive(id: UUID) async throws
 
-    /// Updates the progress of a numeric goal
+    /// Updates the current value of a goal
     func updateProgress(goalId: UUID, currentValue: Double) async throws
-
-    /// Increments the streak for a habit goal
-    func incrementStreak(goalId: UUID) async throws
-
-    /// Resets the streak for a habit goal
-    func resetStreak(goalId: UUID) async throws
-
-    /// Marks a milestone goal as completed
-    func markCompleted(goalId: UUID) async throws
-
-    /// Marks a milestone goal as incomplete
-    func markIncomplete(goalId: UUID) async throws
 }

@@ -16,7 +16,7 @@ public struct DataPoint: Sendable, Equatable, UUIDIdentifiable {
         goalId: UUID,
         value: Double,
         timestamp: Date = Date(),
-        source: DataSourceType = .manual,
+        source: DataSourceType,
         note: String? = nil,
         metadata: [String: String]? = nil
     ) {
@@ -267,36 +267,3 @@ public struct AtCoderDailyEffort: Sendable, Equatable, Identifiable {
     }
 }
 
-/// Finance statistics
-public struct FinanceStats: Sendable, Equatable, Codable {
-    public let date: Date
-    public let income: Double
-    public let expenses: Double
-    public let savings: Double
-    public let currency: String
-
-    public init(
-        date: Date,
-        income: Double,
-        expenses: Double,
-        savings: Double,
-        currency: String = "USD"
-    ) {
-        self.date = date
-        self.income = income
-        self.expenses = expenses
-        self.savings = savings
-        self.currency = currency
-    }
-
-    /// Net income (income - expenses)
-    public var netIncome: Double {
-        income - expenses
-    }
-
-    /// Savings rate as percentage
-    public var savingsRate: Double {
-        guard income > 0 else { return 0 }
-        return savings / income
-    }
-}

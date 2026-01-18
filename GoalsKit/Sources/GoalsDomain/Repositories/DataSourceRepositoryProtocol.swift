@@ -8,12 +8,6 @@ public protocol DataSourceRepositoryProtocol: Sendable {
     /// Metrics available from this data source
     var availableMetrics: [MetricInfo] { get }
 
-    /// Fetches data from the external source for a date range
-    func fetchData(from startDate: Date, to endDate: Date) async throws -> [DataPoint]
-
-    /// Fetches the latest data from the external source
-    func fetchLatest() async throws -> DataPoint?
-
     /// Returns true if the data source is configured and ready to use
     func isConfigured() async -> Bool
 
@@ -23,7 +17,12 @@ public protocol DataSourceRepositoryProtocol: Sendable {
     /// Clears the configuration for this data source
     func clearConfiguration() async throws
 
-    /// Extract a metric value from stats data
+    /// Fetches the latest value for a specific metric
+    /// - Parameter metricKey: The metric key (e.g., "wpm", "accuracy", "rating")
+    /// - Returns: The current value for the metric, or nil if unavailable
+    func fetchLatestMetricValue(for metricKey: String) async throws -> Double?
+
+    /// Extract a metric value from stats data (for UI display with cached stats)
     /// - Parameters:
     ///   - key: The metric key (e.g., "wpm", "accuracy")
     ///   - stats: The stats data to extract from
@@ -57,6 +56,9 @@ public protocol TypeQuickerDataSourceProtocol: DataSourceRepositoryProtocol {
 
     /// Fetches the latest TypeQuicker statistics
     func fetchLatestStats() async throws -> TypeQuickerStats?
+
+    /// Fetches stats aggregated by mode across all dates in the range
+    func fetchStatsByMode(from startDate: Date, to endDate: Date) async throws -> [TypeQuickerModeStats]
 }
 
 /// Protocol for AtCoder data source
@@ -66,13 +68,10 @@ public protocol AtCoderDataSourceProtocol: DataSourceRepositoryProtocol {
 
     /// Fetches contest history
     func fetchContestHistory() async throws -> [AtCoderStats]
-}
 
-/// Protocol for Finance data source
-public protocol FinanceDataSourceProtocol: DataSourceRepositoryProtocol {
-    /// Fetches finance statistics for a date range
-    func fetchStats(from startDate: Date, to endDate: Date) async throws -> [FinanceStats]
+    /// Fetches daily effort data (submissions grouped by day and difficulty)
+    func fetchDailyEffort(from fromDate: Date?) async throws -> [AtCoderDailyEffort]
 
-    /// Fetches the latest finance statistics
-    func fetchLatestStats() async throws -> FinanceStats?
+    /// Fetches user submissions
+    func fetchSubmissions(from fromDate: Date?) async throws -> [AtCoderSubmission]
 }
