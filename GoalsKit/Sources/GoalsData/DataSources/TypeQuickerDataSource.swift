@@ -25,10 +25,10 @@ public actor TypeQuickerDataSource: TypeQuickerDataSourceProtocol {
 
     private var username: String?
     private var baseURL: URL?
-    private let urlSession: URLSession
+    private let httpClient: HTTPClient
 
-    public init(urlSession: URLSession = .shared) {
-        self.urlSession = urlSession
+    public init(httpClient: HTTPClient = HTTPClient()) {
+        self.httpClient = httpClient
     }
 
     public func isConfigured() async -> Bool {
@@ -59,6 +59,14 @@ public actor TypeQuickerDataSource: TypeQuickerDataSourceProtocol {
     }
 
     public func fetchStats(from startDate: Date, to endDate: Date) async throws -> [TypeQuickerStats] {
+        let url = try buildStatsURL(from: startDate, to: endDate)
+        let apiResponse: TypeQuickerAPIResponse = try await httpClient.get(url)
+        return apiResponse.toStats()
+    }
+
+    // MARK: - Private Helpers
+
+    private func buildStatsURL(from startDate: Date, to endDate: Date) throws -> URL {
         guard let username = username else {
             throw DataSourceError.notConfigured
         }
@@ -77,19 +85,7 @@ public actor TypeQuickerDataSource: TypeQuickerDataSourceProtocol {
             throw DataSourceError.invalidURL
         }
 
-        let (data, response) = try await urlSession.data(from: url)
-
-        guard let httpResponse = response as? HTTPURLResponse else {
-            throw DataSourceError.invalidResponse
-        }
-
-        guard httpResponse.statusCode == 200 else {
-            throw DataSourceError.httpError(statusCode: httpResponse.statusCode)
-        }
-
-        let decoder = JSONDecoder()
-        let apiResponse = try decoder.decode(TypeQuickerAPIResponse.self, from: data)
-        return apiResponse.toStats()
+        return url
     }
 
     public func fetchLatestStats() async throws -> TypeQuickerStats? {
@@ -101,36 +97,8 @@ public actor TypeQuickerDataSource: TypeQuickerDataSourceProtocol {
 
     /// Fetch stats aggregated by mode across all dates in the range
     public func fetchStatsByMode(from startDate: Date, to endDate: Date) async throws -> [TypeQuickerModeStats] {
-        guard let username = username else {
-            throw DataSourceError.notConfigured
-        }
-
-        let base = baseURL ?? URL(string: "https://api.typequicker.com")!
-        let dateFormatter = DateFormatter()
-        dateFormatter.dateFormat = "yyyy-MM-dd"
-
-        var components = URLComponents(url: base.appendingPathComponent("stats/\(username)"), resolvingAgainstBaseURL: false)!
-        components.queryItems = [
-            URLQueryItem(name: "start_date", value: dateFormatter.string(from: startDate)),
-            URLQueryItem(name: "end_date", value: dateFormatter.string(from: endDate))
-        ]
-
-        guard let url = components.url else {
-            throw DataSourceError.invalidURL
-        }
-
-        let (data, response) = try await urlSession.data(from: url)
-
-        guard let httpResponse = response as? HTTPURLResponse else {
-            throw DataSourceError.invalidResponse
-        }
-
-        guard httpResponse.statusCode == 200 else {
-            throw DataSourceError.httpError(statusCode: httpResponse.statusCode)
-        }
-
-        let decoder = JSONDecoder()
-        let apiResponse = try decoder.decode(TypeQuickerAPIResponse.self, from: data)
+        let url = try buildStatsURL(from: startDate, to: endDate)
+        let apiResponse: TypeQuickerAPIResponse = try await httpClient.get(url)
         return apiResponse.toStatsByMode()
     }
 }
@@ -228,15 +196,4 @@ private struct TypeQuickerAPIResponse: Codable {
             )
         }.sorted { $0.practiceTimeMinutes > $1.practiceTimeMinutes } // Sort by most practiced
     }
-}
-
-/// Errors that can occur with data sources
-public enum DataSourceError: Error, Sendable {
-    case notConfigured
-    case invalidConfiguration
-    case missingCredentials
-    case invalidURL
-    case invalidResponse
-    case httpError(statusCode: Int)
-    case parseError(String)
 }

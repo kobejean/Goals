@@ -4,6 +4,15 @@ import SwiftUI
 /// Each ViewModel knows how to load its data and create its section view
 @MainActor
 public protocol InsightsSectionViewModel: AnyObject, Observable, Sendable {
+    /// Static display title (available before loading)
+    var title: String { get }
+
+    /// Static system image name (available before loading)
+    var systemImage: String { get }
+
+    /// Static color for the insight (available before loading)
+    var color: Color { get }
+
     /// Whether the section is currently loading data
     var isLoading: Bool { get }
 

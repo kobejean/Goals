@@ -7,6 +7,16 @@ import GoalsData
 @MainActor
 @Observable
 public final class AppContainer {
+    // MARK: - Settings Change Notification
+
+    /// Increments when settings change, observed by views to trigger refresh
+    public private(set) var settingsRevision: Int = 0
+
+    /// Call this after saving settings to notify views of changes
+    public func notifySettingsChanged() {
+        settingsRevision += 1
+    }
+
     // MARK: - ViewModel Factories
 
     public func makeInsightsViewModels() -> [any InsightsSectionViewModel] {
@@ -28,6 +38,10 @@ public final class AppContainer {
     // MARK: - Repositories
 
     public let goalRepository: GoalRepositoryProtocol
+
+    // MARK: - Networking
+
+    public let httpClient: HTTPClient
 
     // MARK: - Data Sources
 
@@ -62,9 +76,12 @@ public final class AppContainer {
         let goalRepo = SwiftDataGoalRepository(modelContainer: modelContainer)
         self.goalRepository = goalRepo
 
+        // Initialize networking
+        self.httpClient = HTTPClient()
+
         // Initialize data sources
-        self.typeQuickerDataSource = TypeQuickerDataSource()
-        self.atCoderDataSource = AtCoderDataSource()
+        self.typeQuickerDataSource = TypeQuickerDataSource(httpClient: httpClient)
+        self.atCoderDataSource = AtCoderDataSource(httpClient: httpClient)
 
         // Initialize use cases
         self.createGoalUseCase = CreateGoalUseCase(goalRepository: goalRepo)
@@ -101,8 +118,12 @@ public final class AppContainer {
         let goalRepo = SwiftDataGoalRepository(modelContainer: modelContainer)
         self.goalRepository = goalRepo
 
-        self.typeQuickerDataSource = TypeQuickerDataSource()
-        self.atCoderDataSource = AtCoderDataSource()
+        // Initialize networking
+        self.httpClient = HTTPClient()
+
+        // Initialize data sources
+        self.typeQuickerDataSource = TypeQuickerDataSource(httpClient: httpClient)
+        self.atCoderDataSource = AtCoderDataSource(httpClient: httpClient)
 
         self.createGoalUseCase = CreateGoalUseCase(goalRepository: goalRepo)
         self.syncDataSourcesUseCase = SyncDataSourcesUseCase(

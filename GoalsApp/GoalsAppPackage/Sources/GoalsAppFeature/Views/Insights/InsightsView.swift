@@ -13,19 +13,22 @@ public struct InsightsView: View {
             ScrollView {
                 LazyVStack(spacing: 16) {
                     ForEach(Array(viewModels.enumerated()), id: \.offset) { _, vm in
-                        if vm.isLoading {
-                            InsightCardSkeleton()
-                        } else if let summary = vm.summary {
+                        if vm.isLoading || vm.summary != nil {
                             NavigationLink {
                                 vm.makeDetailView()
                             } label: {
                                 InsightCard(
-                                    summary: summary,
+                                    title: vm.title,
+                                    systemImage: vm.systemImage,
+                                    color: vm.color,
+                                    summary: vm.summary,
                                     activityData: vm.activityData,
-                                    mode: displayMode
+                                    mode: displayMode,
+                                    isLoading: vm.isLoading
                                 )
                             }
                             .buttonStyle(.plain)
+                            .disabled(vm.isLoading)
                         }
                     }
                 }
@@ -50,6 +53,11 @@ public struct InsightsView: View {
                 }
             }
             .task {
+                viewModels = container.makeInsightsViewModels()
+                await loadAll()
+            }
+            .task(id: container.settingsRevision) {
+                guard container.settingsRevision > 0 else { return }
                 viewModels = container.makeInsightsViewModels()
                 await loadAll()
             }

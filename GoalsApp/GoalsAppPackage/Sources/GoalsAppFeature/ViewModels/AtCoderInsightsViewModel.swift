@@ -5,6 +5,12 @@ import GoalsData
 /// ViewModel for AtCoder insights section
 @MainActor @Observable
 public final class AtCoderInsightsViewModel: InsightsSectionViewModel {
+    // MARK: - Static Properties
+
+    public let title = "AtCoder"
+    public let systemImage = "chevron.left.forwardslash.chevron.right"
+    public let color: Color = .orange
+
     // MARK: - Published State
 
     public private(set) var stats: AtCoderStats?

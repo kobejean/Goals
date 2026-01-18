@@ -95,6 +95,7 @@ public struct SettingsView: View {
             try? await container.typeQuickerDataSource.configure(settings: settings)
         }
 
+        container.notifySettingsChanged()
         typeQuickerSaveState = .saved
         try? await Task.sleep(for: .seconds(1.5))
         typeQuickerSaveState = .idle
@@ -112,6 +113,7 @@ public struct SettingsView: View {
             try? await container.atCoderDataSource.configure(settings: settings)
         }
 
+        container.notifySettingsChanged()
         atCoderSaveState = .saved
         try? await Task.sleep(for: .seconds(1.5))
         atCoderSaveState = .idle

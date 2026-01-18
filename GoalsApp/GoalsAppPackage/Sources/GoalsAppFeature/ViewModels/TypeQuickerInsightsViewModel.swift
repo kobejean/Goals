@@ -5,6 +5,12 @@ import GoalsData
 /// ViewModel for TypeQuicker insights section
 @MainActor @Observable
 public final class TypeQuickerInsightsViewModel: InsightsSectionViewModel {
+    // MARK: - Static Properties
+
+    public let title = "Typing"
+    public let systemImage = "keyboard"
+    public let color: Color = .blue
+
     // MARK: - Published State
 
     public private(set) var stats: [TypeQuickerStats] = []

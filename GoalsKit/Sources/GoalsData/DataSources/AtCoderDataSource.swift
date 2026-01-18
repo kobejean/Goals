@@ -29,14 +29,14 @@ public actor AtCoderDataSource: AtCoderDataSourceProtocol {
     }
 
     private var username: String?
-    private let urlSession: URLSession
+    private let httpClient: HTTPClient
 
     // API base URLs
     private let atCoderBaseURL = URL(string: "https://atcoder.jp")!
     private let kenkooooBaseURL = URL(string: "https://kenkoooo.com/atcoder/atcoder-api/v3")!
 
-    public init(urlSession: URLSession = .shared) {
-        self.urlSession = urlSession
+    public init(httpClient: HTTPClient = HTTPClient()) {
+        self.httpClient = httpClient
     }
 
     public func isConfigured() async -> Bool {
@@ -151,19 +151,7 @@ public actor AtCoderDataSource: AtCoderDataSourceProtocol {
     /// Returns a dictionary mapping problem_id to difficulty rating
     public func fetchProblemDifficulties() async throws -> [String: Int] {
         let url = URL(string: "https://kenkoooo.com/atcoder/resources/problem-models.json")!
-
-        let (data, response) = try await urlSession.data(from: url)
-
-        guard let httpResponse = response as? HTTPURLResponse else {
-            throw DataSourceError.invalidResponse
-        }
-
-        guard httpResponse.statusCode == 200 else {
-            throw DataSourceError.httpError(statusCode: httpResponse.statusCode)
-        }
-
-        let decoder = JSONDecoder()
-        let models = try decoder.decode([String: ProblemModel].self, from: data)
+        let models: [String: ProblemModel] = try await httpClient.get(url)
 
         // Extract difficulty ratings, converting to Int
         return models.compactMapValues { model in
@@ -212,30 +200,8 @@ public actor AtCoderDataSource: AtCoderDataSourceProtocol {
 
         // API returns up to 500 submissions per request, so we paginate
         while true {
-            let url = kenkooooBaseURL.appendingPathComponent("user/submissions")
-            var components = URLComponents(url: url, resolvingAgainstBaseURL: false)!
-            components.queryItems = [
-                URLQueryItem(name: "user", value: username),
-                URLQueryItem(name: "from_second", value: String(currentFromSecond))
-            ]
-
-            guard let requestURL = components.url else {
-                throw DataSourceError.invalidURL
-            }
-
-            let (data, response) = try await urlSession.data(from: requestURL)
-
-            guard let httpResponse = response as? HTTPURLResponse else {
-                throw DataSourceError.invalidResponse
-            }
-
-            guard httpResponse.statusCode == 200 else {
-                throw DataSourceError.httpError(statusCode: httpResponse.statusCode)
-            }
-
-            let decoder = JSONDecoder()
-            decoder.keyDecodingStrategy = .convertFromSnakeCase
-            let submissions = try decoder.decode([AtCoderSubmissionResponse].self, from: data)
+            let url = try buildSubmissionsURL(username: username, fromSecond: currentFromSecond)
+            let submissions: [AtCoderSubmissionResponse] = try await httpClient.get(url, decoder: HTTPClient.snakeCaseDecoder)
 
             if submissions.isEmpty {
                 break
@@ -265,48 +231,40 @@ public actor AtCoderDataSource: AtCoderDataSourceProtocol {
     /// Fetches contest history from official AtCoder API
     private func fetchContestHistoryFromAPI(username: String) async throws -> [AtCoderContestResult] {
         let url = atCoderBaseURL.appendingPathComponent("users/\(username)/history/json")
-
-        let (data, response) = try await urlSession.data(from: url)
-
-        guard let httpResponse = response as? HTTPURLResponse else {
-            throw DataSourceError.invalidResponse
-        }
-
-        guard httpResponse.statusCode == 200 else {
-            throw DataSourceError.httpError(statusCode: httpResponse.statusCode)
-        }
-
-        let decoder = JSONDecoder()
-        return try decoder.decode([AtCoderContestResult].self, from: data)
+        return try await httpClient.get(url)
     }
 
     /// Fetches AC (Accepted) count from kenkoooo's AtCoder Problems API
     private func fetchACRank(username: String) async throws -> KenkooooRankResponse {
-        let url = kenkooooBaseURL.appendingPathComponent("user/ac_rank")
-        var components = URLComponents(url: url, resolvingAgainstBaseURL: false)!
-        components.queryItems = [URLQueryItem(name: "user", value: username)]
-
-        guard let requestURL = components.url else {
-            throw DataSourceError.invalidURL
-        }
-
-        let (data, response) = try await urlSession.data(from: requestURL)
-
-        guard let httpResponse = response as? HTTPURLResponse else {
-            throw DataSourceError.invalidResponse
-        }
-
-        guard httpResponse.statusCode == 200 else {
-            throw DataSourceError.httpError(statusCode: httpResponse.statusCode)
-        }
-
-        let decoder = JSONDecoder()
-        return try decoder.decode(KenkooooRankResponse.self, from: data)
+        let url = try buildKenkooooURL(path: "user/ac_rank", username: username)
+        return try await httpClient.get(url)
     }
 
     /// Fetches longest streak from kenkoooo's AtCoder Problems API
     private func fetchStreakRank(username: String) async throws -> KenkooooRankResponse {
-        let url = kenkooooBaseURL.appendingPathComponent("user/streak_rank")
+        let url = try buildKenkooooURL(path: "user/streak_rank", username: username)
+        return try await httpClient.get(url)
+    }
+
+    // MARK: - URL Building Helpers
+
+    private func buildSubmissionsURL(username: String, fromSecond: Int) throws -> URL {
+        let url = kenkooooBaseURL.appendingPathComponent("user/submissions")
+        var components = URLComponents(url: url, resolvingAgainstBaseURL: false)!
+        components.queryItems = [
+            URLQueryItem(name: "user", value: username),
+            URLQueryItem(name: "from_second", value: String(fromSecond))
+        ]
+
+        guard let requestURL = components.url else {
+            throw DataSourceError.invalidURL
+        }
+
+        return requestURL
+    }
+
+    private func buildKenkooooURL(path: String, username: String) throws -> URL {
+        let url = kenkooooBaseURL.appendingPathComponent(path)
         var components = URLComponents(url: url, resolvingAgainstBaseURL: false)!
         components.queryItems = [URLQueryItem(name: "user", value: username)]
 
@@ -314,18 +272,7 @@ public actor AtCoderDataSource: AtCoderDataSourceProtocol {
             throw DataSourceError.invalidURL
         }
 
-        let (data, response) = try await urlSession.data(from: requestURL)
-
-        guard let httpResponse = response as? HTTPURLResponse else {
-            throw DataSourceError.invalidResponse
-        }
-
-        guard httpResponse.statusCode == 200 else {
-            throw DataSourceError.httpError(statusCode: httpResponse.statusCode)
-        }
-
-        let decoder = JSONDecoder()
-        return try decoder.decode(KenkooooRankResponse.self, from: data)
+        return requestURL
     }
 }
 

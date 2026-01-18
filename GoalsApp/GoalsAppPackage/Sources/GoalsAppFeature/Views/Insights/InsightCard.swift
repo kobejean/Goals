@@ -2,21 +2,43 @@ import SwiftUI
 
 /// Minimalistic card component for insight overview
 struct InsightCard: View {
-    let summary: InsightSummary
+    let title: String
+    let systemImage: String
+    let color: Color
+    let summary: InsightSummary?
     let activityData: InsightActivityData?
     let mode: InsightDisplayMode
+    let isLoading: Bool
+
+    init(
+        title: String,
+        systemImage: String,
+        color: Color,
+        summary: InsightSummary?,
+        activityData: InsightActivityData?,
+        mode: InsightDisplayMode,
+        isLoading: Bool = false
+    ) {
+        self.title = title
+        self.systemImage = systemImage
+        self.color = color
+        self.summary = summary
+        self.activityData = activityData
+        self.mode = mode
+        self.isLoading = isLoading
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             // Header: icon + title + trend (trend only in chart mode)
             HStack {
-                Image(systemName: summary.systemImage)
-                    .foregroundStyle(summary.color)
-                Text(summary.title)
+                Image(systemName: systemImage)
+                    .foregroundStyle(color)
+                Text(title)
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
                 Spacer()
-                if mode == .chart, let trend = summary.trend {
+                if !isLoading, mode == .chart, let trend = summary?.trend {
                     TrendBadge(trend: trend)
                 }
             }
@@ -25,19 +47,33 @@ struct InsightCard: View {
             VStack(alignment: .leading, spacing: 8) {
                 switch mode {
                 case .chart:
-                    SparklineChart(
-                        dataPoints: summary.dataPoints,
-                        color: summary.color,
-                        goalValue: summary.goalValue
-                    )
-                    .frame(height: 40)
+                    if isLoading {
+                        // Skeleton for chart during loading
+                        RoundedRectangle(cornerRadius: 4)
+                            .fill(.quaternary)
+                            .frame(height: 40)
+                    } else if let summary {
+                        SparklineChart(
+                            dataPoints: summary.dataPoints,
+                            color: summary.color,
+                            goalValue: summary.goalValue
+                        )
+                        .frame(height: 40)
+                    }
 
-                    Text(summary.currentValueFormatted)
+                    // Show "--" during loading, actual value when loaded
+                    Text(isLoading ? "--" : (summary?.currentValueFormatted ?? "--"))
                         .font(.title2.bold())
+
                 case .activity:
-                    if let activityData {
+                    if isLoading {
+                        // Skeleton for activity chart during loading
+                        RoundedRectangle(cornerRadius: 4)
+                            .fill(.quaternary)
+                            .frame(height: 76)
+                    } else if let activityData {
                         ActivityChart(activityData: activityData)
-                    } else {
+                    } else if let summary {
                         SparklineChart(dataPoints: summary.dataPoints, color: summary.color)
                     }
                 }
