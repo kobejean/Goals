@@ -51,9 +51,62 @@ public final class AtCoderInsightsViewModel: InsightsSectionViewModel {
         return dailyEffort.filter { $0.date >= cutoffDate }
     }
 
+    /// Summary data for the overview card
+    public var summary: InsightSummary? {
+        guard !contestHistory.isEmpty else { return nil }
+
+        let dataPoints = contestHistory.map {
+            InsightDataPoint(
+                date: $0.date,
+                value: Double($0.rating),
+                color: $0.rankColor.swiftUIColor
+            )
+        }
+        let current = stats?.rating ?? contestHistory.last?.rating ?? 0
+        let trend = calculateRatingTrend()
+
+        return InsightSummary(
+            title: "AtCoder",
+            systemImage: "chevron.left.forwardslash.chevron.right",
+            color: stats?.rankColor.swiftUIColor ?? .gray,
+            dataPoints: dataPoints,
+            currentValueFormatted: "\(current)",
+            trend: trend
+        )
+    }
+
+    /// Calculate rating trend percentage
+    private func calculateRatingTrend() -> Double? {
+        guard contestHistory.count >= 2 else { return nil }
+        let first = Double(contestHistory.first!.rating)
+        let last = Double(contestHistory.last!.rating)
+        guard first > 0 else { return nil }
+        return ((last - first) / first) * 100
+    }
+
+    /// Activity data for GitHub-style contribution chart
+    public var activityData: InsightActivityData? {
+        guard !dailyEffort.isEmpty else { return nil }
+
+        let days = dailyEffort.map { effort in
+            // Find hardest difficulty solved that day
+            let hardest = effort.submissionsByDifficulty.keys
+                .sorted { $0.sortOrder > $1.sortOrder }
+                .first ?? .gray
+
+            return InsightActivityDay(
+                date: effort.date,
+                color: hardest.swiftUIColor,
+                intensity: min(1.0, Double(effort.totalSubmissions) / 10.0)
+            )
+        }
+
+        return InsightActivityData(days: days, emptyColor: .gray.opacity(0.2))
+    }
+
     // MARK: - Data Loading
 
-    public func loadData(timeRange: TimeRange) async {
+    public func loadData() async {
         isLoading = true
         errorMessage = nil
 
@@ -94,7 +147,7 @@ public final class AtCoderInsightsViewModel: InsightsSectionViewModel {
 
     // MARK: - InsightsSectionViewModel
 
-    public func makeSection(timeRange: TimeRange) -> AnyView {
-        AnyView(AtCoderInsightsSection(viewModel: self, timeRange: timeRange))
+    public func makeDetailView() -> AnyView {
+        AnyView(AtCoderInsightsDetailView(viewModel: self))
     }
 }

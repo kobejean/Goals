@@ -2,65 +2,57 @@ import SwiftUI
 import GoalsDomain
 import GoalsData
 
-/// Insights view showing time-based trends and analytics
+/// Insights view showing minimalistic overview cards with sparkline charts
 public struct InsightsView: View {
     @Environment(AppContainer.self) private var container
-    @State private var selectedTimeRange: TimeRange = .all
     @State private var viewModels: [any InsightsSectionViewModel] = []
+    @State private var displayMode: InsightDisplayMode = .chart
 
     public var body: some View {
         NavigationStack {
             ScrollView {
-                VStack(spacing: 20) {
-                    if viewModels.isEmpty || viewModels.allSatisfy(\.isLoading) {
-                        ProgressView()
-                            .frame(maxWidth: .infinity)
-                            .padding()
-                    } else {
-                        ForEach(Array(viewModels.enumerated()), id: \.offset) { _, viewModel in
-                            viewModel.makeSection(timeRange: selectedTimeRange)
+                LazyVStack(spacing: 16) {
+                    ForEach(Array(viewModels.enumerated()), id: \.offset) { _, vm in
+                        if vm.isLoading {
+                            InsightCardSkeleton()
+                        } else if let summary = vm.summary {
+                            NavigationLink {
+                                vm.makeDetailView()
+                            } label: {
+                                InsightCard(
+                                    summary: summary,
+                                    activityData: vm.activityData,
+                                    mode: displayMode
+                                )
+                            }
+                            .buttonStyle(.plain)
                         }
                     }
                 }
-                .padding(.vertical)
+                .padding()
             }
             .navigationTitle("Insights")
-            .toolbarTitleDisplayMode(.inline)
             .toolbar {
-                ToolbarItem(placement: .principal) {
-                    Picker("Time Range", selection: $selectedTimeRange) {
-                        ForEach(TimeRange.allCases, id: \.self) { range in
-                            Text(range.displayName).tag(range)
+                ToolbarItem(placement: .topBarTrailing) {
+                    Picker("Mode", selection: $displayMode) {
+                        ForEach(InsightDisplayMode.allCases, id: \.self) { mode in
+                            Image(systemName: mode.systemImage).tag(mode)
                         }
                     }
                     .pickerStyle(.segmented)
-                    .frame(width: 220)
                 }
             }
             .task {
-                await initialize()
-            }
-            .onChange(of: selectedTimeRange) {
-                Task {
-                    await loadAll()
-                }
+                viewModels = container.makeInsightsViewModels()
+                await loadAll()
             }
         }
     }
 
-    // MARK: - Initialization
-
-    private func initialize() async {
-        viewModels = container.makeInsightsViewModels()
-        await loadAll()
-    }
-
     private func loadAll() async {
         await withTaskGroup(of: Void.self) { group in
-            for viewModel in viewModels {
-                group.addTask {
-                    await viewModel.loadData(timeRange: selectedTimeRange)
-                }
+            for vm in viewModels {
+                group.addTask { await vm.loadData() }
             }
         }
     }

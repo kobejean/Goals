@@ -61,27 +61,6 @@ public final class TypeQuickerInsightsViewModel: InsightsSectionViewModel {
         Array(Set(modeChartData.map(\.mode))).sorted()
     }
 
-    /// Y-axis range that includes the goal target if present
-    public func chartYAxisRange(for metric: ChartMetric) -> ClosedRange<Double> {
-        var values = modeChartData.map { $0.value(for: metric) }
-
-        if let goalTarget = goalTarget(for: metric) {
-            values.append(goalTarget)
-        }
-
-        guard let minVal = values.min(), let maxVal = values.max() else {
-            return 0...100
-        }
-
-        let range = maxVal - minVal
-        let padding = max(range * 0.15, 1)
-
-        let lower = max(0, minVal - padding)
-        let upper = maxVal + padding
-
-        return lower...upper
-    }
-
     /// Trend percentage for the selected metric
     public var metricTrend: Double? {
         guard stats.count >= 2 else { return nil }
@@ -104,6 +83,45 @@ public final class TypeQuickerInsightsViewModel: InsightsSectionViewModel {
         return ((last - first) / first) * 100
     }
 
+    /// Summary data for the overview card
+    public var summary: InsightSummary? {
+        guard !stats.isEmpty else { return nil }
+
+        let dataPoints = stats.map {
+            InsightDataPoint(date: $0.date, value: $0.wordsPerMinute)
+        }
+        let current = stats.last?.wordsPerMinute ?? 0
+
+        return InsightSummary(
+            title: "Typing",
+            systemImage: "keyboard",
+            color: .blue,
+            dataPoints: dataPoints,
+            currentValueFormatted: String(format: "%.0f WPM", current),
+            trend: metricTrend
+        )
+    }
+
+    /// Activity data for GitHub-style contribution chart
+    public var activityData: InsightActivityData? {
+        guard !stats.isEmpty else { return nil }
+
+        // Find max practice time for normalization
+        let maxTime = stats.map(\.practiceTimeMinutes).max() ?? 1
+
+        let days = stats.map { stat in
+            let intensity = Double(stat.practiceTimeMinutes) / Double(max(maxTime, 1))
+
+            return InsightActivityDay(
+                date: stat.date,
+                color: .blue,
+                intensity: intensity
+            )
+        }
+
+        return InsightActivityData(days: days, emptyColor: .gray.opacity(0.2))
+    }
+
     /// Get the goal target for a specific metric
     public func goalTarget(for metric: ChartMetric) -> Double? {
         let metricKey: String
@@ -117,7 +135,7 @@ public final class TypeQuickerInsightsViewModel: InsightsSectionViewModel {
 
     // MARK: - Data Loading
 
-    public func loadData(timeRange: TimeRange) async {
+    public func loadData() async {
         isLoading = true
 
         // Configure from saved settings if available
@@ -136,7 +154,7 @@ public final class TypeQuickerInsightsViewModel: InsightsSectionViewModel {
 
         do {
             let endDate = Date()
-            let startDate = timeRange.startDate(from: endDate)
+            let startDate = TimeRange.all.startDate(from: endDate)
             async let statsTask = dataSource.fetchStats(from: startDate, to: endDate)
             async let goalsTask = goalRepository.fetch(dataSource: .typeQuicker)
 
@@ -151,8 +169,8 @@ public final class TypeQuickerInsightsViewModel: InsightsSectionViewModel {
 
     // MARK: - InsightsSectionViewModel
 
-    public func makeSection(timeRange: TimeRange) -> AnyView {
-        AnyView(TypeQuickerInsightsSection(viewModel: self, timeRange: timeRange))
+    public func makeDetailView() -> AnyView {
+        AnyView(TypeQuickerInsightsDetailView(viewModel: self))
     }
 }
 

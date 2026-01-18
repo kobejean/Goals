@@ -7,9 +7,15 @@ public protocol InsightsSectionViewModel: AnyObject, Observable, Sendable {
     /// Whether the section is currently loading data
     var isLoading: Bool { get }
 
-    /// Load data for the given time range
-    func loadData(timeRange: TimeRange) async
+    /// Summary data for the overview card
+    var summary: InsightSummary? { get }
 
-    /// Create the section view for this ViewModel
-    func makeSection(timeRange: TimeRange) -> AnyView
+    /// Activity data for GitHub-style contribution chart
+    var activityData: InsightActivityData? { get }
+
+    /// Load all data (always loads full range for overview)
+    func loadData() async
+
+    /// Create the detail view for this ViewModel (full charts)
+    func makeDetailView() -> AnyView
 }
