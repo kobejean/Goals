@@ -98,7 +98,14 @@ YourApp/
    - Split into smaller subviews
    - Use compound views that compose smaller views
    - Pass state via bindings between views
-   - Never reach for a ViewModel as the solution
+   - For simple complexity, prefer splitting views over ViewModels
+
+6. **ViewModels for Complex Presentation Logic**
+   Use `@Observable` ViewModels for complex views with significant presentation logic (charts, computed data, multiple data sources). ViewModels should:
+   - Be in separate files under `ViewModels/`
+   - Receive dependencies via init for testability
+   - Be created via AppContainer factory methods
+   - Simple views can use `@State` directly
 
 # iOS 26 Features (Optional)
 

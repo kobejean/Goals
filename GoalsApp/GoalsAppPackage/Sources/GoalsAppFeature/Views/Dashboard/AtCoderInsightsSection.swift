@@ -3,16 +3,9 @@ import Charts
 import GoalsDomain
 import GoalsData
 
-/// AtCoder-specific insights view with Daily Effort chart
-public struct AtCoderInsightsView: View {
-    @Environment(AppContainer.self) private var container
-    @State private var dailyEffort: [AtCoderDailyEffort] = []
-    @State private var contestHistory: [AtCoderStats] = []
-    @State private var stats: AtCoderStats?
-    @State private var atCoderGoals: [Goal] = []
-    @State private var isLoading = true
-    @State private var errorMessage: String?
-
+/// AtCoder-specific insights section with Rating and Daily Effort charts
+public struct AtCoderInsightsSection: View {
+    @Bindable var viewModel: AtCoderInsightsViewModel
     let timeRange: TimeRange
 
     public var body: some View {
@@ -21,10 +14,10 @@ public struct AtCoderInsightsView: View {
             Label("AtCoder", systemImage: "chevron.left.forwardslash.chevron.right")
                 .font(.headline)
 
-            if isLoading {
+            if viewModel.isLoading {
                 ProgressView("Loading AtCoder data...")
                     .frame(maxWidth: .infinity, minHeight: 200)
-            } else if let error = errorMessage {
+            } else if let error = viewModel.errorMessage {
                 ContentUnavailableView {
                     Label("Unable to Load", systemImage: "exclamationmark.triangle")
                 } description: {
@@ -32,20 +25,20 @@ public struct AtCoderInsightsView: View {
                 }
             } else {
                 // Stats summary
-                if let stats {
+                if let stats = viewModel.stats {
                     StatsRow(stats: stats)
                 }
 
                 // Rating History Chart
                 RatingChart(
-                    contestHistory: filteredContestHistory,
+                    contestHistory: viewModel.filteredContestHistory(for: timeRange),
                     timeRange: timeRange,
-                    ratingGoal: ratingGoalTarget
+                    ratingGoal: viewModel.ratingGoalTarget
                 )
 
                 // Daily Effort Chart
                 DailyEffortChart(
-                    dailyEffort: filteredDailyEffort,
+                    dailyEffort: viewModel.filteredDailyEffort(for: timeRange),
                     timeRange: timeRange
                 )
             }
@@ -54,68 +47,10 @@ public struct AtCoderInsightsView: View {
         .background(Color(.systemBackground))
         .clipShape(RoundedRectangle(cornerRadius: 12))
         .shadow(color: .black.opacity(0.05), radius: 2, x: 0, y: 1)
-        .task {
-            await loadData()
-        }
     }
 
-    private var filteredDailyEffort: [AtCoderDailyEffort] {
-        let cutoffDate = timeRange.startDate(from: Date())
-        return dailyEffort.filter { $0.date >= cutoffDate }
-    }
-
-    private var filteredContestHistory: [AtCoderStats] {
-        let cutoffDate = timeRange.startDate(from: Date())
-        return contestHistory.filter { $0.date >= cutoffDate }
-    }
-
-    private var ratingGoalTarget: Int? {
-        guard let goal = atCoderGoals.first(where: { $0.metricKey == "rating" && !$0.isArchived }) else {
-            return nil
-        }
-        return Int(goal.targetValue)
-    }
-
-    private func loadData() async {
-        isLoading = true
-        errorMessage = nil
-
-        // Configure from saved settings if available
-        if let username = UserDefaults.standard.string(forKey: "atCoderUsername"), !username.isEmpty {
-            let settings = DataSourceSettings(
-                dataSourceType: .atCoder,
-                credentials: ["username": username]
-            )
-            try? await container.atCoderDataSource.configure(settings: settings)
-        }
-
-        // Check if configured
-        guard await container.atCoderDataSource.isConfigured() else {
-            errorMessage = "Configure your AtCoder username in Settings"
-            isLoading = false
-            return
-        }
-
-        do {
-            // Fetch data concurrently - always fetch a year of data for filtering
-            let yearStart = TimeRange.year.startDate(from: Date())
-            async let statsTask = container.atCoderDataSource.fetchStats()
-            async let effortTask = container.atCoderDataSource.fetchDailyEffort(from: yearStart)
-            async let historyTask = container.atCoderDataSource.fetchContestHistory()
-            async let goalsTask = container.goalRepository.fetch(dataSource: .atCoder)
-
-            stats = try await statsTask
-            dailyEffort = try await effortTask
-            contestHistory = try await historyTask
-            atCoderGoals = try await goalsTask
-        } catch {
-            errorMessage = "Failed to load data: \(error.localizedDescription)"
-        }
-
-        isLoading = false
-    }
-
-    public init(timeRange: TimeRange) {
+    public init(viewModel: AtCoderInsightsViewModel, timeRange: TimeRange) {
+        self.viewModel = viewModel
         self.timeRange = timeRange
     }
 }
@@ -378,12 +313,4 @@ extension AtCoderRankColor {
         case .red: return .red
         }
     }
-}
-
-#Preview {
-    ScrollView {
-        AtCoderInsightsView(timeRange: .month)
-            .padding()
-    }
-    .environment(try! AppContainer.preview())
 }

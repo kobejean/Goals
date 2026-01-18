@@ -7,6 +7,20 @@ import GoalsData
 @MainActor
 @Observable
 public final class AppContainer {
+    // MARK: - ViewModel Factories
+
+    public func makeInsightsViewModels() -> [any InsightsSectionViewModel] {
+        [
+            TypeQuickerInsightsViewModel(
+                dataSource: typeQuickerDataSource,
+                goalRepository: goalRepository
+            ),
+            AtCoderInsightsViewModel(
+                dataSource: atCoderDataSource,
+                goalRepository: goalRepository
+            )
+        ]
+    }
     // MARK: - Model Container
 
     public let modelContainer: ModelContainer
