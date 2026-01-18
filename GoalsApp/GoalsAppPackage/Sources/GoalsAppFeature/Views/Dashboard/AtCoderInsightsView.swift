@@ -11,23 +11,14 @@ public struct AtCoderInsightsView: View {
     @State private var stats: AtCoderStats?
     @State private var isLoading = true
     @State private var errorMessage: String?
-    @State private var selectedTimeRange: AtCoderTimeRange = .month
+
+    let timeRange: TimeRange
 
     public var body: some View {
         VStack(alignment: .leading, spacing: 16) {
             // Header
-            HStack {
-                Label("AtCoder", systemImage: "chevron.left.forwardslash.chevron.right")
-                    .font(.headline)
-                Spacer()
-                Picker("Time Range", selection: $selectedTimeRange) {
-                    ForEach(AtCoderTimeRange.allCases, id: \.self) { range in
-                        Text(range.displayName).tag(range)
-                    }
-                }
-                .pickerStyle(.segmented)
-                .frame(width: 160)
-            }
+            Label("AtCoder", systemImage: "chevron.left.forwardslash.chevron.right")
+                .font(.headline)
 
             if isLoading {
                 ProgressView("Loading AtCoder data...")
@@ -47,13 +38,13 @@ public struct AtCoderInsightsView: View {
                 // Rating History Chart
                 RatingChart(
                     contestHistory: filteredContestHistory,
-                    timeRange: selectedTimeRange
+                    timeRange: timeRange
                 )
 
                 // Daily Effort Chart
                 DailyEffortChart(
                     dailyEffort: filteredDailyEffort,
-                    timeRange: selectedTimeRange
+                    timeRange: timeRange
                 )
             }
         }
@@ -64,18 +55,15 @@ public struct AtCoderInsightsView: View {
         .task {
             await loadData()
         }
-        .onChange(of: selectedTimeRange) { _, _ in
-            // Data is already loaded, just filter
-        }
     }
 
     private var filteredDailyEffort: [AtCoderDailyEffort] {
-        let cutoffDate = selectedTimeRange.startDate
+        let cutoffDate = timeRange.startDate(from: Date())
         return dailyEffort.filter { $0.date >= cutoffDate }
     }
 
     private var filteredContestHistory: [AtCoderStats] {
-        let cutoffDate = selectedTimeRange.startDate
+        let cutoffDate = timeRange.startDate(from: Date())
         return contestHistory.filter { $0.date >= cutoffDate }
     }
 
@@ -91,9 +79,10 @@ public struct AtCoderInsightsView: View {
         }
 
         do {
-            // Fetch data concurrently
+            // Fetch data concurrently - always fetch a year of data for filtering
+            let yearStart = TimeRange.year.startDate(from: Date())
             async let statsTask = container.atCoderDataSource.fetchStats()
-            async let effortTask = container.atCoderDataSource.fetchDailyEffort(from: AtCoderTimeRange.year.startDate)
+            async let effortTask = container.atCoderDataSource.fetchDailyEffort(from: yearStart)
             async let historyTask = container.atCoderDataSource.fetchContestHistory()
 
             stats = try await statsTask
@@ -106,7 +95,9 @@ public struct AtCoderInsightsView: View {
         isLoading = false
     }
 
-    public init() {}
+    public init(timeRange: TimeRange) {
+        self.timeRange = timeRange
+    }
 }
 
 // MARK: - Stats Row
@@ -176,7 +167,7 @@ private struct StatItem: View {
 
 private struct RatingChart: View {
     let contestHistory: [AtCoderStats]
-    let timeRange: AtCoderTimeRange
+    let timeRange: TimeRange
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
@@ -184,7 +175,7 @@ private struct RatingChart: View {
                 .font(.subheadline.bold())
 
             if contestHistory.isEmpty {
-                Text("No contest history")
+                Text("No contest history in this period")
                     .font(.caption)
                     .foregroundStyle(.secondary)
                     .frame(maxWidth: .infinity, minHeight: 120)
@@ -213,10 +204,11 @@ private struct RatingChart: View {
                         .symbolSize(30)
                     }
                 }
+                .chartXScale(domain: xAxisDomain)
                 .chartXAxis {
-                    AxisMarks(values: .stride(by: xAxisStride, count: xAxisCount)) { _ in
+                    AxisMarks(values: .stride(by: timeRange.xAxisStride, count: timeRange.xAxisCount)) { _ in
                         AxisGridLine()
-                        AxisValueLabel(format: xAxisFormat)
+                        AxisValueLabel(format: timeRange.xAxisFormat)
                     }
                 }
                 .chartYAxis {
@@ -247,38 +239,17 @@ private struct RatingChart: View {
         )
     }
 
+    private var xAxisDomain: ClosedRange<Date> {
+        let now = Date()
+        let start = timeRange.startDate(from: now)
+        return start...now
+    }
+
     private var yAxisDomain: ClosedRange<Int> {
         let ratings = contestHistory.map { $0.rating }
         let minRating = (ratings.min() ?? 0) - 100
         let maxRating = (ratings.max() ?? 100) + 100
         return max(0, minRating)...maxRating
-    }
-
-    private var xAxisStride: Calendar.Component {
-        switch timeRange {
-        case .week: return .day
-        case .month: return .weekOfYear
-        case .quarter: return .month
-        case .year: return .month
-        }
-    }
-
-    private var xAxisCount: Int {
-        switch timeRange {
-        case .week: return 1
-        case .month: return 1
-        case .quarter: return 1
-        case .year: return 2
-        }
-    }
-
-    private var xAxisFormat: Date.FormatStyle {
-        switch timeRange {
-        case .week: return .dateTime.weekday(.abbreviated)
-        case .month: return .dateTime.month(.abbreviated).day()
-        case .quarter: return .dateTime.month(.abbreviated)
-        case .year: return .dateTime.month(.abbreviated)
-        }
     }
 }
 
@@ -286,7 +257,7 @@ private struct RatingChart: View {
 
 private struct DailyEffortChart: View {
     let dailyEffort: [AtCoderDailyEffort]
-    let timeRange: AtCoderTimeRange
+    let timeRange: TimeRange
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
@@ -294,7 +265,7 @@ private struct DailyEffortChart: View {
                 .font(.subheadline.bold())
 
             if dailyEffort.isEmpty {
-                Text("No submissions found")
+                Text("No submissions found in this period")
                     .font(.caption)
                     .foregroundStyle(.secondary)
                     .frame(maxWidth: .infinity, minHeight: 150)
@@ -312,10 +283,11 @@ private struct DailyEffortChart: View {
                         }
                     }
                 }
+                .chartXScale(domain: xAxisDomain)
                 .chartXAxis {
-                    AxisMarks(values: .stride(by: xAxisStride, count: xAxisCount)) { _ in
+                    AxisMarks(values: .stride(by: timeRange.xAxisStride, count: timeRange.xAxisCount)) { _ in
                         AxisGridLine()
-                        AxisValueLabel(format: xAxisFormat)
+                        AxisValueLabel(format: timeRange.xAxisFormat)
                     }
                 }
                 .chartYAxis {
@@ -333,65 +305,10 @@ private struct DailyEffortChart: View {
         AtCoderRankColor.allCases.sorted { $0.sortOrder < $1.sortOrder }
     }
 
-    private var xAxisStride: Calendar.Component {
-        switch timeRange {
-        case .week: return .day
-        case .month: return .weekOfYear
-        case .quarter: return .month
-        case .year: return .month
-        }
-    }
-
-    private var xAxisCount: Int {
-        switch timeRange {
-        case .week: return 1
-        case .month: return 1
-        case .quarter: return 1
-        case .year: return 2
-        }
-    }
-
-    private var xAxisFormat: Date.FormatStyle {
-        switch timeRange {
-        case .week: return .dateTime.weekday(.abbreviated)
-        case .month: return .dateTime.month(.abbreviated).day()
-        case .quarter: return .dateTime.month(.abbreviated)
-        case .year: return .dateTime.month(.abbreviated)
-        }
-    }
-}
-
-// MARK: - AtCoder Time Range
-
-/// Time range for AtCoder insights
-enum AtCoderTimeRange: String, CaseIterable {
-    case week
-    case month
-    case quarter
-    case year
-
-    var displayName: String {
-        switch self {
-        case .week: return "1W"
-        case .month: return "1M"
-        case .quarter: return "3M"
-        case .year: return "1Y"
-        }
-    }
-
-    var startDate: Date {
-        let calendar = Calendar.current
+    private var xAxisDomain: ClosedRange<Date> {
         let now = Date()
-        switch self {
-        case .week:
-            return calendar.date(byAdding: .day, value: -7, to: now)!
-        case .month:
-            return calendar.date(byAdding: .month, value: -1, to: now)!
-        case .quarter:
-            return calendar.date(byAdding: .month, value: -3, to: now)!
-        case .year:
-            return calendar.date(byAdding: .year, value: -1, to: now)!
-        }
+        let start = timeRange.startDate(from: now)
+        return start...now
     }
 }
 
@@ -414,7 +331,7 @@ extension AtCoderRankColor {
 
 #Preview {
     ScrollView {
-        AtCoderInsightsView()
+        AtCoderInsightsView(timeRange: .month)
             .padding()
     }
     .environment(try! AppContainer.preview())

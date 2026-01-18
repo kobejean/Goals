@@ -17,15 +17,6 @@ public struct InsightsView: View {
         NavigationStack {
             ScrollView {
                 VStack(spacing: 20) {
-                    // Time range picker
-                    Picker("Time Range", selection: $selectedTimeRange) {
-                        ForEach(TimeRange.allCases, id: \.self) { range in
-                            Text(range.displayName).tag(range)
-                        }
-                    }
-                    .pickerStyle(.segmented)
-                    .padding(.horizontal)
-
                     if isLoading {
                         ProgressView()
                             .frame(maxWidth: .infinity)
@@ -35,7 +26,7 @@ public struct InsightsView: View {
                         typeQuickerTrendSection
 
                         // AtCoder Daily Effort chart
-                        AtCoderInsightsView()
+                        AtCoderInsightsView(timeRange: selectedTimeRange)
                             .padding(.horizontal)
 
                         // Goal progress over time
@@ -51,6 +42,18 @@ public struct InsightsView: View {
                 .padding(.vertical)
             }
             .navigationTitle("Insights")
+            .toolbarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .principal) {
+                    Picker("Time Range", selection: $selectedTimeRange) {
+                        ForEach(TimeRange.allCases, id: \.self) { range in
+                            Text(range.displayName).tag(range)
+                        }
+                    }
+                    .pickerStyle(.segmented)
+                    .frame(width: 180)
+                }
+            }
             .task {
                 await loadData()
             }
@@ -646,32 +649,59 @@ private struct ModeDataPoint: Identifiable {
 
 // MARK: - Time Range
 
-enum TimeRange: String, CaseIterable {
+public enum TimeRange: String, CaseIterable {
     case week
     case month
+    case quarter
     case year
-    case all
 
-    var displayName: String {
+    public var displayName: String {
         switch self {
-        case .week: return "Week"
-        case .month: return "Month"
-        case .year: return "Year"
-        case .all: return "All"
+        case .week: return "1W"
+        case .month: return "1M"
+        case .quarter: return "3M"
+        case .year: return "1Y"
         }
     }
 
-    func startDate(from endDate: Date) -> Date {
+    public func startDate(from endDate: Date) -> Date {
         let calendar = Calendar.current
         switch self {
         case .week:
             return calendar.date(byAdding: .day, value: -7, to: endDate) ?? endDate
         case .month:
             return calendar.date(byAdding: .month, value: -1, to: endDate) ?? endDate
+        case .quarter:
+            return calendar.date(byAdding: .month, value: -3, to: endDate) ?? endDate
         case .year:
             return calendar.date(byAdding: .year, value: -1, to: endDate) ?? endDate
-        case .all:
-            return calendar.date(byAdding: .year, value: -5, to: endDate) ?? endDate
+        }
+    }
+
+    public var xAxisStride: Calendar.Component {
+        switch self {
+        case .week: return .day
+        case .month: return .weekOfYear
+        case .quarter: return .month
+        case .year: return .month
+        }
+    }
+
+    public var xAxisCount: Int {
+        switch self {
+        case .week: return 1
+        case .month: return 1
+        case .quarter: return 1
+        case .year: return 2
+        }
+    }
+
+    public var xAxisFormat: Date.FormatStyle {
+        switch self {
+        case .week: return .dateTime.weekday(.abbreviated)
+        case .month: return .dateTime.month(.abbreviated).day()
+        case .quarter: return .dateTime.month(.abbreviated)
+        case .year: return .dateTime.month(.abbreviated)
         }
     }
 }
