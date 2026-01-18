@@ -34,6 +34,10 @@ public struct InsightsView: View {
                         // TypeQuicker trend chart with mode breakdown
                         typeQuickerTrendSection
 
+                        // AtCoder Daily Effort chart
+                        AtCoderInsightsView()
+                            .padding(.horizontal)
+
                         // Goal progress over time
                         progressTrendSection
 

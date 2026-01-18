@@ -2,6 +2,7 @@ import Foundation
 import GoalsDomain
 
 /// Data source implementation for AtCoder competitive programming statistics
+/// Uses official AtCoder API for contest history and kenkoooo's AtCoder Problems API for solve counts
 public actor AtCoderDataSource: AtCoderDataSourceProtocol {
     public let dataSourceType: DataSourceType = .atCoder
 
@@ -11,6 +12,7 @@ public actor AtCoderDataSource: AtCoderDataSourceProtocol {
             MetricInfo(key: "highestRating", name: "Highest Rating", unit: "", icon: "star.fill"),
             MetricInfo(key: "contestsParticipated", name: "Contests", unit: "", icon: "calendar"),
             MetricInfo(key: "problemsSolved", name: "Problems Solved", unit: "", icon: "checkmark.circle"),
+            MetricInfo(key: "longestStreak", name: "Longest Streak", unit: "days", icon: "flame"),
         ]
     }
 
@@ -21,13 +23,17 @@ public actor AtCoderDataSource: AtCoderDataSourceProtocol {
         case "highestRating": return Double(stat.highestRating)
         case "contestsParticipated": return Double(stat.contestsParticipated)
         case "problemsSolved": return Double(stat.problemsSolved)
+        case "longestStreak": return Double(stat.longestStreak ?? 0)
         default: return nil
         }
     }
 
     private var username: String?
     private let urlSession: URLSession
-    private let baseURL = URL(string: "https://atcoder.jp")!
+
+    // API base URLs
+    private let atCoderBaseURL = URL(string: "https://atcoder.jp")!
+    private let kenkooooBaseURL = URL(string: "https://kenkoooo.com/atcoder/atcoder-api/v3")!
 
     public init(urlSession: URLSession = .shared) {
         self.urlSession = urlSession
@@ -65,7 +71,8 @@ public actor AtCoderDataSource: AtCoderDataSourceProtocol {
                 metadata: [
                     "highestRating": "\(stats.highestRating)",
                     "contests": "\(stats.contestsParticipated)",
-                    "problemsSolved": "\(stats.problemsSolved)"
+                    "problemsSolved": "\(stats.problemsSolved)",
+                    "longestStreak": "\(stats.longestStreak ?? 0)"
                 ]
             )
         ]
@@ -82,7 +89,8 @@ public actor AtCoderDataSource: AtCoderDataSourceProtocol {
             metadata: [
                 "highestRating": "\(stats.highestRating)",
                 "contests": "\(stats.contestsParticipated)",
-                "problemsSolved": "\(stats.problemsSolved)"
+                "problemsSolved": "\(stats.problemsSolved)",
+                "longestStreak": "\(stats.longestStreak ?? 0)"
             ]
         )
     }
@@ -92,34 +100,37 @@ public actor AtCoderDataSource: AtCoderDataSourceProtocol {
             throw DataSourceError.notConfigured
         }
 
-        // Fetch user profile data from AtCoder API
-        // Note: AtCoder doesn't have an official API, so we'd typically scrape
-        // or use a third-party service. For now, we'll use a common pattern.
-        let profileURL = URL(string: "https://atcoder.jp/users/\(username)/history/json")!
+        // Fetch data from multiple APIs concurrently
+        async let contestHistoryTask = fetchContestHistoryFromAPI(username: username)
+        async let acRankTask = fetchACRank(username: username)
+        async let streakRankTask = fetchStreakRank(username: username)
 
-        let (data, response) = try await urlSession.data(from: profileURL)
+        let contestHistory = try await contestHistoryTask
+        let acRank = try? await acRankTask
+        let streakRank = try? await streakRankTask
 
-        guard let httpResponse = response as? HTTPURLResponse else {
-            throw DataSourceError.invalidResponse
-        }
-
-        guard httpResponse.statusCode == 200 else {
-            throw DataSourceError.httpError(statusCode: httpResponse.statusCode)
-        }
-
-        let decoder = JSONDecoder()
-        let history = try decoder.decode([AtCoderContestResult].self, from: data)
-
-        guard let latest = history.last else {
+        guard let latest = contestHistory.last else {
+            // User has no contest history, but might still have solved problems
+            if let acRank {
+                return AtCoderStats(
+                    date: Date(),
+                    rating: 0,
+                    highestRating: 0,
+                    contestsParticipated: 0,
+                    problemsSolved: acRank.count,
+                    longestStreak: streakRank?.count
+                )
+            }
             return nil
         }
 
         return AtCoderStats(
             date: Date(),
             rating: latest.NewRating,
-            highestRating: history.map { $0.NewRating }.max() ?? 0,
-            contestsParticipated: history.count,
-            problemsSolved: 0 // Would need separate API call
+            highestRating: contestHistory.map { $0.NewRating }.max() ?? 0,
+            contestsParticipated: contestHistory.count,
+            problemsSolved: acRank?.count ?? 0,
+            longestStreak: streakRank?.count
         )
     }
 
@@ -128,9 +139,51 @@ public actor AtCoderDataSource: AtCoderDataSourceProtocol {
             throw DataSourceError.notConfigured
         }
 
-        let profileURL = URL(string: "https://atcoder.jp/users/\(username)/history/json")!
+        let contestHistory = try await fetchContestHistoryFromAPI(username: username)
 
-        let (data, response) = try await urlSession.data(from: profileURL)
+        // Also fetch AC count for the most recent stats
+        let acRank = try? await fetchACRank(username: username)
+        let streakRank = try? await fetchStreakRank(username: username)
+        let problemsSolved = acRank?.count ?? 0
+        let longestStreak = streakRank?.count
+
+        var highestSoFar = 0
+        return contestHistory.enumerated().map { (index, result) in
+            highestSoFar = max(highestSoFar, result.NewRating)
+            return AtCoderStats(
+                date: result.endTime,
+                rating: result.NewRating,
+                highestRating: highestSoFar,
+                contestsParticipated: index + 1,
+                problemsSolved: index == contestHistory.count - 1 ? problemsSolved : 0,
+                longestStreak: index == contestHistory.count - 1 ? longestStreak : nil
+            )
+        }
+    }
+
+    // MARK: - Submission APIs
+
+    /// Fetches user submissions from kenkoooo API
+    /// - Parameters:
+    ///   - fromDate: Start date for submissions (defaults to 1 year ago)
+    /// - Returns: Array of submissions
+    public func fetchSubmissions(from fromDate: Date? = nil) async throws -> [AtCoderSubmission] {
+        guard let username = username else {
+            throw DataSourceError.notConfigured
+        }
+
+        let startDate = fromDate ?? Calendar.current.date(byAdding: .year, value: -1, to: Date())!
+        let fromSecond = Int(startDate.timeIntervalSince1970)
+
+        return try await fetchSubmissionsFromAPI(username: username, fromSecond: fromSecond)
+    }
+
+    /// Fetches problem difficulties from kenkoooo API
+    /// Returns a dictionary mapping problem_id to difficulty rating
+    public func fetchProblemDifficulties() async throws -> [String: Int] {
+        let url = URL(string: "https://kenkoooo.com/atcoder/resources/problem-models.json")!
+
+        let (data, response) = try await urlSession.data(from: url)
 
         guard let httpResponse = response as? HTTPURLResponse else {
             throw DataSourceError.invalidResponse
@@ -141,25 +194,175 @@ public actor AtCoderDataSource: AtCoderDataSourceProtocol {
         }
 
         let decoder = JSONDecoder()
-        let history = try decoder.decode([AtCoderContestResult].self, from: data)
+        let models = try decoder.decode([String: ProblemModel].self, from: data)
 
-        var highestSoFar = 0
-        return history.enumerated().map { (index, result) in
-            highestSoFar = max(highestSoFar, result.NewRating)
-            return AtCoderStats(
-                date: result.endTime,
-                rating: result.NewRating,
-                highestRating: highestSoFar,
-                contestsParticipated: index + 1,
-                problemsSolved: 0
-            )
+        // Extract difficulty ratings, converting to Int
+        return models.compactMapValues { model in
+            model.difficulty.map { Int($0) }
         }
+    }
+
+    /// Fetches daily effort data (submissions grouped by day and difficulty)
+    /// - Parameter fromDate: Start date (defaults to 1 year ago)
+    /// - Returns: Array of daily effort summaries sorted by date
+    public func fetchDailyEffort(from fromDate: Date? = nil) async throws -> [AtCoderDailyEffort] {
+        // Fetch submissions and difficulties concurrently
+        async let submissionsTask = fetchSubmissions(from: fromDate)
+        async let difficultiesTask = fetchProblemDifficulties()
+
+        let submissions = try await submissionsTask
+        let difficulties = try await difficultiesTask
+
+        // Group submissions by day
+        let calendar = Calendar.current
+        var dailyData: [Date: [AtCoderRankColor: Int]] = [:]
+
+        for submission in submissions {
+            let dayStart = calendar.startOfDay(for: submission.date)
+            let difficulty = difficulties[submission.problemId]
+            let color = AtCoderRankColor.from(difficulty: difficulty)
+
+            if dailyData[dayStart] == nil {
+                dailyData[dayStart] = [:]
+            }
+            dailyData[dayStart]![color, default: 0] += 1
+        }
+
+        // Convert to array and sort by date
+        return dailyData.map { date, submissions in
+            AtCoderDailyEffort(date: date, submissionsByDifficulty: submissions)
+        }.sorted { $0.date < $1.date }
+    }
+
+    // MARK: - Private API Methods
+
+    /// Fetches submissions from kenkoooo API (handles pagination for >500 submissions)
+    private func fetchSubmissionsFromAPI(username: String, fromSecond: Int) async throws -> [AtCoderSubmission] {
+        var allSubmissions: [AtCoderSubmission] = []
+        var currentFromSecond = fromSecond
+
+        // API returns up to 500 submissions per request, so we paginate
+        while true {
+            let url = kenkooooBaseURL.appendingPathComponent("user/submissions")
+            var components = URLComponents(url: url, resolvingAgainstBaseURL: false)!
+            components.queryItems = [
+                URLQueryItem(name: "user", value: username),
+                URLQueryItem(name: "from_second", value: String(currentFromSecond))
+            ]
+
+            guard let requestURL = components.url else {
+                throw DataSourceError.invalidURL
+            }
+
+            let (data, response) = try await urlSession.data(from: requestURL)
+
+            guard let httpResponse = response as? HTTPURLResponse else {
+                throw DataSourceError.invalidResponse
+            }
+
+            guard httpResponse.statusCode == 200 else {
+                throw DataSourceError.httpError(statusCode: httpResponse.statusCode)
+            }
+
+            let decoder = JSONDecoder()
+            decoder.keyDecodingStrategy = .convertFromSnakeCase
+            let submissions = try decoder.decode([AtCoderSubmissionResponse].self, from: data)
+
+            if submissions.isEmpty {
+                break
+            }
+
+            allSubmissions.append(contentsOf: submissions.map { $0.toDomain() })
+
+            // If we got fewer than 500, we've reached the end
+            if submissions.count < 500 {
+                break
+            }
+
+            // Get the last submission's epoch second for next page
+            if let lastEpoch = submissions.last?.epochSecond {
+                currentFromSecond = lastEpoch + 1
+            } else {
+                break
+            }
+
+            // Rate limiting: wait 1 second between requests as per API guidelines
+            try await Task.sleep(for: .seconds(1))
+        }
+
+        return allSubmissions
+    }
+
+    /// Fetches contest history from official AtCoder API
+    private func fetchContestHistoryFromAPI(username: String) async throws -> [AtCoderContestResult] {
+        let url = atCoderBaseURL.appendingPathComponent("users/\(username)/history/json")
+
+        let (data, response) = try await urlSession.data(from: url)
+
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw DataSourceError.invalidResponse
+        }
+
+        guard httpResponse.statusCode == 200 else {
+            throw DataSourceError.httpError(statusCode: httpResponse.statusCode)
+        }
+
+        let decoder = JSONDecoder()
+        return try decoder.decode([AtCoderContestResult].self, from: data)
+    }
+
+    /// Fetches AC (Accepted) count from kenkoooo's AtCoder Problems API
+    private func fetchACRank(username: String) async throws -> KenkooooRankResponse {
+        let url = kenkooooBaseURL.appendingPathComponent("user/ac_rank")
+        var components = URLComponents(url: url, resolvingAgainstBaseURL: false)!
+        components.queryItems = [URLQueryItem(name: "user", value: username)]
+
+        guard let requestURL = components.url else {
+            throw DataSourceError.invalidURL
+        }
+
+        let (data, response) = try await urlSession.data(from: requestURL)
+
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw DataSourceError.invalidResponse
+        }
+
+        guard httpResponse.statusCode == 200 else {
+            throw DataSourceError.httpError(statusCode: httpResponse.statusCode)
+        }
+
+        let decoder = JSONDecoder()
+        return try decoder.decode(KenkooooRankResponse.self, from: data)
+    }
+
+    /// Fetches longest streak from kenkoooo's AtCoder Problems API
+    private func fetchStreakRank(username: String) async throws -> KenkooooRankResponse {
+        let url = kenkooooBaseURL.appendingPathComponent("user/streak_rank")
+        var components = URLComponents(url: url, resolvingAgainstBaseURL: false)!
+        components.queryItems = [URLQueryItem(name: "user", value: username)]
+
+        guard let requestURL = components.url else {
+            throw DataSourceError.invalidURL
+        }
+
+        let (data, response) = try await urlSession.data(from: requestURL)
+
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw DataSourceError.invalidResponse
+        }
+
+        guard httpResponse.statusCode == 200 else {
+            throw DataSourceError.httpError(statusCode: httpResponse.statusCode)
+        }
+
+        let decoder = JSONDecoder()
+        return try decoder.decode(KenkooooRankResponse.self, from: data)
     }
 }
 
 // MARK: - API Response Models
 
-/// AtCoder contest result from history API
+/// AtCoder contest result from official history API
 private struct AtCoderContestResult: Codable {
     let IsRated: Bool
     let Place: Int
@@ -175,5 +378,53 @@ private struct AtCoderContestResult: Codable {
         let formatter = ISO8601DateFormatter()
         formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
         return formatter.date(from: EndTime) ?? Date()
+    }
+}
+
+/// Response from kenkoooo's ranking APIs (ac_rank, streak_rank, etc.)
+private struct KenkooooRankResponse: Codable {
+    let count: Int
+    let rank: Int
+}
+
+/// Submission response from kenkoooo API
+private struct AtCoderSubmissionResponse: Codable {
+    let id: Int
+    let epochSecond: Int
+    let problemId: String
+    let contestId: String
+    let userId: String
+    let language: String
+    let point: Double
+    let length: Int
+    let result: String
+    let executionTime: Int?
+
+    func toDomain() -> AtCoderSubmission {
+        AtCoderSubmission(
+            id: id,
+            epochSecond: epochSecond,
+            problemId: problemId,
+            contestId: contestId,
+            userId: userId,
+            language: language,
+            point: point,
+            length: length,
+            result: result,
+            executionTime: executionTime
+        )
+    }
+}
+
+/// Problem model from kenkoooo API (for difficulty ratings)
+private struct ProblemModel: Codable {
+    let difficulty: Double?
+    let discrimination: Double?
+    let isExperimental: Bool?
+
+    enum CodingKeys: String, CodingKey {
+        case difficulty
+        case discrimination
+        case isExperimental = "is_experimental"
     }
 }

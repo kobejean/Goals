@@ -166,6 +166,8 @@ public struct SyncDataSourcesUseCase: Sendable {
                 return metadata["contests"].flatMap { Double($0) }
             case "problemsSolved":
                 return metadata["problemsSolved"].flatMap { Double($0) }
+            case "longestStreak":
+                return metadata["longestStreak"].flatMap { Double($0) }
             default:
                 return nil
             }

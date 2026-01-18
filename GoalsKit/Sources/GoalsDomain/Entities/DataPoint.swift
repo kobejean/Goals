@@ -94,19 +94,22 @@ public struct AtCoderStats: Sendable, Equatable, Codable {
     public let highestRating: Int
     public let contestsParticipated: Int
     public let problemsSolved: Int
+    public let longestStreak: Int?
 
     public init(
         date: Date,
         rating: Int,
         highestRating: Int,
         contestsParticipated: Int,
-        problemsSolved: Int
+        problemsSolved: Int,
+        longestStreak: Int? = nil
     ) {
         self.date = date
         self.rating = rating
         self.highestRating = highestRating
         self.contestsParticipated = contestsParticipated
         self.problemsSolved = problemsSolved
+        self.longestStreak = longestStreak
     }
 
     /// AtCoder rank color based on rating
@@ -132,8 +135,8 @@ public struct AtCoderStats: Sendable, Equatable, Codable {
     }
 }
 
-/// AtCoder rank colors
-public enum AtCoderRankColor: String, Sendable, CaseIterable {
+/// AtCoder rank colors based on rating/difficulty
+public enum AtCoderRankColor: String, Sendable, CaseIterable, Codable {
     case gray
     case brown
     case green
@@ -166,6 +169,101 @@ public enum AtCoderRankColor: String, Sendable, CaseIterable {
         case .red:
             return "2800+"
         }
+    }
+
+    /// Returns the color for a given difficulty rating
+    public static func from(difficulty: Int?) -> AtCoderRankColor {
+        guard let diff = difficulty else { return .gray }
+        switch diff {
+        case ..<400: return .gray
+        case 400..<800: return .brown
+        case 800..<1200: return .green
+        case 1200..<1600: return .cyan
+        case 1600..<2000: return .blue
+        case 2000..<2400: return .yellow
+        case 2400..<2800: return .orange
+        default: return .red
+        }
+    }
+
+    /// Sort order for stacking (easiest at bottom)
+    public var sortOrder: Int {
+        switch self {
+        case .gray: return 0
+        case .brown: return 1
+        case .green: return 2
+        case .cyan: return 3
+        case .blue: return 4
+        case .yellow: return 5
+        case .orange: return 6
+        case .red: return 7
+        }
+    }
+}
+
+/// AtCoder submission record
+public struct AtCoderSubmission: Sendable, Equatable, Codable, Identifiable {
+    public let id: Int
+    public let epochSecond: Int
+    public let problemId: String
+    public let contestId: String
+    public let userId: String
+    public let language: String
+    public let point: Double
+    public let length: Int
+    public let result: String
+    public let executionTime: Int?
+
+    public init(
+        id: Int,
+        epochSecond: Int,
+        problemId: String,
+        contestId: String,
+        userId: String,
+        language: String,
+        point: Double,
+        length: Int,
+        result: String,
+        executionTime: Int?
+    ) {
+        self.id = id
+        self.epochSecond = epochSecond
+        self.problemId = problemId
+        self.contestId = contestId
+        self.userId = userId
+        self.language = language
+        self.point = point
+        self.length = length
+        self.result = result
+        self.executionTime = executionTime
+    }
+
+    /// Date of the submission
+    public var date: Date {
+        Date(timeIntervalSince1970: TimeInterval(epochSecond))
+    }
+
+    /// Whether the submission was accepted
+    public var isAccepted: Bool {
+        result == "AC"
+    }
+}
+
+/// Daily submission summary grouped by difficulty
+public struct AtCoderDailyEffort: Sendable, Equatable, Identifiable {
+    public let date: Date
+    public let submissionsByDifficulty: [AtCoderRankColor: Int]
+
+    public var id: Date { date }
+
+    public init(date: Date, submissionsByDifficulty: [AtCoderRankColor: Int]) {
+        self.date = date
+        self.submissionsByDifficulty = submissionsByDifficulty
+    }
+
+    /// Total submissions for the day
+    public var totalSubmissions: Int {
+        submissionsByDifficulty.values.reduce(0, +)
     }
 }
 
