@@ -376,7 +376,7 @@ private struct AtCoderContestResult: Codable {
 
     var endTime: Date {
         let formatter = ISO8601DateFormatter()
-        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        formatter.formatOptions = [.withInternetDateTime]
         return formatter.date(from: EndTime) ?? Date()
     }
 }

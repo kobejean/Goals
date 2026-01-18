@@ -51,7 +51,7 @@ public struct InsightsView: View {
                         }
                     }
                     .pickerStyle(.segmented)
-                    .frame(width: 180)
+                    .frame(width: 220)
                 }
             }
             .task {
@@ -654,6 +654,7 @@ public enum TimeRange: String, CaseIterable {
     case month
     case quarter
     case year
+    case all
 
     public var displayName: String {
         switch self {
@@ -661,6 +662,7 @@ public enum TimeRange: String, CaseIterable {
         case .month: return "1M"
         case .quarter: return "3M"
         case .year: return "1Y"
+        case .all: return "All"
         }
     }
 
@@ -675,6 +677,9 @@ public enum TimeRange: String, CaseIterable {
             return calendar.date(byAdding: .month, value: -3, to: endDate) ?? endDate
         case .year:
             return calendar.date(byAdding: .year, value: -1, to: endDate) ?? endDate
+        case .all:
+            // Return a date far in the past to include all data
+            return calendar.date(byAdding: .year, value: -100, to: endDate) ?? Date.distantPast
         }
     }
 
@@ -684,6 +689,7 @@ public enum TimeRange: String, CaseIterable {
         case .month: return .weekOfYear
         case .quarter: return .month
         case .year: return .month
+        case .all: return .year
         }
     }
 
@@ -693,6 +699,7 @@ public enum TimeRange: String, CaseIterable {
         case .month: return 1
         case .quarter: return 1
         case .year: return 2
+        case .all: return 1
         }
     }
 
@@ -702,6 +709,7 @@ public enum TimeRange: String, CaseIterable {
         case .month: return .dateTime.month(.abbreviated).day()
         case .quarter: return .dateTime.month(.abbreviated)
         case .year: return .dateTime.month(.abbreviated)
+        case .all: return .dateTime.year()
         }
     }
 }

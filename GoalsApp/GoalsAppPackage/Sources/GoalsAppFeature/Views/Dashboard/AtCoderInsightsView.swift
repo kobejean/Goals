@@ -240,6 +240,11 @@ private struct RatingChart: View {
     }
 
     private var xAxisDomain: ClosedRange<Date> {
+        // For "All" time range, use actual data range
+        if timeRange == .all, let earliest = contestHistory.map(\.date).min() {
+            let now = Date()
+            return earliest...now
+        }
         let now = Date()
         let start = timeRange.startDate(from: now)
         return start...now
@@ -306,6 +311,11 @@ private struct DailyEffortChart: View {
     }
 
     private var xAxisDomain: ClosedRange<Date> {
+        // For "All" time range, use actual data range
+        if timeRange == .all, let earliest = dailyEffort.map(\.date).min() {
+            let now = Date()
+            return earliest...now
+        }
         let now = Date()
         let start = timeRange.startDate(from: now)
         return start...now
