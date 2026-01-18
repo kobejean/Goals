@@ -1,6 +1,25 @@
 import Foundation
 
-/// Add Codable conformance to AtCoderDailyEffort for caching
+/// Daily submission summary grouped by difficulty
+public struct AtCoderDailyEffort: Sendable, Equatable, Identifiable {
+    public let date: Date
+    public let submissionsByDifficulty: [AtCoderRankColor: Int]
+
+    public var id: Date { date }
+
+    public init(date: Date, submissionsByDifficulty: [AtCoderRankColor: Int]) {
+        self.date = date
+        self.submissionsByDifficulty = submissionsByDifficulty
+    }
+
+    /// Total submissions for the day
+    public var totalSubmissions: Int {
+        submissionsByDifficulty.values.reduce(0, +)
+    }
+}
+
+// MARK: - Codable
+
 extension AtCoderDailyEffort: Codable {
     enum CodingKeys: String, CodingKey {
         case date
@@ -35,6 +54,8 @@ extension AtCoderDailyEffort: Codable {
         try container.encode(stringDict, forKey: .submissionsByDifficulty)
     }
 }
+
+// MARK: - CacheableRecord
 
 extension AtCoderDailyEffort: CacheableRecord {
     public static var dataSource: DataSourceType { .atCoder }
