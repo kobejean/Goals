@@ -142,38 +142,29 @@ struct DataSourceRow: View {
 
     var body: some View {
         HStack {
-            Image(systemName: icon)
-                .foregroundStyle(.blue)
-                .frame(width: 24)
-
-            VStack(alignment: .leading, spacing: 4) {
-                Text(title)
-                    .fontWeight(.medium)
-
-                TextField(placeholder, text: $username)
-                    .textFieldStyle(.roundedBorder)
-                    .textInputAutocapitalization(.never)
-                    .autocorrectionDisabled()
-            }
+            Label(title, systemImage: icon)
 
             Spacer()
 
+            TextField(placeholder, text: $username)
+                .multilineTextAlignment(.trailing)
+                .textInputAutocapitalization(.never)
+                .autocorrectionDisabled()
+                .foregroundStyle(.secondary)
+
             // Save status indicator
-            Group {
-                switch saveState {
-                case .idle:
-                    EmptyView()
-                case .saving:
-                    ProgressView()
-                        .scaleEffect(0.7)
-                case .saved:
-                    Image(systemName: "checkmark.circle.fill")
-                        .foregroundStyle(.green)
-                }
+            switch saveState {
+            case .idle:
+                EmptyView()
+                    .frame(width: 0)
+            case .saving:
+                ProgressView()
+                    .scaleEffect(0.7)
+            case .saved:
+                Image(systemName: "checkmark.circle.fill")
+                    .foregroundStyle(.green)
             }
-            .frame(width: 24)
         }
-        .padding(.vertical, 4)
     }
 }
 
