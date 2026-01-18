@@ -25,8 +25,12 @@ struct InsightCard: View {
             VStack(alignment: .leading, spacing: 8) {
                 switch mode {
                 case .chart:
-                    SparklineChart(dataPoints: summary.dataPoints, color: summary.color)
-                        .frame(height: 40)
+                    SparklineChart(
+                        dataPoints: summary.dataPoints,
+                        color: summary.color,
+                        goalValue: summary.goalValue
+                    )
+                    .frame(height: 40)
 
                     Text(summary.currentValueFormatted)
                         .font(.title2.bold())

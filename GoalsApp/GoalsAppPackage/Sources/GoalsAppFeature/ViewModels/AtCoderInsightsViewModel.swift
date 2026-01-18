@@ -71,7 +71,8 @@ public final class AtCoderInsightsViewModel: InsightsSectionViewModel {
             color: stats?.rankColor.swiftUIColor ?? .gray,
             dataPoints: dataPoints,
             currentValueFormatted: "\(current)",
-            trend: trend
+            trend: trend,
+            goalValue: ratingGoalTarget.map { Double($0) }
         )
     }
 

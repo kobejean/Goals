@@ -98,7 +98,8 @@ public final class TypeQuickerInsightsViewModel: InsightsSectionViewModel {
             color: .blue,
             dataPoints: dataPoints,
             currentValueFormatted: String(format: "%.0f WPM", current),
-            trend: metricTrend
+            trend: metricTrend,
+            goalValue: goalTarget(for: .wpm)
         )
     }
 

@@ -31,15 +31,22 @@ public struct InsightsView: View {
                 }
                 .padding()
             }
-            .navigationTitle("Insights")
+            .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                ToolbarItem(placement: .topBarTrailing) {
-                    Picker("Mode", selection: $displayMode) {
-                        ForEach(InsightDisplayMode.allCases, id: \.self) { mode in
-                            Image(systemName: mode.systemImage).tag(mode)
+                ToolbarItem(placement: .principal) {
+                    HStack {
+                        Text("Insights")
+                            .font(.largeTitle.bold())
+                        Spacer()
+                        Picker("Mode", selection: $displayMode) {
+                            ForEach(InsightDisplayMode.allCases, id: \.self) { mode in
+                                Image(systemName: mode.systemImage).tag(mode)
+                            }
                         }
+                        .pickerStyle(.segmented)
+                        .fixedSize()
                     }
-                    .pickerStyle(.segmented)
+                    .frame(maxWidth: .infinity)
                 }
             }
             .task {

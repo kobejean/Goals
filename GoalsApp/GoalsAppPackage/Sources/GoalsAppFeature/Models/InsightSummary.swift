@@ -47,6 +47,7 @@ public struct InsightSummary: Sendable {
     public let dataPoints: [InsightDataPoint]
     public let currentValueFormatted: String
     public let trend: Double?  // percentage change, nil if insufficient data
+    public let goalValue: Double?  // optional goal target to show as line
 
     public init(
         title: String,
@@ -54,7 +55,8 @@ public struct InsightSummary: Sendable {
         color: Color,
         dataPoints: [InsightDataPoint],
         currentValueFormatted: String,
-        trend: Double?
+        trend: Double?,
+        goalValue: Double? = nil
     ) {
         self.title = title
         self.systemImage = systemImage
@@ -62,5 +64,6 @@ public struct InsightSummary: Sendable {
         self.dataPoints = dataPoints
         self.currentValueFormatted = currentValueFormatted
         self.trend = trend
+        self.goalValue = goalValue
     }
 }
