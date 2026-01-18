@@ -13,14 +13,17 @@ public struct ContentView: View {
             InsightsView()
                 .tag(AppTab.insights)
                 .tabItem { AppTab.insights.label }
+                .accessibilityIdentifier("tab-insights")
 
             GoalsListView()
                 .tag(AppTab.goals)
                 .tabItem { AppTab.goals.label }
+                .accessibilityIdentifier("tab-goals")
 
             SettingsView()
                 .tag(AppTab.settings)
                 .tabItem { AppTab.settings.label }
+                .accessibilityIdentifier("tab-settings")
         }
     }
 

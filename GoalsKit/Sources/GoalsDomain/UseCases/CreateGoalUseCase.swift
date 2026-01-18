@@ -32,6 +32,32 @@ public struct CreateGoalUseCase: Sendable {
         return try await goalRepository.create(goal)
     }
 
+    /// Creates a new data source goal with a specific metric
+    public func createDataSourceGoal(
+        title: String,
+        description: String? = nil,
+        dataSource: DataSourceType,
+        metricKey: String,
+        targetValue: Double,
+        unit: String,
+        deadline: Date? = nil,
+        color: GoalColor = .blue
+    ) async throws -> Goal {
+        let goal = Goal(
+            title: title,
+            description: description,
+            type: .numeric,
+            dataSource: dataSource,
+            metricKey: metricKey,
+            targetValue: targetValue,
+            currentValue: 0,
+            unit: unit,
+            deadline: deadline,
+            color: color
+        )
+        return try await goalRepository.create(goal)
+    }
+
     /// Creates a new habit goal
     public func createHabitGoal(
         title: String,

@@ -5,6 +5,9 @@ public protocol DataSourceRepositoryProtocol: Sendable {
     /// The type of data source this repository handles
     var dataSourceType: DataSourceType { get }
 
+    /// Metrics available from this data source
+    var availableMetrics: [MetricInfo] { get }
+
     /// Fetches data from the external source for a date range
     func fetchData(from startDate: Date, to endDate: Date) async throws -> [DataPoint]
 
@@ -19,6 +22,13 @@ public protocol DataSourceRepositoryProtocol: Sendable {
 
     /// Clears the configuration for this data source
     func clearConfiguration() async throws
+
+    /// Extract a metric value from stats data
+    /// - Parameters:
+    ///   - key: The metric key (e.g., "wpm", "accuracy")
+    ///   - stats: The stats data to extract from
+    /// - Returns: The metric value, or nil if not found
+    func metricValue(for key: String, from stats: Any) -> Double?
 }
 
 /// Settings for configuring a data source

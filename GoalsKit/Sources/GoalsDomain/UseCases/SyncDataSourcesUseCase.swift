@@ -85,6 +85,9 @@ public struct SyncDataSourcesUseCase: Sendable {
 
         let dataPoints = try await repository.fetchData(from: startDate, to: endDate)
 
+        // Get the latest stats for metric-based goal updates
+        let latestStats = try await repository.fetchLatest()
+
         // Create data points for each goal
         var createdCount = 0
         for goal in goals {
@@ -102,8 +105,22 @@ public struct SyncDataSourcesUseCase: Sendable {
             let created = try await dataPointRepository.createBatch(goalDataPoints)
             createdCount += created.count
 
-            // Update goal progress based on latest data
-            if let latest = created.last {
+            // Update goal progress based on metric key or latest data
+            if let metricKey = goal.metricKey, let latestStats {
+                // For metric-based goals, extract the specific metric value
+                let value = extractMetricValue(
+                    from: latestStats,
+                    for: metricKey,
+                    sourceType: sourceType
+                )
+                if let value {
+                    try await goalRepository.updateProgress(
+                        goalId: goal.id,
+                        currentValue: value
+                    )
+                }
+            } else if let latest = created.last {
+                // For non-metric goals, use the latest data point value
                 try await goalRepository.updateProgress(
                     goalId: goal.id,
                     currentValue: latest.value
@@ -117,6 +134,44 @@ public struct SyncDataSourcesUseCase: Sendable {
             dataPointsCreated: createdCount,
             error: nil
         )
+    }
+
+    /// Extract a metric value from a data point
+    private func extractMetricValue(
+        from dataPoint: DataPoint,
+        for metricKey: String,
+        sourceType: DataSourceType
+    ) -> Double? {
+        let metadata = dataPoint.metadata ?? [:]
+
+        switch sourceType {
+        case .typeQuicker:
+            switch metricKey {
+            case "wpm":
+                return dataPoint.value // WPM is the main value
+            case "accuracy":
+                return metadata["accuracy"].flatMap { Double($0) }
+            case "practiceTime":
+                return metadata["practiceMinutes"].flatMap { Double($0) }
+            default:
+                return nil
+            }
+        case .atCoder:
+            switch metricKey {
+            case "rating":
+                return dataPoint.value // Rating is the main value
+            case "highestRating":
+                return metadata["highestRating"].flatMap { Double($0) }
+            case "contestsParticipated":
+                return metadata["contests"].flatMap { Double($0) }
+            case "problemsSolved":
+                return metadata["problemsSolved"].flatMap { Double($0) }
+            default:
+                return nil
+            }
+        default:
+            return nil
+        }
     }
 }
 

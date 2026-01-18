@@ -13,11 +13,6 @@ public struct InsightsView: View {
     @State private var selectedMetric: ChartMetric = .wpm
     @State private var isLoading = true
 
-    // TypeQuicker goals from settings
-    @State private var wpmGoal: Double = 0
-    @State private var accuracyGoal: Double = 0
-    @State private var timeGoal: Double = 0
-
     public var body: some View {
         NavigationStack {
             ScrollView {
@@ -99,11 +94,18 @@ public struct InsightsView: View {
 
     /// Current goal value based on selected metric
     private var currentGoal: Double {
+        // Map ChartMetric to metricKey
+        let metricKey: String
         switch selectedMetric {
-        case .wpm: return wpmGoal
-        case .accuracy: return accuracyGoal
-        case .time: return timeGoal
+        case .wpm: metricKey = "wpm"
+        case .accuracy: metricKey = "accuracy"
+        case .time: metricKey = "practiceTime"
         }
+
+        // Find a goal for TypeQuicker with the matching metricKey
+        return goals
+            .first { $0.dataSource == .typeQuicker && $0.metricKey == metricKey }?
+            .targetValue ?? 0
     }
 
     /// Y-axis range for current metric with padding
@@ -542,11 +544,6 @@ public struct InsightsView: View {
 
     private func loadData() async {
         isLoading = true
-
-        // Load TypeQuicker goals from UserDefaults
-        wpmGoal = UserDefaults.standard.double(forKey: "typeQuickerWpmGoal")
-        accuracyGoal = UserDefaults.standard.double(forKey: "typeQuickerAccuracyGoal")
-        timeGoal = UserDefaults.standard.double(forKey: "typeQuickerTimeGoal")
 
         async let goalsTask: () = loadGoals()
         async let statsTask: () = loadTypeQuickerStats()

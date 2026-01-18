@@ -5,6 +5,24 @@ import GoalsDomain
 public actor TypeQuickerDataSource: TypeQuickerDataSourceProtocol {
     public let dataSourceType: DataSourceType = .typeQuicker
 
+    public nonisolated var availableMetrics: [MetricInfo] {
+        [
+            MetricInfo(key: "wpm", name: "Words Per Minute", unit: "WPM", icon: "speedometer"),
+            MetricInfo(key: "accuracy", name: "Accuracy", unit: "%", icon: "target"),
+            MetricInfo(key: "practiceTime", name: "Practice Time", unit: "min", icon: "clock"),
+        ]
+    }
+
+    public nonisolated func metricValue(for key: String, from stats: Any) -> Double? {
+        guard let stat = stats as? TypeQuickerStats else { return nil }
+        switch key {
+        case "wpm": return stat.wordsPerMinute
+        case "accuracy": return stat.accuracy
+        case "practiceTime": return Double(stat.practiceTimeMinutes)
+        default: return nil
+        }
+    }
+
     private var username: String?
     private var baseURL: URL?
     private let urlSession: URLSession

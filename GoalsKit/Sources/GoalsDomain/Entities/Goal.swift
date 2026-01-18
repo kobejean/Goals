@@ -11,6 +11,9 @@ public struct Goal: Sendable, Equatable, UUIDIdentifiable {
     public var createdAt: Date
     public var updatedAt: Date
 
+    // Data source metric key (e.g., "wpm", "accuracy", "rating")
+    public var metricKey: String?
+
     // Numeric goal properties
     public var targetValue: Double?
     public var currentValue: Double?
@@ -42,6 +45,7 @@ public struct Goal: Sendable, Equatable, UUIDIdentifiable {
         dataSource: DataSourceType = .manual,
         createdAt: Date = Date(),
         updatedAt: Date = Date(),
+        metricKey: String? = nil,
         targetValue: Double? = nil,
         currentValue: Double? = nil,
         unit: String? = nil,
@@ -63,6 +67,7 @@ public struct Goal: Sendable, Equatable, UUIDIdentifiable {
         self.dataSource = dataSource
         self.createdAt = createdAt
         self.updatedAt = updatedAt
+        self.metricKey = metricKey
         self.targetValue = targetValue
         self.currentValue = currentValue
         self.unit = unit

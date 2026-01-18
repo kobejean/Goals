@@ -12,11 +12,6 @@ public struct SettingsView: View {
     @State private var typeQuickerSaveState: SaveState = .idle
     @State private var atCoderSaveState: SaveState = .idle
 
-    // TypeQuicker goals
-    @State private var wpmGoal: Double = 0
-    @State private var accuracyGoal: Double = 0
-    @State private var timeGoal: Double = 0
-
     enum SaveState {
         case idle
         case saving
@@ -47,37 +42,6 @@ public struct SettingsView: View {
                     Text("Data Sources")
                 } footer: {
                     Text("Settings are saved automatically")
-                }
-
-                // TypeQuicker Goals
-                Section {
-                    GoalInputRow(
-                        label: "WPM Goal",
-                        value: $wpmGoal,
-                        unit: "WPM",
-                        icon: "speedometer",
-                        color: .blue
-                    )
-
-                    GoalInputRow(
-                        label: "Accuracy Goal",
-                        value: $accuracyGoal,
-                        unit: "%",
-                        icon: "target",
-                        color: .green
-                    )
-
-                    GoalInputRow(
-                        label: "Daily Practice Goal",
-                        value: $timeGoal,
-                        unit: "min",
-                        icon: "clock",
-                        color: .orange
-                    )
-                } header: {
-                    Text("TypeQuicker Goals")
-                } footer: {
-                    Text("Set targets to display on your charts. Set to 0 to hide.")
                 }
 
                 // Sync
@@ -153,26 +117,12 @@ public struct SettingsView: View {
                     await saveAtCoderSettings(username: newValue)
                 }
             }
-            .onChange(of: wpmGoal) { _, newValue in
-                UserDefaults.standard.set(newValue, forKey: "typeQuickerWpmGoal")
-            }
-            .onChange(of: accuracyGoal) { _, newValue in
-                UserDefaults.standard.set(newValue, forKey: "typeQuickerAccuracyGoal")
-            }
-            .onChange(of: timeGoal) { _, newValue in
-                UserDefaults.standard.set(newValue, forKey: "typeQuickerTimeGoal")
-            }
         }
     }
 
     private func loadSettings() async {
         typeQuickerUsername = UserDefaults.standard.string(forKey: "typeQuickerUsername") ?? ""
         atCoderUsername = UserDefaults.standard.string(forKey: "atCoderUsername") ?? ""
-
-        // Load TypeQuicker goals
-        wpmGoal = UserDefaults.standard.double(forKey: "typeQuickerWpmGoal")
-        accuracyGoal = UserDefaults.standard.double(forKey: "typeQuickerAccuracyGoal")
-        timeGoal = UserDefaults.standard.double(forKey: "typeQuickerTimeGoal")
     }
 
     private func saveTypeQuickerSettings(username: String) async {
@@ -272,37 +222,6 @@ struct DataSourceRow: View {
             .frame(width: 24)
         }
         .padding(.vertical, 4)
-    }
-}
-
-/// Row for setting a numeric goal
-struct GoalInputRow: View {
-    let label: String
-    @Binding var value: Double
-    let unit: String
-    let icon: String
-    let color: Color
-
-    var body: some View {
-        HStack {
-            Image(systemName: icon)
-                .foregroundStyle(color)
-                .frame(width: 24)
-
-            Text(label)
-
-            Spacer()
-
-            TextField("0", value: $value, format: .number)
-                .textFieldStyle(.roundedBorder)
-                .keyboardType(.decimalPad)
-                .frame(width: 80)
-                .multilineTextAlignment(.trailing)
-
-            Text(unit)
-                .foregroundStyle(.secondary)
-                .frame(width: 40, alignment: .leading)
-        }
     }
 }
 

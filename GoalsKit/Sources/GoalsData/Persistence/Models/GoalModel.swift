@@ -13,6 +13,9 @@ public final class GoalModel {
     public var createdAt: Date
     public var updatedAt: Date
 
+    // Data source metric key
+    public var metricKey: String?
+
     // Numeric goal properties
     public var targetValue: Double?
     public var currentValue: Double?
@@ -48,6 +51,7 @@ public final class GoalModel {
         dataSourceRawValue: String,
         createdAt: Date = Date(),
         updatedAt: Date = Date(),
+        metricKey: String? = nil,
         targetValue: Double? = nil,
         currentValue: Double? = nil,
         unit: String? = nil,
@@ -69,6 +73,7 @@ public final class GoalModel {
         self.dataSourceRawValue = dataSourceRawValue
         self.createdAt = createdAt
         self.updatedAt = updatedAt
+        self.metricKey = metricKey
         self.targetValue = targetValue
         self.currentValue = currentValue
         self.unit = unit
@@ -98,6 +103,7 @@ public extension GoalModel {
             dataSource: DataSourceType(rawValue: dataSourceRawValue) ?? .manual,
             createdAt: createdAt,
             updatedAt: updatedAt,
+            metricKey: metricKey,
             targetValue: targetValue,
             currentValue: currentValue,
             unit: unit,
@@ -124,6 +130,7 @@ public extension GoalModel {
             dataSourceRawValue: goal.dataSource.rawValue,
             createdAt: goal.createdAt,
             updatedAt: goal.updatedAt,
+            metricKey: goal.metricKey,
             targetValue: goal.targetValue,
             currentValue: goal.currentValue,
             unit: goal.unit,
@@ -147,6 +154,7 @@ public extension GoalModel {
         typeRawValue = goal.type.rawValue
         dataSourceRawValue = goal.dataSource.rawValue
         updatedAt = Date()
+        metricKey = goal.metricKey
         targetValue = goal.targetValue
         currentValue = goal.currentValue
         unit = goal.unit

@@ -5,6 +5,26 @@ import GoalsDomain
 public actor AtCoderDataSource: AtCoderDataSourceProtocol {
     public let dataSourceType: DataSourceType = .atCoder
 
+    public nonisolated var availableMetrics: [MetricInfo] {
+        [
+            MetricInfo(key: "rating", name: "Rating", unit: "", icon: "star"),
+            MetricInfo(key: "highestRating", name: "Highest Rating", unit: "", icon: "star.fill"),
+            MetricInfo(key: "contestsParticipated", name: "Contests", unit: "", icon: "calendar"),
+            MetricInfo(key: "problemsSolved", name: "Problems Solved", unit: "", icon: "checkmark.circle"),
+        ]
+    }
+
+    public nonisolated func metricValue(for key: String, from stats: Any) -> Double? {
+        guard let stat = stats as? AtCoderStats else { return nil }
+        switch key {
+        case "rating": return Double(stat.rating)
+        case "highestRating": return Double(stat.highestRating)
+        case "contestsParticipated": return Double(stat.contestsParticipated)
+        case "problemsSolved": return Double(stat.problemsSolved)
+        default: return nil
+        }
+    }
+
     private var username: String?
     private let urlSession: URLSession
     private let baseURL = URL(string: "https://atcoder.jp")!
