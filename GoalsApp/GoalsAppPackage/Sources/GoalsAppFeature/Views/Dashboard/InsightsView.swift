@@ -6,8 +6,6 @@ import GoalsData
 /// Insights view showing time-based trends and analytics
 public struct InsightsView: View {
     @Environment(AppContainer.self) private var container
-    @State private var goals: [Goal] = []
-    @State private var dataPoints: [DataPoint] = []
     @State private var typeQuickerStats: [TypeQuickerStats] = []
     @State private var selectedTimeRange: TimeRange = .week
     @State private var selectedMetric: ChartMetric = .wpm
@@ -25,18 +23,9 @@ public struct InsightsView: View {
                         // TypeQuicker trend chart with mode breakdown
                         typeQuickerTrendSection
 
-                        // AtCoder Daily Effort chart
+                        // AtCoder insights
                         AtCoderInsightsView(timeRange: selectedTimeRange)
                             .padding(.horizontal)
-
-                        // Goal progress over time
-                        progressTrendSection
-
-                        // Activity summary
-                        activitySummarySection
-
-                        // Goal distribution
-                        goalDistributionSection
                     }
                 }
                 .padding(.vertical)
@@ -65,12 +54,13 @@ public struct InsightsView: View {
         }
     }
 
+    // MARK: - Chart Data
+
     /// Flattened data points for charting by mode
     private var modeChartData: [ModeDataPoint] {
         var points: [ModeDataPoint] = []
         for stat in typeQuickerStats {
             if let byMode = stat.byMode, !byMode.isEmpty {
-                // Add individual mode lines
                 for modeStat in byMode {
                     points.append(ModeDataPoint(
                         date: stat.date,
@@ -81,7 +71,6 @@ public struct InsightsView: View {
                     ))
                 }
             } else {
-                // Fallback to overall if no mode breakdown
                 points.append(ModeDataPoint(
                     date: stat.date,
                     mode: "overall",
@@ -99,43 +88,43 @@ public struct InsightsView: View {
         Array(Set(modeChartData.map(\.mode))).sorted()
     }
 
-    /// Current goal value based on selected metric
-    private var currentGoal: Double {
-        // Map ChartMetric to metricKey
-        let metricKey: String
-        switch selectedMetric {
-        case .wpm: metricKey = "wpm"
-        case .accuracy: metricKey = "accuracy"
-        case .time: metricKey = "practiceTime"
-        }
-
-        // Find a goal for TypeQuicker with the matching metricKey
-        return goals
-            .first { $0.dataSource == .typeQuicker && $0.metricKey == metricKey }?
-            .targetValue ?? 0
-    }
-
     /// Y-axis range for current metric with padding
     private var chartYAxisRange: ClosedRange<Double> {
-        var values = modeChartData.map { $0.value(for: selectedMetric) }
-
-        // Include goal in range calculation if set
-        if currentGoal > 0 {
-            values.append(currentGoal)
-        }
+        let values = modeChartData.map { $0.value(for: selectedMetric) }
 
         guard let minVal = values.min(), let maxVal = values.max() else {
             return 0...100
         }
 
-        // Add 10% padding above and below
         let range = maxVal - minVal
-        let padding = max(range * 0.15, 1) // At least 1 unit padding
+        let padding = max(range * 0.15, 1)
 
         let lower = max(0, minVal - padding)
         let upper = maxVal + padding
 
         return lower...upper
+    }
+
+    /// Trend percentage for the selected metric
+    private var metricTrend: Double? {
+        guard typeQuickerStats.count >= 2 else { return nil }
+        let first: Double
+        let last: Double
+
+        switch selectedMetric {
+        case .wpm:
+            first = typeQuickerStats.first!.wordsPerMinute
+            last = typeQuickerStats.last!.wordsPerMinute
+        case .accuracy:
+            first = typeQuickerStats.first!.accuracy
+            last = typeQuickerStats.last!.accuracy
+        case .time:
+            first = Double(typeQuickerStats.first!.practiceTimeMinutes)
+            last = Double(typeQuickerStats.last!.practiceTimeMinutes)
+        }
+
+        guard first > 0 else { return nil }
+        return ((last - first) / first) * 100
     }
 
     // MARK: - TypeQuicker Trend Section
@@ -185,21 +174,6 @@ public struct InsightsView: View {
                         .symbol(by: .value("Mode", point.mode.capitalized))
                         .lineStyle(StrokeStyle(lineWidth: 2))
                     }
-
-                    // Goal line
-                    if currentGoal > 0 {
-                        RuleMark(y: .value("Goal", currentGoal))
-                            .foregroundStyle(.red.opacity(0.7))
-                            .lineStyle(StrokeStyle(lineWidth: 2, dash: [5, 5]))
-                            .annotation(position: .top, alignment: .trailing) {
-                                Text("Goal: \(formatMetricValue(currentGoal, for: selectedMetric))")
-                                    .font(.caption2)
-                                    .foregroundStyle(.red)
-                                    .padding(.horizontal, 4)
-                                    .background(.ultraThinMaterial)
-                                    .clipShape(RoundedRectangle(cornerRadius: 4))
-                            }
-                    }
                 }
                 .frame(height: 200)
                 .chartYScale(domain: chartYAxisRange)
@@ -239,6 +213,8 @@ public struct InsightsView: View {
         .padding(.horizontal)
     }
 
+    // MARK: - Helpers
+
     private func formatMetricValue(_ value: Double, for metric: ChartMetric, suffix: String = "") -> String {
         switch metric {
         case .wpm:
@@ -261,312 +237,12 @@ public struct InsightsView: View {
         }
     }
 
-    // MARK: - Progress Trend Section
-
-    @ViewBuilder
-    private var progressTrendSection: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            HStack {
-                Image(systemName: "chart.line.uptrend.xyaxis")
-                    .foregroundStyle(.green)
-                Text("Goal Progress")
-                    .font(.headline)
-                Spacer()
-            }
-
-            if goals.isEmpty {
-                VStack(spacing: 8) {
-                    Image(systemName: "target")
-                        .font(.title)
-                        .foregroundStyle(.secondary)
-                    Text("No goals yet")
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
-                }
-                .frame(maxWidth: .infinity)
-                .padding()
-            } else {
-                // Average progress over time (simulated based on current progress)
-                Chart {
-                    ForEach(goals.filter { !$0.isArchived }) { goal in
-                        BarMark(
-                            x: .value("Goal", goal.title),
-                            y: .value("Progress", goal.progress * 100)
-                        )
-                        .foregroundStyle(goal.color.swiftUIColor)
-                    }
-                }
-                .frame(height: 150)
-                .chartYAxisLabel("%")
-                .chartYScale(domain: 0...100)
-
-                // Progress stats
-                HStack(spacing: 20) {
-                    VStack(alignment: .leading) {
-                        Text("\(completedGoalsCount)")
-                            .font(.title2)
-                            .fontWeight(.bold)
-                        Text("Completed")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                    }
-
-                    Divider()
-                        .frame(height: 40)
-
-                    VStack(alignment: .leading) {
-                        Text("\(inProgressGoalsCount)")
-                            .font(.title2)
-                            .fontWeight(.bold)
-                        Text("In Progress")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                    }
-
-                    Divider()
-                        .frame(height: 40)
-
-                    VStack(alignment: .leading) {
-                        Text("\(averageProgress)%")
-                            .font(.title2)
-                            .fontWeight(.bold)
-                        Text("Avg Progress")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                    }
-                }
-                .frame(maxWidth: .infinity)
-            }
-        }
-        .padding()
-        .background(.regularMaterial)
-        .clipShape(RoundedRectangle(cornerRadius: 16))
-        .padding(.horizontal)
-    }
-
-    // MARK: - Activity Summary Section
-
-    @ViewBuilder
-    private var activitySummarySection: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            HStack {
-                Image(systemName: "calendar")
-                    .foregroundStyle(.orange)
-                Text("Activity Summary")
-                    .font(.headline)
-                Spacer()
-            }
-
-            LazyVGrid(columns: [
-                GridItem(.flexible()),
-                GridItem(.flexible())
-            ], spacing: 12) {
-                ActivityCard(
-                    title: "Active Streaks",
-                    value: "\(activeStreaksCount)",
-                    icon: "flame.fill",
-                    color: .orange
-                )
-
-                ActivityCard(
-                    title: "Habits Tracked",
-                    value: "\(habitsCount)",
-                    icon: "repeat.circle.fill",
-                    color: .green
-                )
-
-                ActivityCard(
-                    title: "Milestones Hit",
-                    value: "\(completedMilestonesCount)/\(totalMilestonesCount)",
-                    icon: "flag.fill",
-                    color: .purple
-                )
-
-                ActivityCard(
-                    title: "Typing Sessions",
-                    value: "\(totalTypingSessions)",
-                    icon: "keyboard.fill",
-                    color: .blue
-                )
-            }
-        }
-        .padding()
-        .background(.regularMaterial)
-        .clipShape(RoundedRectangle(cornerRadius: 16))
-        .padding(.horizontal)
-    }
-
-    // MARK: - Goal Distribution Section
-
-    @ViewBuilder
-    private var goalDistributionSection: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            HStack {
-                Image(systemName: "chart.pie")
-                    .foregroundStyle(.purple)
-                Text("Goals by Type")
-                    .font(.headline)
-                Spacer()
-            }
-
-            if goals.isEmpty {
-                Text("No goals to display")
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
-                    .frame(maxWidth: .infinity)
-                    .padding()
-            } else {
-                let typeCounts = Dictionary(grouping: goals, by: { $0.type })
-                    .mapValues { $0.count }
-
-                Chart {
-                    ForEach(GoalType.allCases, id: \.self) { type in
-                        let count = typeCounts[type] ?? 0
-                        if count > 0 {
-                            SectorMark(
-                                angle: .value("Count", count),
-                                innerRadius: .ratio(0.5),
-                                angularInset: 1.5
-                            )
-                            .foregroundStyle(by: .value("Type", type.displayName))
-                            .annotation(position: .overlay) {
-                                Text("\(count)")
-                                    .font(.caption)
-                                    .fontWeight(.bold)
-                                    .foregroundStyle(.white)
-                            }
-                        }
-                    }
-                }
-                .frame(height: 180)
-
-                // Legend
-                HStack(spacing: 16) {
-                    ForEach(GoalType.allCases, id: \.self) { type in
-                        let count = typeCounts[type] ?? 0
-                        if count > 0 {
-                            HStack(spacing: 4) {
-                                Circle()
-                                    .fill(colorForType(type))
-                                    .frame(width: 8, height: 8)
-                                Text(type.displayName)
-                                    .font(.caption)
-                            }
-                        }
-                    }
-                }
-            }
-        }
-        .padding()
-        .background(.regularMaterial)
-        .clipShape(RoundedRectangle(cornerRadius: 16))
-        .padding(.horizontal)
-    }
-
-    // MARK: - Computed Properties
-
-    private var averageWpm: Double {
-        guard !typeQuickerStats.isEmpty else { return 0 }
-        return typeQuickerStats.reduce(0) { $0 + $1.wordsPerMinute } / Double(typeQuickerStats.count)
-    }
-
-    private var bestWpm: Double {
-        typeQuickerStats.map(\.wordsPerMinute).max() ?? 0
-    }
-
-    private var averageAccuracy: Double {
-        guard !typeQuickerStats.isEmpty else { return 0 }
-        return typeQuickerStats.reduce(0) { $0 + $1.accuracy } / Double(typeQuickerStats.count)
-    }
-
-    private var totalPracticeMinutes: Int {
-        typeQuickerStats.reduce(0) { $0 + $1.practiceTimeMinutes }
-    }
-
-    private var totalTypingSessions: Int {
-        typeQuickerStats.reduce(0) { $0 + $1.sessionsCount }
-    }
-
-    private var metricTrend: Double? {
-        guard typeQuickerStats.count >= 2 else { return nil }
-        let first: Double
-        let last: Double
-
-        switch selectedMetric {
-        case .wpm:
-            first = typeQuickerStats.first!.wordsPerMinute
-            last = typeQuickerStats.last!.wordsPerMinute
-        case .accuracy:
-            first = typeQuickerStats.first!.accuracy
-            last = typeQuickerStats.last!.accuracy
-        case .time:
-            first = Double(typeQuickerStats.first!.practiceTimeMinutes)
-            last = Double(typeQuickerStats.last!.practiceTimeMinutes)
-        }
-
-        guard first > 0 else { return nil }
-        return ((last - first) / first) * 100
-    }
-
-    private var completedGoalsCount: Int {
-        goals.filter { $0.isAchieved }.count
-    }
-
-    private var inProgressGoalsCount: Int {
-        goals.filter { !$0.isAchieved && !$0.isArchived }.count
-    }
-
-    private var averageProgress: Int {
-        guard !goals.isEmpty else { return 0 }
-        let total = goals.reduce(0.0) { $0 + $1.progress }
-        return Int(total / Double(goals.count) * 100)
-    }
-
-    private var activeStreaksCount: Int {
-        goals.filter { $0.type == .habit && ($0.currentStreak ?? 0) > 0 }.count
-    }
-
-    private var habitsCount: Int {
-        goals.filter { $0.type == .habit }.count
-    }
-
-    private var completedMilestonesCount: Int {
-        goals.filter { $0.type == .milestone && $0.isAchieved }.count
-    }
-
-    private var totalMilestonesCount: Int {
-        goals.filter { $0.type == .milestone }.count
-    }
-
-    private func colorForType(_ type: GoalType) -> Color {
-        switch type {
-        case .numeric: return .blue
-        case .habit: return .green
-        case .milestone: return .purple
-        case .compound: return .orange
-        }
-    }
-
     // MARK: - Data Loading
 
     private func loadData() async {
         isLoading = true
-
-        async let goalsTask: () = loadGoals()
-        async let statsTask: () = loadTypeQuickerStats()
-
-        await goalsTask
-        await statsTask
-
+        await loadTypeQuickerStats()
         isLoading = false
-    }
-
-    private func loadGoals() async {
-        do {
-            goals = try await container.goalRepository.fetchAll()
-        } catch {
-            print("Failed to load goals: \(error)")
-        }
     }
 
     private func loadTypeQuickerStats() async {
@@ -586,7 +262,6 @@ public struct InsightsView: View {
         do {
             let endDate = Date()
             let startDate = selectedTimeRange.startDate(from: endDate)
-            // Fetch daily stats (includes byMode breakdown per day)
             typeQuickerStats = try await container.typeQuickerDataSource.fetchStats(from: startDate, to: endDate)
         } catch {
             print("Failed to load TypeQuicker stats: \(error)")
@@ -617,14 +292,6 @@ enum ChartMetric: String, CaseIterable {
         case .wpm: return "WPM"
         case .accuracy: return "%"
         case .time: return "min"
-        }
-    }
-
-    var unitSuffix: String {
-        switch self {
-        case .wpm: return " WPM"
-        case .accuracy: return "%"
-        case .time: return " min"
         }
     }
 }
@@ -678,7 +345,6 @@ public enum TimeRange: String, CaseIterable {
         case .year:
             return calendar.date(byAdding: .year, value: -1, to: endDate) ?? endDate
         case .all:
-            // Return a date far in the past to include all data
             return calendar.date(byAdding: .year, value: -100, to: endDate) ?? Date.distantPast
         }
     }
@@ -732,54 +398,6 @@ struct TrendBadge: View {
         .background(trend >= 0 ? Color.green.opacity(0.2) : Color.red.opacity(0.2))
         .foregroundStyle(trend >= 0 ? .green : .red)
         .clipShape(Capsule())
-    }
-}
-
-struct MiniStatCard: View {
-    let label: String
-    let value: String
-
-    var body: some View {
-        VStack(spacing: 2) {
-            Text(value)
-                .font(.subheadline)
-                .fontWeight(.semibold)
-            Text(label)
-                .font(.caption2)
-                .foregroundStyle(.secondary)
-        }
-        .frame(maxWidth: .infinity)
-        .padding(.vertical, 8)
-        .background(.ultraThinMaterial)
-        .clipShape(RoundedRectangle(cornerRadius: 8))
-    }
-}
-
-struct ActivityCard: View {
-    let title: String
-    let value: String
-    let icon: String
-    let color: Color
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            HStack {
-                Image(systemName: icon)
-                    .foregroundStyle(color)
-                Spacer()
-            }
-
-            Text(value)
-                .font(.title2)
-                .fontWeight(.bold)
-
-            Text(title)
-                .font(.caption)
-                .foregroundStyle(.secondary)
-        }
-        .padding()
-        .background(.ultraThinMaterial)
-        .clipShape(RoundedRectangle(cornerRadius: 12))
     }
 }
 
