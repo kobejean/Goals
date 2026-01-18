@@ -187,6 +187,9 @@
 			mainGroup = 8B41F63C2DEDD0D5001A66F9;
 			minimizedProjectReferenceProxies = 1;
 			preferredProjectObjectVersion = 77;
+			packageReferences = (
+				8B41F6902DEDD300001A66F9 /* XCLocalSwiftPackageReference "GoalsAppPackage" */,
+			);
 			productRefGroup = 8B41F6462DEDD0D5001A66F9 /* Products */;
 			projectDirPath = "";
 			projectRoot = "";
@@ -469,14 +472,23 @@
 		};
 /* End XCConfigurationList section */
 
+/* Begin XCLocalSwiftPackageReference section */
+		8B41F6902DEDD300001A66F9 /* XCLocalSwiftPackageReference "GoalsAppPackage" */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = GoalsAppPackage;
+		};
+/* End XCLocalSwiftPackageReference section */
+
 /* Begin XCSwiftPackageProductDependency section */
 		8B41F6822DEDD23B001A66F9 /* GoalsAppFeature */ = {
 			isa = XCSwiftPackageProductDependency;
 			productName = GoalsAppFeature;
+			package = 8B41F6902DEDD300001A66F9 /* XCLocalSwiftPackageReference "GoalsAppPackage" */;
 		};
 		8B41F6842DEDD25C001A66F9 /* GoalsAppFeature */ = {
 			isa = XCSwiftPackageProductDependency;
 			productName = GoalsAppFeature;
+			package = 8B41F6902DEDD300001A66F9 /* XCLocalSwiftPackageReference "GoalsAppPackage" */;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};
