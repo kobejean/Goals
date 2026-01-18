@@ -5,15 +5,12 @@ extension AtCoderStats: CacheableRecord {
     public static var recordType: String { "contest_history" }
 
     public var cacheKey: String {
-        // Use contest screen name as unique identifier
-        // This ensures we only store actual contest results, not stats snapshots
-        if let contestScreenName = contestScreenName {
-            return "ac:contest:\(contestScreenName)"
+        // Contest screen name is the unique identifier for contest results
+        // Only contest results should be cached - stats snapshots should not be stored
+        guard let contestScreenName = contestScreenName else {
+            fatalError("AtCoderStats.cacheKey called on non-contest entry. Only contest results should be cached.")
         }
-        // Fallback for legacy data without contest ID (will be overwritten)
-        let formatter = ISO8601DateFormatter()
-        formatter.formatOptions = [.withInternetDateTime]
-        return "ac:stats:\(formatter.string(from: date))"
+        return "ac:contest:\(contestScreenName)"
     }
 
     public var recordDate: Date { date }
