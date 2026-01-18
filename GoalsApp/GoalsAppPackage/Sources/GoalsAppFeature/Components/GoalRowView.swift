@@ -54,10 +54,8 @@ public struct GoalRowView: View {
         } else if goal.isArchived {
             Image(systemName: "archivebox.fill")
                 .foregroundStyle(.gray)
-        } else {
-            Image(systemName: "chevron.right")
-                .foregroundStyle(.secondary)
         }
+        // No chevron needed - NavigationLink provides it
     }
 
     private var progressText: String {

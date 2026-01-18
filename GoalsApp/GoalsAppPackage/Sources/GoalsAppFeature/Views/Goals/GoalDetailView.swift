@@ -28,7 +28,7 @@ public struct GoalDetailView: View {
             .padding()
         }
         .navigationTitle(goal.title)
-        .navigationBarTitleDisplayMode(.large)
+        .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItem(placement: .primaryAction) {
                 Menu {
@@ -86,6 +86,18 @@ public struct GoalDetailView: View {
         .clipShape(RoundedRectangle(cornerRadius: 16))
     }
 
+    /// Get the display name for the metric from the data source
+    private var metricDisplayName: String {
+        let metrics: [MetricInfo]
+        switch goal.dataSource {
+        case .typeQuicker:
+            metrics = container.typeQuickerDataSource.availableMetrics
+        case .atCoder:
+            metrics = container.atCoderDataSource.availableMetrics
+        }
+        return metrics.first { $0.key == goal.metricKey }?.name ?? goal.metricKey.capitalized
+    }
+
     @ViewBuilder
     private var detailsSection: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -94,7 +106,7 @@ public struct GoalDetailView: View {
 
             VStack(spacing: 8) {
                 DetailRow(label: "Source", value: goal.dataSource.displayName, icon: goal.dataSource.iconName)
-                DetailRow(label: "Metric", value: goal.metricKey.capitalized, icon: "chart.line.uptrend.xyaxis")
+                DetailRow(label: "Metric", value: metricDisplayName, icon: "chart.line.uptrend.xyaxis")
 
                 if let deadline = goal.deadline {
                     DetailRow(

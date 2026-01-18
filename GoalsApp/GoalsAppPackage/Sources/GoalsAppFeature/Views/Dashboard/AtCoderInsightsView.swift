@@ -9,6 +9,7 @@ public struct AtCoderInsightsView: View {
     @State private var dailyEffort: [AtCoderDailyEffort] = []
     @State private var contestHistory: [AtCoderStats] = []
     @State private var stats: AtCoderStats?
+    @State private var atCoderGoals: [Goal] = []
     @State private var isLoading = true
     @State private var errorMessage: String?
 
@@ -38,7 +39,8 @@ public struct AtCoderInsightsView: View {
                 // Rating History Chart
                 RatingChart(
                     contestHistory: filteredContestHistory,
-                    timeRange: timeRange
+                    timeRange: timeRange,
+                    ratingGoal: ratingGoalTarget
                 )
 
                 // Daily Effort Chart
@@ -67,6 +69,13 @@ public struct AtCoderInsightsView: View {
         return contestHistory.filter { $0.date >= cutoffDate }
     }
 
+    private var ratingGoalTarget: Int? {
+        guard let goal = atCoderGoals.first(where: { $0.metricKey == "rating" && !$0.isArchived }) else {
+            return nil
+        }
+        return Int(goal.targetValue)
+    }
+
     private func loadData() async {
         isLoading = true
         errorMessage = nil
@@ -93,10 +102,12 @@ public struct AtCoderInsightsView: View {
             async let statsTask = container.atCoderDataSource.fetchStats()
             async let effortTask = container.atCoderDataSource.fetchDailyEffort(from: yearStart)
             async let historyTask = container.atCoderDataSource.fetchContestHistory()
+            async let goalsTask = container.goalRepository.fetch(dataSource: .atCoder)
 
             stats = try await statsTask
             dailyEffort = try await effortTask
             contestHistory = try await historyTask
+            atCoderGoals = try await goalsTask
         } catch {
             errorMessage = "Failed to load data: \(error.localizedDescription)"
         }
@@ -177,6 +188,7 @@ private struct StatItem: View {
 private struct RatingChart: View {
     let contestHistory: [AtCoderStats]
     let timeRange: TimeRange
+    let ratingGoal: Int?
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
@@ -206,6 +218,21 @@ private struct RatingChart: View {
                         .foregroundStyle(AtCoderRankColor.from(difficulty: stat.rating).swiftUIColor)
                         .symbolSize(40)
                     }
+
+                    // Goal target line
+                    if let goal = ratingGoal {
+                        RuleMark(y: .value("Goal", goal))
+                            .foregroundStyle(.red.opacity(0.8))
+                            .lineStyle(StrokeStyle(lineWidth: 2, dash: [5, 5]))
+                            .annotation(position: .top, alignment: .trailing) {
+                                Text("Goal: \(goal)")
+                                    .font(.caption2)
+                                    .foregroundStyle(.red)
+                                    .padding(.horizontal, 4)
+                                    .background(.regularMaterial)
+                                    .clipShape(RoundedRectangle(cornerRadius: 4))
+                            }
+                    }
                 }
                 .chartXScale(domain: xAxisDomain)
                 .chartXAxis {
@@ -220,7 +247,7 @@ private struct RatingChart: View {
                         AxisValueLabel()
                     }
                 }
-                .chartYScale(domain: yAxisDomain)
+                .chartYScale(domain: yAxisDomainWithGoal)
                 .frame(height: 150)
             }
         }
@@ -255,6 +282,16 @@ private struct RatingChart: View {
 
     private var yAxisDomain: ClosedRange<Int> {
         let ratings = contestHistory.map { $0.rating }
+        let minRating = (ratings.min() ?? 0) - 100
+        let maxRating = (ratings.max() ?? 100) + 100
+        return max(0, minRating)...maxRating
+    }
+
+    private var yAxisDomainWithGoal: ClosedRange<Int> {
+        var ratings = contestHistory.map { $0.rating }
+        if let goal = ratingGoal {
+            ratings.append(goal)
+        }
         let minRating = (ratings.min() ?? 0) - 100
         let maxRating = (ratings.max() ?? 100) + 100
         return max(0, minRating)...maxRating

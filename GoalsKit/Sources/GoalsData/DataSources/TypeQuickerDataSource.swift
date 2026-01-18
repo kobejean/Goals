@@ -7,8 +7,8 @@ public actor TypeQuickerDataSource: TypeQuickerDataSourceProtocol {
 
     public nonisolated var availableMetrics: [MetricInfo] {
         [
-            MetricInfo(key: "wpm", name: "Words Per Minute", unit: "WPM", icon: "speedometer"),
-            MetricInfo(key: "accuracy", name: "Accuracy", unit: "%", icon: "target"),
+            MetricInfo(key: "wpm", name: "Average WPM", unit: "WPM", icon: "speedometer"),
+            MetricInfo(key: "accuracy", name: "Average Accuracy", unit: "%", icon: "target"),
             MetricInfo(key: "practiceTime", name: "Practice Time", unit: "min", icon: "clock"),
         ]
     }

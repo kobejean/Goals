@@ -173,6 +173,8 @@ public struct CreateGoalView: View {
                 unit: metric.unit,
                 color: color
             )
+            // Sync to populate the initial value
+            _ = try? await container.syncDataSourcesUseCase.sync(dataSource: dataSource)
             await onSave?()
             dismiss()
         } catch {

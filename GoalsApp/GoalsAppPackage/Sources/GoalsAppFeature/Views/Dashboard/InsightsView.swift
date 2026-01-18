@@ -7,6 +7,7 @@ import GoalsData
 public struct InsightsView: View {
     @Environment(AppContainer.self) private var container
     @State private var typeQuickerStats: [TypeQuickerStats] = []
+    @State private var typeQuickerGoals: [Goal] = []
     @State private var selectedTimeRange: TimeRange = .week
     @State private var selectedMetric: ChartMetric = .wpm
     @State private var isLoading = true
@@ -105,6 +106,28 @@ public struct InsightsView: View {
         return lower...upper
     }
 
+    /// Y-axis range that includes the goal target if present
+    private var chartYAxisRangeWithGoal: ClosedRange<Double> {
+        var values = modeChartData.map { $0.value(for: selectedMetric) }
+
+        // Include goal target in range calculation
+        if let goalTarget = goalTargetForMetric(selectedMetric) {
+            values.append(goalTarget)
+        }
+
+        guard let minVal = values.min(), let maxVal = values.max() else {
+            return 0...100
+        }
+
+        let range = maxVal - minVal
+        let padding = max(range * 0.15, 1)
+
+        let lower = max(0, minVal - padding)
+        let upper = maxVal + padding
+
+        return lower...upper
+    }
+
     /// Trend percentage for the selected metric
     private var metricTrend: Double? {
         guard typeQuickerStats.count >= 2 else { return nil }
@@ -174,9 +197,24 @@ public struct InsightsView: View {
                         .symbol(by: .value("Mode", point.mode.capitalized))
                         .lineStyle(StrokeStyle(lineWidth: 2))
                     }
+
+                    // Goal target line
+                    if let goalTarget = goalTargetForMetric(selectedMetric) {
+                        RuleMark(y: .value("Goal", goalTarget))
+                            .foregroundStyle(.red.opacity(0.8))
+                            .lineStyle(StrokeStyle(lineWidth: 2, dash: [5, 5]))
+                            .annotation(position: .top, alignment: .trailing) {
+                                Text("Goal: \(formatMetricValue(goalTarget, for: selectedMetric))")
+                                    .font(.caption2)
+                                    .foregroundStyle(.red)
+                                    .padding(.horizontal, 4)
+                                    .background(.regularMaterial)
+                                    .clipShape(RoundedRectangle(cornerRadius: 4))
+                            }
+                    }
                 }
                 .frame(height: 200)
-                .chartYScale(domain: chartYAxisRange)
+                .chartYScale(domain: chartYAxisRangeWithGoal)
                 .chartYAxisLabel(selectedMetric.yAxisLabel)
                 .chartLegend(.hidden)
                 .chartForegroundStyleScale(mapping: { (mode: String) in
@@ -242,7 +280,27 @@ public struct InsightsView: View {
     private func loadData() async {
         isLoading = true
         await loadTypeQuickerStats()
+        await loadTypeQuickerGoals()
         isLoading = false
+    }
+
+    private func loadTypeQuickerGoals() async {
+        do {
+            typeQuickerGoals = try await container.goalRepository.fetch(dataSource: .typeQuicker)
+        } catch {
+            print("Failed to load TypeQuicker goals: \(error)")
+        }
+    }
+
+    /// Get the goal target for the current metric (if any)
+    private func goalTargetForMetric(_ metric: ChartMetric) -> Double? {
+        let metricKey: String
+        switch metric {
+        case .wpm: metricKey = "wpm"
+        case .accuracy: metricKey = "accuracy"
+        case .time: metricKey = "practiceTime"
+        }
+        return typeQuickerGoals.first { $0.metricKey == metricKey && !$0.isArchived }?.targetValue
     }
 
     private func loadTypeQuickerStats() async {
