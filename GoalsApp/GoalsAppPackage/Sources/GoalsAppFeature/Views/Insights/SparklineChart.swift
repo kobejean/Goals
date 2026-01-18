@@ -49,6 +49,7 @@ struct SparklineChart: View {
         .chartXAxis(.hidden)
         .chartYAxis(.hidden)
         .chartYScale(domain: yAxisDomain)
+        .transaction { $0.animation = nil }  // Disable animation to preserve interpolation
     }
 
     /// Y-axis domain including goal value if present

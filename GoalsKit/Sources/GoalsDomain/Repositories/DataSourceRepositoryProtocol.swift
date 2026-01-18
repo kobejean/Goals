@@ -59,6 +59,25 @@ public protocol TypeQuickerDataSourceProtocol: DataSourceRepositoryProtocol {
 
     /// Fetches stats aggregated by mode across all dates in the range
     func fetchStatsByMode(from startDate: Date, to endDate: Date) async throws -> [TypeQuickerModeStats]
+
+    // MARK: - Cache Methods (optional, for stale-while-revalidate pattern)
+
+    /// Returns cached stats without fetching from remote (for instant display)
+    func fetchCachedStats(from startDate: Date, to endDate: Date) async throws -> [TypeQuickerStats]
+
+    /// Returns true if there's any cached data available
+    func hasCachedData() async throws -> Bool
+}
+
+// Default implementations for non-cached data sources
+public extension TypeQuickerDataSourceProtocol {
+    func fetchCachedStats(from startDate: Date, to endDate: Date) async throws -> [TypeQuickerStats] {
+        [] // Non-cached sources return empty
+    }
+
+    func hasCachedData() async throws -> Bool {
+        false // Non-cached sources have no cache
+    }
 }
 
 /// Protocol for AtCoder data source
@@ -74,4 +93,37 @@ public protocol AtCoderDataSourceProtocol: DataSourceRepositoryProtocol {
 
     /// Fetches user submissions
     func fetchSubmissions(from fromDate: Date?) async throws -> [AtCoderSubmission]
+
+    // MARK: - Cache Methods (optional, for stale-while-revalidate pattern)
+
+    /// Returns cached contest history without fetching from remote
+    func fetchCachedContestHistory() async throws -> [AtCoderStats]
+
+    /// Returns cached daily effort without fetching from remote
+    func fetchCachedDailyEffort(from startDate: Date) async throws -> [AtCoderDailyEffort]
+
+    /// Returns true if there's any cached contest history
+    func hasCachedContestHistory() async throws -> Bool
+
+    /// Returns true if there's any cached daily effort
+    func hasCachedDailyEffort() async throws -> Bool
+}
+
+// Default implementations for non-cached data sources
+public extension AtCoderDataSourceProtocol {
+    func fetchCachedContestHistory() async throws -> [AtCoderStats] {
+        []
+    }
+
+    func fetchCachedDailyEffort(from startDate: Date) async throws -> [AtCoderDailyEffort] {
+        []
+    }
+
+    func hasCachedContestHistory() async throws -> Bool {
+        false
+    }
+
+    func hasCachedDailyEffort() async throws -> Bool {
+        false
+    }
 }

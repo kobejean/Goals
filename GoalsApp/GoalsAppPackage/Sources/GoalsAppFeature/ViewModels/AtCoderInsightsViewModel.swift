@@ -17,8 +17,8 @@ public final class AtCoderInsightsViewModel: InsightsSectionViewModel {
     public private(set) var contestHistory: [AtCoderStats] = []
     public private(set) var dailyEffort: [AtCoderDailyEffort] = []
     public private(set) var goals: [Goal] = []
-    public private(set) var isLoading = true
     public private(set) var errorMessage: String?
+    public var isLoading: Bool { false }  // No loading state - show cached data immediately
 
     // MARK: - Dependencies
 
@@ -114,7 +114,6 @@ public final class AtCoderInsightsViewModel: InsightsSectionViewModel {
     // MARK: - Data Loading
 
     public func loadData() async {
-        isLoading = true
         errorMessage = nil
 
         // Configure from saved settings if available
@@ -129,27 +128,38 @@ public final class AtCoderInsightsViewModel: InsightsSectionViewModel {
         // Check if configured
         guard await dataSource.isConfigured() else {
             errorMessage = "Configure your AtCoder username in Settings"
-            isLoading = false
             return
         }
 
+        let yearStart = TimeRange.year.startDate(from: Date())
+
+        // Load goals
+        goals = (try? await goalRepository.fetch(dataSource: .atCoder)) ?? []
+
+        // Display cached data immediately
+        if let cachedHistory = try? await dataSource.fetchCachedContestHistory(), !cachedHistory.isEmpty {
+            contestHistory = cachedHistory
+            stats = cachedHistory.last
+        }
+        if let cachedEffort = try? await dataSource.fetchCachedDailyEffort(from: yearStart), !cachedEffort.isEmpty {
+            dailyEffort = cachedEffort
+        }
+
+        // Fetch fresh data (updates cache internally), then update UI
         do {
-            // Fetch data concurrently - always fetch a year of data for filtering
-            let yearStart = TimeRange.year.startDate(from: Date())
             async let statsTask = dataSource.fetchStats()
             async let effortTask = dataSource.fetchDailyEffort(from: yearStart)
             async let historyTask = dataSource.fetchContestHistory()
-            async let goalsTask = goalRepository.fetch(dataSource: .atCoder)
 
             stats = try await statsTask
             dailyEffort = try await effortTask
             contestHistory = try await historyTask
-            goals = try await goalsTask
         } catch {
-            errorMessage = "Failed to load data: \(error.localizedDescription)"
+            // Keep cached data on error
+            if contestHistory.isEmpty {
+                errorMessage = "Failed to load data: \(error.localizedDescription)"
+            }
         }
-
-        isLoading = false
     }
 
     // MARK: - InsightsSectionViewModel

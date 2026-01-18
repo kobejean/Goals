@@ -95,6 +95,7 @@ public struct AtCoderStats: Sendable, Equatable, Codable {
     public let contestsParticipated: Int
     public let problemsSolved: Int
     public let longestStreak: Int?
+    public let contestScreenName: String?  // Unique contest identifier (nil for current stats snapshot)
 
     public init(
         date: Date,
@@ -102,7 +103,8 @@ public struct AtCoderStats: Sendable, Equatable, Codable {
         highestRating: Int,
         contestsParticipated: Int,
         problemsSolved: Int,
-        longestStreak: Int? = nil
+        longestStreak: Int? = nil,
+        contestScreenName: String? = nil
     ) {
         self.date = date
         self.rating = rating
@@ -110,6 +112,12 @@ public struct AtCoderStats: Sendable, Equatable, Codable {
         self.contestsParticipated = contestsParticipated
         self.problemsSolved = problemsSolved
         self.longestStreak = longestStreak
+        self.contestScreenName = contestScreenName
+    }
+
+    /// Whether this is a contest result (vs a stats snapshot)
+    public var isContestResult: Bool {
+        contestScreenName != nil
     }
 
     /// AtCoder rank color based on rating

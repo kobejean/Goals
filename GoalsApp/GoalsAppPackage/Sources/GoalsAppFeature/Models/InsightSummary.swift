@@ -2,7 +2,7 @@ import SwiftUI
 
 /// Single day's activity for GitHub-style chart
 public struct InsightActivityDay: Identifiable, Sendable {
-    public let id = UUID()
+    public var id: Date { date }  // Stable ID based on date for smooth animations
     public let date: Date
     public let color: Color      // The color for this square
     public let intensity: Double // 0.0-1.0 for opacity/shade
@@ -27,7 +27,7 @@ public struct InsightActivityData: Sendable {
 
 /// Data point for sparkline chart
 public struct InsightDataPoint: Identifiable, Sendable {
-    public let id = UUID()
+    public var id: Date { date }  // Stable ID based on date for smooth chart animations
     public let date: Date
     public let value: Double
     public let color: Color?  // Optional per-point color (e.g., for rating-based coloring)

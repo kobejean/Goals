@@ -15,7 +15,7 @@ public final class TypeQuickerInsightsViewModel: InsightsSectionViewModel {
 
     public private(set) var stats: [TypeQuickerStats] = []
     public private(set) var goals: [Goal] = []
-    public private(set) var isLoading = true
+    public var isLoading: Bool { false }  // No loading state - show cached data immediately
     public var selectedMetric: ChartMetric = .wpm
 
     // MARK: - Dependencies
@@ -143,8 +143,6 @@ public final class TypeQuickerInsightsViewModel: InsightsSectionViewModel {
     // MARK: - Data Loading
 
     public func loadData() async {
-        isLoading = true
-
         // Configure from saved settings if available
         if let username = UserDefaults.standard.string(forKey: "typeQuickerUsername"), !username.isEmpty {
             let settings = DataSourceSettings(
@@ -155,23 +153,26 @@ public final class TypeQuickerInsightsViewModel: InsightsSectionViewModel {
         }
 
         guard await dataSource.isConfigured() else {
-            isLoading = false
             return
         }
 
-        do {
-            let endDate = Date()
-            let startDate = TimeRange.all.startDate(from: endDate)
-            async let statsTask = dataSource.fetchStats(from: startDate, to: endDate)
-            async let goalsTask = goalRepository.fetch(dataSource: .typeQuicker)
+        let endDate = Date()
+        let startDate = TimeRange.all.startDate(from: endDate)
 
-            stats = try await statsTask
-            goals = try await goalsTask
-        } catch {
-            print("Failed to load TypeQuicker data: \(error)")
+        // Load goals first (needed for goal lines on charts)
+        goals = (try? await goalRepository.fetch(dataSource: .typeQuicker)) ?? []
+
+        // Display cached data immediately
+        if let cachedStats = try? await dataSource.fetchCachedStats(from: startDate, to: endDate), !cachedStats.isEmpty {
+            stats = cachedStats
         }
 
-        isLoading = false
+        // Fetch fresh stats (updates cache internally), then update UI
+        do {
+            stats = try await dataSource.fetchStats(from: startDate, to: endDate)
+        } catch {
+            // Keep cached data on error (already displayed above)
+        }
     }
 
     // MARK: - InsightsSectionViewModel

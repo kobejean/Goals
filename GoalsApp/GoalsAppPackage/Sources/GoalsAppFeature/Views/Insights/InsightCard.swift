@@ -73,8 +73,6 @@ struct InsightCard: View {
                             .frame(height: 76)
                     } else if let activityData {
                         ActivityChart(activityData: activityData)
-                    } else if let summary {
-                        SparklineChart(dataPoints: summary.dataPoints, color: summary.color)
                     }
                 }
             }

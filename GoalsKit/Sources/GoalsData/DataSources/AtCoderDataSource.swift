@@ -125,7 +125,8 @@ public actor AtCoderDataSource: AtCoderDataSourceProtocol {
                 highestRating: highestSoFar,
                 contestsParticipated: index + 1,
                 problemsSolved: index == contestHistory.count - 1 ? problemsSolved : 0,
-                longestStreak: index == contestHistory.count - 1 ? longestStreak : nil
+                longestStreak: index == contestHistory.count - 1 ? longestStreak : nil,
+                contestScreenName: result.ContestScreenName
             )
         }
     }
@@ -145,6 +146,29 @@ public actor AtCoderDataSource: AtCoderDataSourceProtocol {
         let fromSecond = Int(startDate.timeIntervalSince1970)
 
         return try await fetchSubmissionsFromAPI(username: username, fromSecond: fromSecond)
+    }
+
+    /// Fetches submissions with configurable rate limiting for backfill operations
+    /// - Parameters:
+    ///   - fromSecond: Unix timestamp to start from
+    ///   - toSecond: Unix timestamp to end at (optional, defaults to now)
+    ///   - sleepDuration: Duration to sleep between API calls (default 1.5s)
+    /// - Returns: Array of submissions within the specified time range
+    public func fetchSubmissionsWithRateLimit(
+        fromSecond: Int,
+        toSecond: Int? = nil,
+        sleepDuration: Duration = .milliseconds(1500)
+    ) async throws -> [AtCoderSubmission] {
+        guard let username = username else {
+            throw DataSourceError.notConfigured
+        }
+
+        return try await fetchSubmissionsFromAPI(
+            username: username,
+            fromSecond: fromSecond,
+            toSecond: toSecond,
+            sleepDuration: sleepDuration
+        )
     }
 
     /// Fetches problem difficulties from kenkoooo API
@@ -194,7 +218,17 @@ public actor AtCoderDataSource: AtCoderDataSourceProtocol {
     // MARK: - Private API Methods
 
     /// Fetches submissions from kenkoooo API (handles pagination for >500 submissions)
-    private func fetchSubmissionsFromAPI(username: String, fromSecond: Int) async throws -> [AtCoderSubmission] {
+    /// - Parameters:
+    ///   - username: AtCoder username
+    ///   - fromSecond: Unix timestamp to start from
+    ///   - toSecond: Optional Unix timestamp to end at (stops fetching when exceeded)
+    ///   - sleepDuration: Duration to sleep between API calls (default 1 second)
+    private func fetchSubmissionsFromAPI(
+        username: String,
+        fromSecond: Int,
+        toSecond: Int? = nil,
+        sleepDuration: Duration = .seconds(1)
+    ) async throws -> [AtCoderSubmission] {
         var allSubmissions: [AtCoderSubmission] = []
         var currentFromSecond = fromSecond
 
@@ -207,7 +241,20 @@ public actor AtCoderDataSource: AtCoderDataSourceProtocol {
                 break
             }
 
-            allSubmissions.append(contentsOf: submissions.map { $0.toDomain() })
+            // Filter submissions if we have an end bound
+            let filteredSubmissions: [AtCoderSubmissionResponse]
+            if let toSecond = toSecond {
+                filteredSubmissions = submissions.filter { $0.epochSecond <= toSecond }
+            } else {
+                filteredSubmissions = submissions
+            }
+
+            allSubmissions.append(contentsOf: filteredSubmissions.map { $0.toDomain() })
+
+            // If we filtered some out, we've reached our end bound
+            if let toSecond = toSecond, submissions.contains(where: { $0.epochSecond > toSecond }) {
+                break
+            }
 
             // If we got fewer than 500, we've reached the end
             if submissions.count < 500 {
@@ -221,8 +268,8 @@ public actor AtCoderDataSource: AtCoderDataSourceProtocol {
                 break
             }
 
-            // Rate limiting: wait 1 second between requests as per API guidelines
-            try await Task.sleep(for: .seconds(1))
+            // Rate limiting between requests
+            try await Task.sleep(for: sleepDuration)
         }
 
         return allSubmissions

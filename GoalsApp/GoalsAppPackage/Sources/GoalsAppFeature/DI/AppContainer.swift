@@ -39,14 +39,18 @@ public final class AppContainer {
 
     public let goalRepository: GoalRepositoryProtocol
 
+    // MARK: - Caching
+
+    public let dataCache: DataCache
+
     // MARK: - Networking
 
     public let httpClient: HTTPClient
 
     // MARK: - Data Sources
 
-    public let typeQuickerDataSource: TypeQuickerDataSource
-    public let atCoderDataSource: AtCoderDataSource
+    public let typeQuickerDataSource: CachedTypeQuickerDataSource
+    public let atCoderDataSource: CachedAtCoderDataSource
 
     // MARK: - Use Cases
 
@@ -59,6 +63,7 @@ public final class AppContainer {
         // Configure SwiftData
         let schema = Schema([
             GoalModel.self,
+            CachedDataEntry.self,
         ])
 
         let modelConfiguration = ModelConfiguration(
@@ -76,12 +81,24 @@ public final class AppContainer {
         let goalRepo = SwiftDataGoalRepository(modelContainer: modelContainer)
         self.goalRepository = goalRepo
 
+        // Initialize caching
+        self.dataCache = DataCache(modelContainer: modelContainer)
+
         // Initialize networking
         self.httpClient = HTTPClient()
 
-        // Initialize data sources
-        self.typeQuickerDataSource = TypeQuickerDataSource(httpClient: httpClient)
-        self.atCoderDataSource = AtCoderDataSource(httpClient: httpClient)
+        // Initialize data sources with caching
+        let remoteTypeQuicker = TypeQuickerDataSource(httpClient: httpClient)
+        let remoteAtCoder = AtCoderDataSource(httpClient: httpClient)
+
+        self.typeQuickerDataSource = CachedTypeQuickerDataSource(
+            remote: remoteTypeQuicker,
+            cache: dataCache
+        )
+        self.atCoderDataSource = CachedAtCoderDataSource(
+            remote: remoteAtCoder,
+            cache: dataCache
+        )
 
         // Initialize use cases
         self.createGoalUseCase = CreateGoalUseCase(goalRepository: goalRepo)
@@ -102,6 +119,7 @@ public final class AppContainer {
     private init(inMemory: Bool) throws {
         let schema = Schema([
             GoalModel.self,
+            CachedDataEntry.self,
         ])
 
         let modelConfiguration = ModelConfiguration(
@@ -118,12 +136,24 @@ public final class AppContainer {
         let goalRepo = SwiftDataGoalRepository(modelContainer: modelContainer)
         self.goalRepository = goalRepo
 
+        // Initialize caching
+        self.dataCache = DataCache(modelContainer: modelContainer)
+
         // Initialize networking
         self.httpClient = HTTPClient()
 
-        // Initialize data sources
-        self.typeQuickerDataSource = TypeQuickerDataSource(httpClient: httpClient)
-        self.atCoderDataSource = AtCoderDataSource(httpClient: httpClient)
+        // Initialize data sources with caching
+        let remoteTypeQuicker = TypeQuickerDataSource(httpClient: httpClient)
+        let remoteAtCoder = AtCoderDataSource(httpClient: httpClient)
+
+        self.typeQuickerDataSource = CachedTypeQuickerDataSource(
+            remote: remoteTypeQuicker,
+            cache: dataCache
+        )
+        self.atCoderDataSource = CachedAtCoderDataSource(
+            remote: remoteAtCoder,
+            cache: dataCache
+        )
 
         self.createGoalUseCase = CreateGoalUseCase(goalRepository: goalRepo)
         self.syncDataSourcesUseCase = SyncDataSourcesUseCase(
