@@ -71,6 +71,15 @@ public struct AtCoderInsightsView: View {
         isLoading = true
         errorMessage = nil
 
+        // Configure from saved settings if available
+        if let username = UserDefaults.standard.string(forKey: "atCoderUsername"), !username.isEmpty {
+            let settings = DataSourceSettings(
+                dataSourceType: .atCoder,
+                credentials: ["username": username]
+            )
+            try? await container.atCoderDataSource.configure(settings: settings)
+        }
+
         // Check if configured
         guard await container.atCoderDataSource.isConfigured() else {
             errorMessage = "Configure your AtCoder username in Settings"
@@ -188,20 +197,14 @@ private struct RatingChart: View {
                         )
                         .foregroundStyle(ratingGradient)
                         .interpolationMethod(.catmullRom)
-
-                        AreaMark(
-                            x: .value("Date", stat.date),
-                            y: .value("Rating", stat.rating)
-                        )
-                        .foregroundStyle(areaGradient)
-                        .interpolationMethod(.catmullRom)
+                        .lineStyle(StrokeStyle(lineWidth: 2))
 
                         PointMark(
                             x: .value("Date", stat.date),
                             y: .value("Rating", stat.rating)
                         )
                         .foregroundStyle(AtCoderRankColor.from(difficulty: stat.rating).swiftUIColor)
-                        .symbolSize(30)
+                        .symbolSize(40)
                     }
                 }
                 .chartXScale(domain: xAxisDomain)
@@ -212,7 +215,7 @@ private struct RatingChart: View {
                     }
                 }
                 .chartYAxis {
-                    AxisMarks { _ in
+                    AxisMarks(values: .stride(by: 400)) { _ in
                         AxisGridLine()
                         AxisValueLabel()
                     }
@@ -231,23 +234,23 @@ private struct RatingChart: View {
         )
     }
 
-    private var areaGradient: LinearGradient {
-        LinearGradient(
-            colors: [.cyan.opacity(0.3), .blue.opacity(0.1)],
-            startPoint: .top,
-            endPoint: .bottom
-        )
-    }
-
     private var xAxisDomain: ClosedRange<Date> {
-        // For "All" time range, use actual data range
-        if timeRange == .all, let earliest = contestHistory.map(\.date).min() {
-            let now = Date()
-            return earliest...now
-        }
         let now = Date()
-        let start = timeRange.startDate(from: now)
-        return start...now
+
+        // For "All" time range, use actual data range with padding
+        if timeRange == .all, let earliest = contestHistory.map(\.date).min(),
+           let latest = contestHistory.map(\.date).max() {
+            // Add 5% padding on each side
+            let dataSpan = latest.timeIntervalSince(earliest)
+            let padding = max(dataSpan * 0.05, 86400) // At least 1 day padding
+            let paddedStart = earliest.addingTimeInterval(-padding)
+            let paddedEnd = now.addingTimeInterval(padding * 0.5)
+            return paddedStart...paddedEnd
+        }
+
+        // For fixed time ranges, use the full range
+        let rangeStart = timeRange.startDate(from: now)
+        return rangeStart...now
     }
 
     private var yAxisDomain: ClosedRange<Int> {
@@ -311,14 +314,22 @@ private struct DailyEffortChart: View {
     }
 
     private var xAxisDomain: ClosedRange<Date> {
-        // For "All" time range, use actual data range
-        if timeRange == .all, let earliest = dailyEffort.map(\.date).min() {
-            let now = Date()
-            return earliest...now
-        }
         let now = Date()
-        let start = timeRange.startDate(from: now)
-        return start...now
+
+        // For "All" time range, use actual data range with padding
+        if timeRange == .all, let earliest = dailyEffort.map(\.date).min(),
+           let latest = dailyEffort.map(\.date).max() {
+            // Add 5% padding on each side
+            let dataSpan = latest.timeIntervalSince(earliest)
+            let padding = max(dataSpan * 0.05, 86400) // At least 1 day padding
+            let paddedStart = earliest.addingTimeInterval(-padding)
+            let paddedEnd = now.addingTimeInterval(padding * 0.5)
+            return paddedStart...paddedEnd
+        }
+
+        // For fixed time ranges, use the full range
+        let rangeStart = timeRange.startDate(from: now)
+        return rangeStart...now
     }
 }
 
