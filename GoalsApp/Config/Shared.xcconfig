@@ -8,7 +8,7 @@
 // ==========================================
 PRODUCT_NAME = GoalsApp
 PRODUCT_DISPLAY_NAME = Goals
-PRODUCT_BUNDLE_IDENTIFIER = com.goals.app
+PRODUCT_BUNDLE_IDENTIFIER = com.kobejean.goals
 MARKETING_VERSION = 1.0
 CURRENT_PROJECT_VERSION = 1
 
