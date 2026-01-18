@@ -280,13 +280,6 @@ private struct RatingChart: View {
         return rangeStart...now
     }
 
-    private var yAxisDomain: ClosedRange<Int> {
-        let ratings = contestHistory.map { $0.rating }
-        let minRating = (ratings.min() ?? 0) - 100
-        let maxRating = (ratings.max() ?? 100) + 100
-        return max(0, minRating)...maxRating
-    }
-
     private var yAxisDomainWithGoal: ClosedRange<Int> {
         var ratings = contestHistory.map { $0.rating }
         if let goal = ratingGoal {

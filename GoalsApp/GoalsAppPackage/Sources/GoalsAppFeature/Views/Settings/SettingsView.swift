@@ -7,8 +7,6 @@ public struct SettingsView: View {
     @Environment(AppContainer.self) private var container
     @State private var typeQuickerUsername = ""
     @State private var atCoderUsername = ""
-    @State private var isSyncing = false
-    @State private var lastSyncResult: String?
     @State private var typeQuickerSaveState: SaveState = .idle
     @State private var atCoderSaveState: SaveState = .idle
 
@@ -42,34 +40,6 @@ public struct SettingsView: View {
                     Text("Data Sources")
                 } footer: {
                     Text("Settings are saved automatically")
-                }
-
-                // Sync
-                Section {
-                    Button {
-                        Task {
-                            await syncDataSources()
-                        }
-                    } label: {
-                        HStack {
-                            Label("Sync Now", systemImage: "arrow.triangle.2.circlepath")
-                            Spacer()
-                            if isSyncing {
-                                ProgressView()
-                            }
-                        }
-                    }
-                    .disabled(isSyncing)
-
-                    if let result = lastSyncResult {
-                        Text(result)
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                    }
-                } header: {
-                    Text("Sync")
-                } footer: {
-                    Text("Sync fetches latest data from configured sources")
                 }
 
                 // iCloud
@@ -157,24 +127,6 @@ public struct SettingsView: View {
         atCoderSaveState = .saved
         try? await Task.sleep(for: .seconds(1.5))
         atCoderSaveState = .idle
-    }
-
-    private func syncDataSources() async {
-        isSyncing = true
-        defer { isSyncing = false }
-
-        do {
-            let result = try await container.syncDataSourcesUseCase.syncAll()
-
-            if result.allSuccessful {
-                lastSyncResult = "Updated \(result.totalGoalsUpdated) goals"
-            } else {
-                let failed = result.sourceResults.filter { !$0.value.success }.keys
-                lastSyncResult = "Some sources failed: \(failed.map { $0.displayName }.joined(separator: ", "))"
-            }
-        } catch {
-            lastSyncResult = "Sync failed: \(error.localizedDescription)"
-        }
     }
 
     public init() {}

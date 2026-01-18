@@ -89,23 +89,6 @@ public struct InsightsView: View {
         Array(Set(modeChartData.map(\.mode))).sorted()
     }
 
-    /// Y-axis range for current metric with padding
-    private var chartYAxisRange: ClosedRange<Double> {
-        let values = modeChartData.map { $0.value(for: selectedMetric) }
-
-        guard let minVal = values.min(), let maxVal = values.max() else {
-            return 0...100
-        }
-
-        let range = maxVal - minVal
-        let padding = max(range * 0.15, 1)
-
-        let lower = max(0, minVal - padding)
-        let upper = maxVal + padding
-
-        return lower...upper
-    }
-
     /// Y-axis range that includes the goal target if present
     private var chartYAxisRangeWithGoal: ClosedRange<Double> {
         var values = modeChartData.map { $0.value(for: selectedMetric) }

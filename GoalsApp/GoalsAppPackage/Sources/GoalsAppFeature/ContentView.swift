@@ -1,12 +1,8 @@
 import SwiftUI
-import SwiftData
-import GoalsDomain
-import GoalsData
 
 /// Root content view with tab navigation
 public struct ContentView: View {
     @State private var selectedTab: AppTab = .insights
-    @Environment(AppContainer.self) private var container
 
     public var body: some View {
         TabView(selection: $selectedTab) {

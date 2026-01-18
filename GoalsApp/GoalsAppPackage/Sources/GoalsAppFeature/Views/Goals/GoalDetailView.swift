@@ -7,7 +7,6 @@ import GoalsData
 public struct GoalDetailView: View {
     @Environment(AppContainer.self) private var container
     @State private var goal: Goal
-    @State private var isLoading = false
 
     public init(goal: Goal) {
         self._goal = State(initialValue: goal)
@@ -21,9 +20,6 @@ public struct GoalDetailView: View {
 
                 // Goal details
                 detailsSection
-
-                // Sync button
-                syncSection
             }
             .padding()
         }
@@ -32,17 +28,6 @@ public struct GoalDetailView: View {
         .toolbar {
             ToolbarItem(placement: .primaryAction) {
                 Menu {
-                    Button {
-                        Task {
-                            try? await container.syncDataSourcesUseCase.sync(dataSource: goal.dataSource)
-                            await loadData()
-                        }
-                    } label: {
-                        Label("Sync Now", systemImage: "arrow.triangle.2.circlepath")
-                    }
-
-                    Divider()
-
                     Button(role: .destructive) {
                         Task {
                             try? await container.goalRepository.archive(id: goal.id)
@@ -127,30 +112,6 @@ public struct GoalDetailView: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(.regularMaterial)
         .clipShape(RoundedRectangle(cornerRadius: 16))
-    }
-
-    @ViewBuilder
-    private var syncSection: some View {
-        VStack(spacing: 12) {
-            Button {
-                Task {
-                    isLoading = true
-                    try? await container.syncDataSourcesUseCase.sync(dataSource: goal.dataSource)
-                    await loadData()
-                    isLoading = false
-                }
-            } label: {
-                if isLoading {
-                    ProgressView()
-                        .frame(maxWidth: .infinity)
-                } else {
-                    Label("Sync from \(goal.dataSource.displayName)", systemImage: "arrow.triangle.2.circlepath")
-                        .frame(maxWidth: .infinity)
-                }
-            }
-            .buttonStyle(.borderedProminent)
-            .disabled(isLoading)
-        }
     }
 
     private func formatValue(_ value: Double) -> String {

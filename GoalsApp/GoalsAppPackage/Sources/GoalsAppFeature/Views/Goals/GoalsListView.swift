@@ -78,11 +78,6 @@ public struct GoalsListView: View {
                 _ = try? await container.syncDataSourcesUseCase.syncAll()
                 await loadGoals()
             }
-            .refreshable {
-                // Sync all data sources on pull to refresh
-                _ = try? await container.syncDataSourcesUseCase.syncAll()
-                await loadGoals()
-            }
         }
     }
 
