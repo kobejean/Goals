@@ -13,6 +13,11 @@ public struct InsightsView: View {
     @State private var selectedMetric: ChartMetric = .wpm
     @State private var isLoading = true
 
+    // TypeQuicker goals from settings
+    @State private var wpmGoal: Double = 0
+    @State private var accuracyGoal: Double = 0
+    @State private var timeGoal: Double = 0
+
     public var body: some View {
         NavigationStack {
             ScrollView {
@@ -92,9 +97,24 @@ public struct InsightsView: View {
         Array(Set(modeChartData.map(\.mode))).sorted()
     }
 
+    /// Current goal value based on selected metric
+    private var currentGoal: Double {
+        switch selectedMetric {
+        case .wpm: return wpmGoal
+        case .accuracy: return accuracyGoal
+        case .time: return timeGoal
+        }
+    }
+
     /// Y-axis range for current metric with padding
     private var chartYAxisRange: ClosedRange<Double> {
-        let values = modeChartData.map { $0.value(for: selectedMetric) }
+        var values = modeChartData.map { $0.value(for: selectedMetric) }
+
+        // Include goal in range calculation if set
+        if currentGoal > 0 {
+            values.append(currentGoal)
+        }
+
         guard let minVal = values.min(), let maxVal = values.max() else {
             return 0...100
         }
@@ -146,14 +166,31 @@ public struct InsightsView: View {
                 .pickerStyle(.segmented)
 
                 // Trend chart with separate lines per mode
-                Chart(modeChartData) { point in
-                    LineMark(
-                        x: .value("Date", point.date, unit: .day),
-                        y: .value(selectedMetric.displayName, point.value(for: selectedMetric))
-                    )
-                    .foregroundStyle(by: .value("Mode", point.mode.capitalized))
-                    .symbol(by: .value("Mode", point.mode.capitalized))
-                    .lineStyle(StrokeStyle(lineWidth: 2))
+                Chart {
+                    ForEach(modeChartData) { point in
+                        LineMark(
+                            x: .value("Date", point.date, unit: .day),
+                            y: .value(selectedMetric.displayName, point.value(for: selectedMetric))
+                        )
+                        .foregroundStyle(by: .value("Mode", point.mode.capitalized))
+                        .symbol(by: .value("Mode", point.mode.capitalized))
+                        .lineStyle(StrokeStyle(lineWidth: 2))
+                    }
+
+                    // Goal line
+                    if currentGoal > 0 {
+                        RuleMark(y: .value("Goal", currentGoal))
+                            .foregroundStyle(.red.opacity(0.7))
+                            .lineStyle(StrokeStyle(lineWidth: 2, dash: [5, 5]))
+                            .annotation(position: .top, alignment: .trailing) {
+                                Text("Goal: \(formatMetricValue(currentGoal, for: selectedMetric))")
+                                    .font(.caption2)
+                                    .foregroundStyle(.red)
+                                    .padding(.horizontal, 4)
+                                    .background(.ultraThinMaterial)
+                                    .clipShape(RoundedRectangle(cornerRadius: 4))
+                            }
+                    }
                 }
                 .frame(height: 200)
                 .chartYScale(domain: chartYAxisRange)
@@ -505,6 +542,11 @@ public struct InsightsView: View {
 
     private func loadData() async {
         isLoading = true
+
+        // Load TypeQuicker goals from UserDefaults
+        wpmGoal = UserDefaults.standard.double(forKey: "typeQuickerWpmGoal")
+        accuracyGoal = UserDefaults.standard.double(forKey: "typeQuickerAccuracyGoal")
+        timeGoal = UserDefaults.standard.double(forKey: "typeQuickerTimeGoal")
 
         async let goalsTask: () = loadGoals()
         async let statsTask: () = loadTypeQuickerStats()
