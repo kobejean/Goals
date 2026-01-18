@@ -42,18 +42,6 @@ public struct SettingsView: View {
                     Text("Settings are saved automatically")
                 }
 
-                // iCloud
-                Section {
-                    HStack {
-                        Label("iCloud Sync", systemImage: "icloud")
-                        Spacer()
-                        Text("Automatic")
-                            .foregroundStyle(.secondary)
-                    }
-                } footer: {
-                    Text("Your goals sync automatically across all your devices via iCloud")
-                }
-
                 // About
                 Section("About") {
                     HStack {
