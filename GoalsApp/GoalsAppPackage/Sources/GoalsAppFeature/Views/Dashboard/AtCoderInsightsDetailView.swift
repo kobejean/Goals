@@ -3,55 +3,62 @@ import Charts
 import GoalsDomain
 import GoalsData
 
-/// AtCoder-specific insights section with Rating and Daily Effort charts
-public struct AtCoderInsightsSection: View {
+/// AtCoder insights detail view with Rating and Daily Effort charts
+public struct AtCoderInsightsDetailView: View {
     @Bindable var viewModel: AtCoderInsightsViewModel
-    let timeRange: TimeRange
+    @State private var timeRange: TimeRange = .all
 
     public var body: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            // Header
-            Label("AtCoder", systemImage: "chevron.left.forwardslash.chevron.right")
-                .font(.headline)
+        ScrollView {
+            VStack(alignment: .leading, spacing: 16) {
+                if viewModel.isLoading {
+                    ProgressView("Loading AtCoder data...")
+                        .frame(maxWidth: .infinity, minHeight: 200)
+                } else if let error = viewModel.errorMessage {
+                    ContentUnavailableView {
+                        Label("Unable to Load", systemImage: "exclamationmark.triangle")
+                    } description: {
+                        Text(error)
+                    }
+                } else {
+                    // Stats summary
+                    if let stats = viewModel.stats {
+                        StatsRow(stats: stats)
+                    }
 
-            if viewModel.isLoading {
-                ProgressView("Loading AtCoder data...")
-                    .frame(maxWidth: .infinity, minHeight: 200)
-            } else if let error = viewModel.errorMessage {
-                ContentUnavailableView {
-                    Label("Unable to Load", systemImage: "exclamationmark.triangle")
-                } description: {
-                    Text(error)
+                    // Rating History Chart
+                    RatingChart(
+                        contestHistory: viewModel.filteredContestHistory(for: timeRange),
+                        timeRange: timeRange,
+                        ratingGoal: viewModel.ratingGoalTarget
+                    )
+
+                    // Daily Effort Chart
+                    DailyEffortChart(
+                        dailyEffort: viewModel.filteredDailyEffort(for: timeRange),
+                        timeRange: timeRange
+                    )
                 }
-            } else {
-                // Stats summary
-                if let stats = viewModel.stats {
-                    StatsRow(stats: stats)
+            }
+            .padding()
+        }
+        .navigationTitle("AtCoder")
+        .toolbarTitleDisplayMode(.inline)
+        .toolbar {
+            ToolbarItem(placement: .principal) {
+                Picker("Time Range", selection: $timeRange) {
+                    ForEach(TimeRange.allCases, id: \.self) { range in
+                        Text(range.displayName).tag(range)
+                    }
                 }
-
-                // Rating History Chart
-                RatingChart(
-                    contestHistory: viewModel.filteredContestHistory(for: timeRange),
-                    timeRange: timeRange,
-                    ratingGoal: viewModel.ratingGoalTarget
-                )
-
-                // Daily Effort Chart
-                DailyEffortChart(
-                    dailyEffort: viewModel.filteredDailyEffort(for: timeRange),
-                    timeRange: timeRange
-                )
+                .pickerStyle(.segmented)
+                .frame(width: 220)
             }
         }
-        .padding()
-        .background(Color(.systemBackground))
-        .clipShape(RoundedRectangle(cornerRadius: 12))
-        .shadow(color: .black.opacity(0.05), radius: 2, x: 0, y: 1)
     }
 
-    public init(viewModel: AtCoderInsightsViewModel, timeRange: TimeRange) {
+    public init(viewModel: AtCoderInsightsViewModel) {
         self.viewModel = viewModel
-        self.timeRange = timeRange
     }
 }
 

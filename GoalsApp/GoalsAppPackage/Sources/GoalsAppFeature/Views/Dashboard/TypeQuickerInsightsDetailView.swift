@@ -2,38 +2,57 @@ import SwiftUI
 import Charts
 import GoalsDomain
 
-/// TypeQuicker insights section view
-struct TypeQuickerInsightsSection: View {
+/// TypeQuicker insights detail view with full charts
+struct TypeQuickerInsightsDetailView: View {
     @Bindable var viewModel: TypeQuickerInsightsViewModel
-    let timeRange: TimeRange
+    @State private var timeRange: TimeRange = .all
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            HStack {
-                Image(systemName: "keyboard")
-                    .foregroundStyle(.blue)
-                Text("Typing Progress")
-                    .font(.headline)
-                Spacer()
-                if let trend = viewModel.metricTrend {
-                    TrendBadge(trend: trend)
+        ScrollView {
+            VStack(alignment: .leading, spacing: 12) {
+                HStack {
+                    Image(systemName: "keyboard")
+                        .foregroundStyle(.blue)
+                    Text("Typing Progress")
+                        .font(.headline)
+                    Spacer()
+                    if let trend = viewModel.metricTrend {
+                        TrendBadge(trend: trend)
+                    }
+                }
+
+                if filteredStats.isEmpty {
+                    emptyStateView
+                } else {
+                    metricPicker
+                    trendChart
+                    if viewModel.uniqueModes.count > 1 {
+                        modeLegend
+                    }
                 }
             }
-
-            if viewModel.stats.isEmpty {
-                emptyStateView
-            } else {
-                metricPicker
-                trendChart
-                if viewModel.uniqueModes.count > 1 {
-                    modeLegend
+            .padding()
+        }
+        .navigationTitle("Typing Progress")
+        .toolbarTitleDisplayMode(.inline)
+        .toolbar {
+            ToolbarItem(placement: .principal) {
+                Picker("Time Range", selection: $timeRange) {
+                    ForEach(TimeRange.allCases, id: \.self) { range in
+                        Text(range.displayName).tag(range)
+                    }
                 }
+                .pickerStyle(.segmented)
+                .frame(width: 220)
             }
         }
-        .padding()
-        .background(.regularMaterial)
-        .clipShape(RoundedRectangle(cornerRadius: 16))
-        .padding(.horizontal)
+    }
+
+    // MARK: - Filtered Data
+
+    private var filteredStats: [ModeDataPoint] {
+        let cutoffDate = timeRange.startDate(from: Date())
+        return viewModel.modeChartData.filter { $0.date >= cutoffDate }
     }
 
     // MARK: - Subviews
@@ -62,7 +81,7 @@ struct TypeQuickerInsightsSection: View {
 
     private var trendChart: some View {
         Chart {
-            ForEach(viewModel.modeChartData) { point in
+            ForEach(filteredStats) { point in
                 LineMark(
                     x: .value("Date", point.date, unit: .day),
                     y: .value(viewModel.selectedMetric.displayName, point.value(for: viewModel.selectedMetric))
@@ -88,7 +107,7 @@ struct TypeQuickerInsightsSection: View {
             }
         }
         .frame(height: 200)
-        .chartYScale(domain: viewModel.chartYAxisRange(for: viewModel.selectedMetric))
+        .chartYScale(domain: chartYAxisRange)
         .chartYAxisLabel(viewModel.selectedMetric.yAxisLabel)
         .chartLegend(.hidden)
         .chartForegroundStyleScale(mapping: { (mode: String) in
@@ -96,10 +115,31 @@ struct TypeQuickerInsightsSection: View {
         })
     }
 
+    private var chartYAxisRange: ClosedRange<Double> {
+        var values = filteredStats.map { $0.value(for: viewModel.selectedMetric) }
+
+        if let goalTarget = viewModel.goalTarget(for: viewModel.selectedMetric) {
+            values.append(goalTarget)
+        }
+
+        guard let minVal = values.min(), let maxVal = values.max() else {
+            return 0...100
+        }
+
+        let range = maxVal - minVal
+        let padding = max(range * 0.15, 1)
+
+        let lower = max(0, minVal - padding)
+        let upper = maxVal + padding
+
+        return lower...upper
+    }
+
     private var modeLegend: some View {
-        VStack(spacing: 6) {
-            ForEach(viewModel.uniqueModes, id: \.self) { mode in
-                let modePoints = viewModel.modeChartData.filter { $0.mode == mode }
+        let uniqueModes = Array(Set(filteredStats.map(\.mode))).sorted()
+        return VStack(spacing: 6) {
+            ForEach(uniqueModes, id: \.self) { mode in
+                let modePoints = filteredStats.filter { $0.mode == mode }
                 let avgValue = modePoints.isEmpty ? 0 : modePoints.reduce(0) { $0 + $1.value(for: viewModel.selectedMetric) } / Double(modePoints.count)
 
                 HStack {
@@ -140,26 +180,5 @@ struct TypeQuickerInsightsSection: View {
         case "code": return .cyan
         default: return .gray
         }
-    }
-}
-
-// MARK: - TrendBadge
-
-struct TrendBadge: View {
-    let trend: Double
-
-    var body: some View {
-        HStack(spacing: 2) {
-            Image(systemName: trend >= 0 ? "arrow.up.right" : "arrow.down.right")
-                .font(.caption2)
-            Text(String(format: "%.1f%%", abs(trend)))
-                .font(.caption2)
-                .fontWeight(.semibold)
-        }
-        .padding(.horizontal, 6)
-        .padding(.vertical, 2)
-        .background(trend >= 0 ? Color.green.opacity(0.2) : Color.red.opacity(0.2))
-        .foregroundStyle(trend >= 0 ? .green : .red)
-        .clipShape(Capsule())
     }
 }
