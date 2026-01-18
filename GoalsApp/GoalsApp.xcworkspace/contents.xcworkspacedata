@@ -5,6 +5,9 @@
       location = "group:GoalsAppPackage">
    </FileRef>
    <FileRef
+      location = "group:../GoalsKit">
+   </FileRef>
+   <FileRef
       location = "container:GoalsApp.xcodeproj">
    </FileRef>
 </Workspace>
