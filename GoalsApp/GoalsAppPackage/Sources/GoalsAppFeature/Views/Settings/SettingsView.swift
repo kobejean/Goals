@@ -9,25 +9,39 @@ public struct SettingsView: View {
     @State private var atCoderUsername = ""
     @State private var isSyncing = false
     @State private var lastSyncResult: String?
+    @State private var typeQuickerSaveState: SaveState = .idle
+    @State private var atCoderSaveState: SaveState = .idle
+
+    enum SaveState {
+        case idle
+        case saving
+        case saved
+    }
 
     public var body: some View {
         NavigationStack {
             Form {
                 // Data Sources
-                Section("Data Sources") {
-                    dataSourceRow(
+                Section {
+                    DataSourceRow(
                         title: "TypeQuicker",
                         icon: "keyboard",
                         username: $typeQuickerUsername,
-                        placeholder: "Enter username"
+                        placeholder: "Enter username",
+                        saveState: typeQuickerSaveState
                     )
 
-                    dataSourceRow(
+                    DataSourceRow(
                         title: "AtCoder",
                         icon: "chevron.left.forwardslash.chevron.right",
                         username: $atCoderUsername,
-                        placeholder: "Enter username"
+                        placeholder: "Enter username",
+                        saveState: atCoderSaveState
                     )
+                } header: {
+                    Text("Data Sources")
+                } footer: {
+                    Text("Settings are saved automatically")
                 }
 
                 // Sync
@@ -93,67 +107,56 @@ public struct SettingsView: View {
             .task {
                 await loadSettings()
             }
-        }
-    }
-
-    @ViewBuilder
-    private func dataSourceRow(
-        title: String,
-        icon: String,
-        username: Binding<String>,
-        placeholder: String
-    ) -> some View {
-        VStack(alignment: .leading, spacing: 8) {
-            HStack {
-                Image(systemName: icon)
-                    .foregroundStyle(.blue)
-                Text(title)
-                    .fontWeight(.medium)
-            }
-
-            TextField(placeholder, text: username)
-                .textFieldStyle(.roundedBorder)
-                .autocapitalization(.none)
-                .autocorrectionDisabled()
-
-            Button("Save") {
+            .onChange(of: typeQuickerUsername) { _, newValue in
                 Task {
-                    await saveDataSourceSettings(title: title, username: username.wrappedValue)
+                    await saveTypeQuickerSettings(username: newValue)
                 }
             }
-            .font(.caption)
-            .disabled(username.wrappedValue.isEmpty)
+            .onChange(of: atCoderUsername) { _, newValue in
+                Task {
+                    await saveAtCoderSettings(username: newValue)
+                }
+            }
         }
-        .padding(.vertical, 4)
     }
 
     private func loadSettings() async {
-        // Load saved settings from UserDefaults or Keychain
         typeQuickerUsername = UserDefaults.standard.string(forKey: "typeQuickerUsername") ?? ""
         atCoderUsername = UserDefaults.standard.string(forKey: "atCoderUsername") ?? ""
     }
 
-    private func saveDataSourceSettings(title: String, username: String) async {
-        switch title {
-        case "TypeQuicker":
-            UserDefaults.standard.set(username, forKey: "typeQuickerUsername")
+    private func saveTypeQuickerSettings(username: String) async {
+        typeQuickerSaveState = .saving
+        UserDefaults.standard.set(username, forKey: "typeQuickerUsername")
+
+        if !username.isEmpty {
             let settings = DataSourceSettings(
                 dataSourceType: .typeQuicker,
                 credentials: ["username": username]
             )
             try? await container.typeQuickerDataSource.configure(settings: settings)
+        }
 
-        case "AtCoder":
-            UserDefaults.standard.set(username, forKey: "atCoderUsername")
+        typeQuickerSaveState = .saved
+        try? await Task.sleep(for: .seconds(1.5))
+        typeQuickerSaveState = .idle
+    }
+
+    private func saveAtCoderSettings(username: String) async {
+        atCoderSaveState = .saving
+        UserDefaults.standard.set(username, forKey: "atCoderUsername")
+
+        if !username.isEmpty {
             let settings = DataSourceSettings(
                 dataSourceType: .atCoder,
                 credentials: ["username": username]
             )
             try? await container.atCoderDataSource.configure(settings: settings)
-
-        default:
-            break
         }
+
+        atCoderSaveState = .saved
+        try? await Task.sleep(for: .seconds(1.5))
+        atCoderSaveState = .idle
     }
 
     private func syncDataSources() async {
@@ -175,6 +178,51 @@ public struct SettingsView: View {
     }
 
     public init() {}
+}
+
+/// Row for configuring a data source
+struct DataSourceRow: View {
+    let title: String
+    let icon: String
+    @Binding var username: String
+    let placeholder: String
+    let saveState: SettingsView.SaveState
+
+    var body: some View {
+        HStack {
+            Image(systemName: icon)
+                .foregroundStyle(.blue)
+                .frame(width: 24)
+
+            VStack(alignment: .leading, spacing: 4) {
+                Text(title)
+                    .fontWeight(.medium)
+
+                TextField(placeholder, text: $username)
+                    .textFieldStyle(.roundedBorder)
+                    .textInputAutocapitalization(.never)
+                    .autocorrectionDisabled()
+            }
+
+            Spacer()
+
+            // Save status indicator
+            Group {
+                switch saveState {
+                case .idle:
+                    EmptyView()
+                case .saving:
+                    ProgressView()
+                        .scaleEffect(0.7)
+                case .saved:
+                    Image(systemName: "checkmark.circle.fill")
+                        .foregroundStyle(.green)
+                }
+            }
+            .frame(width: 24)
+        }
+        .padding(.vertical, 4)
+    }
 }
 
 #Preview {

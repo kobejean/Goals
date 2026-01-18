@@ -5,14 +5,14 @@ import GoalsData
 
 /// Root content view with tab navigation
 public struct ContentView: View {
-    @State private var selectedTab: AppTab = .dashboard
+    @State private var selectedTab: AppTab = .today
     @Environment(AppContainer.self) private var container
 
     public var body: some View {
         TabView(selection: $selectedTab) {
             DashboardView()
-                .tag(AppTab.dashboard)
-                .tabItem { AppTab.dashboard.label }
+                .tag(AppTab.today)
+                .tabItem { AppTab.today.label }
 
             GoalsListView()
                 .tag(AppTab.goals)

@@ -73,13 +73,13 @@ public actor TypeQuickerDataSource: TypeQuickerDataSourceProtocol {
         }
 
         let base = baseURL ?? URL(string: "https://api.typequicker.com")!
-        let dateFormatter = ISO8601DateFormatter()
-        dateFormatter.formatOptions = [.withFullDate]
+        let dateFormatter = DateFormatter()
+        dateFormatter.dateFormat = "yyyy-MM-dd"
 
         var components = URLComponents(url: base.appendingPathComponent("stats/\(username)"), resolvingAgainstBaseURL: false)!
         components.queryItems = [
-            URLQueryItem(name: "start_date", value: dateFormatter.string(from: startDate).prefix(10).description),
-            URLQueryItem(name: "end_date", value: dateFormatter.string(from: endDate).prefix(10).description)
+            URLQueryItem(name: "start_date", value: dateFormatter.string(from: startDate)),
+            URLQueryItem(name: "end_date", value: dateFormatter.string(from: endDate))
         ]
 
         guard let url = components.url else {
@@ -97,8 +97,6 @@ public actor TypeQuickerDataSource: TypeQuickerDataSourceProtocol {
         }
 
         let decoder = JSONDecoder()
-        decoder.dateDecodingStrategy = .iso8601
-
         let apiResponse = try decoder.decode(TypeQuickerAPIResponse.self, from: data)
         return apiResponse.toStats()
     }
@@ -109,50 +107,135 @@ public actor TypeQuickerDataSource: TypeQuickerDataSourceProtocol {
         let stats = try await fetchStats(from: startDate, to: endDate)
         return stats.last
     }
+
+    /// Fetch stats aggregated by mode across all dates in the range
+    public func fetchStatsByMode(from startDate: Date, to endDate: Date) async throws -> [TypeQuickerModeStats] {
+        guard let username = username else {
+            throw DataSourceError.notConfigured
+        }
+
+        let base = baseURL ?? URL(string: "https://api.typequicker.com")!
+        let dateFormatter = DateFormatter()
+        dateFormatter.dateFormat = "yyyy-MM-dd"
+
+        var components = URLComponents(url: base.appendingPathComponent("stats/\(username)"), resolvingAgainstBaseURL: false)!
+        components.queryItems = [
+            URLQueryItem(name: "start_date", value: dateFormatter.string(from: startDate)),
+            URLQueryItem(name: "end_date", value: dateFormatter.string(from: endDate))
+        ]
+
+        guard let url = components.url else {
+            throw DataSourceError.invalidURL
+        }
+
+        let (data, response) = try await urlSession.data(from: url)
+
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw DataSourceError.invalidResponse
+        }
+
+        guard httpResponse.statusCode == 200 else {
+            throw DataSourceError.httpError(statusCode: httpResponse.statusCode)
+        }
+
+        let decoder = JSONDecoder()
+        let apiResponse = try decoder.decode(TypeQuickerAPIResponse.self, from: data)
+        return apiResponse.toStatsByMode()
+    }
 }
 
 // MARK: - API Response Models
 
 /// API response structure from TypeQuicker
+/// Format: { "activity": { "2026-01-11": [{ "wpm": 45, ... }], ... } }
 private struct TypeQuickerAPIResponse: Codable {
-    let dailyStats: [DailyStat]?
+    let activity: [String: [Session]]
 
-    enum CodingKeys: String, CodingKey {
-        case dailyStats = "daily_stats"
-    }
-
-    struct DailyStat: Codable {
-        let date: String
-        let wpm: Double?
-        let accuracy: Double?
-        let practiceMinutes: Int?
-        let sessions: Int?
-
-        enum CodingKeys: String, CodingKey {
-            case date
-            case wpm
-            case accuracy
-            case practiceMinutes = "practice_minutes"
-            case sessions
-        }
+    struct Session: Codable {
+        let wpm: Double
+        let cpm: Double
+        let accuracy: Double
+        let trueAccuracy: Double
+        let timeTyping: Int // milliseconds
+        let charactersTyped: Int
+        let primaryMode: String
+        let secondaryMode: String
+        let keyboardLayout: String
     }
 
     func toStats() -> [TypeQuickerStats] {
-        guard let dailyStats = dailyStats else { return [] }
-
         let dateFormatter = DateFormatter()
         dateFormatter.dateFormat = "yyyy-MM-dd"
 
-        return dailyStats.compactMap { stat -> TypeQuickerStats? in
-            guard let date = dateFormatter.date(from: stat.date) else { return nil }
+        return activity.compactMap { (dateString, sessions) -> TypeQuickerStats? in
+            guard let date = dateFormatter.date(from: dateString), !sessions.isEmpty else {
+                return nil
+            }
+
+            // Aggregate all sessions for the day
+            let totalTimeMs = sessions.reduce(0) { $0 + $1.timeTyping }
+
+            // Weighted average WPM based on time spent
+            let weightedWpm = sessions.reduce(0.0) { acc, session in
+                let weight = Double(session.timeTyping) / Double(max(totalTimeMs, 1))
+                return acc + (session.wpm * weight)
+            }
+
+            // Weighted average accuracy
+            let weightedAccuracy = sessions.reduce(0.0) { acc, session in
+                let weight = Double(session.timeTyping) / Double(max(totalTimeMs, 1))
+                return acc + (session.trueAccuracy * weight)
+            }
+
+            // Group by mode for this day
+            let modeStats = aggregateByMode(sessions: sessions)
+
             return TypeQuickerStats(
                 date: date,
-                wordsPerMinute: stat.wpm ?? 0,
-                accuracy: stat.accuracy ?? 0,
-                practiceTimeMinutes: stat.practiceMinutes ?? 0,
-                sessionsCount: stat.sessions ?? 0
+                wordsPerMinute: weightedWpm,
+                accuracy: weightedAccuracy,
+                practiceTimeMinutes: totalTimeMs / 60000, // ms to minutes
+                sessionsCount: sessions.count,
+                byMode: modeStats.isEmpty ? nil : modeStats
             )
-        }
+        }.sorted { $0.date < $1.date }
+    }
+
+    /// Aggregate all sessions by mode across all dates
+    func toStatsByMode() -> [TypeQuickerModeStats] {
+        let allSessions = activity.values.flatMap { $0 }
+        return aggregateByMode(sessions: allSessions)
+    }
+
+    /// Helper to aggregate sessions by primaryMode
+    private func aggregateByMode(sessions: [Session]) -> [TypeQuickerModeStats] {
+        let grouped = Dictionary(grouping: sessions) { $0.primaryMode }
+
+        return grouped.compactMap { (mode, modeSessions) -> TypeQuickerModeStats? in
+            guard !modeSessions.isEmpty else { return nil }
+
+            let totalTimeMs = modeSessions.reduce(0) { $0 + $1.timeTyping }
+
+            // Weighted average WPM
+            let weightedWpm = modeSessions.reduce(0.0) { acc, session in
+                let weight = Double(session.timeTyping) / Double(max(totalTimeMs, 1))
+                return acc + (session.wpm * weight)
+            }
+
+            // Weighted average accuracy
+            let weightedAccuracy = modeSessions.reduce(0.0) { acc, session in
+                let weight = Double(session.timeTyping) / Double(max(totalTimeMs, 1))
+                return acc + (session.trueAccuracy * weight)
+            }
+
+            return TypeQuickerModeStats(
+                mode: mode,
+                wordsPerMinute: weightedWpm,
+                accuracy: weightedAccuracy,
+                practiceTimeMinutes: totalTimeMs / 60000,
+                sessionsCount: modeSessions.count
+            )
+        }.sorted { $0.practiceTimeMinutes > $1.practiceTimeMinutes } // Sort by most practiced
     }
 }
 

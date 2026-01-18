@@ -2,7 +2,7 @@ import SwiftUI
 
 /// Represents the main navigation tabs in the app
 public enum AppTab: String, CaseIterable, Identifiable {
-    case dashboard
+    case today
     case goals
     case insights
     case settings
@@ -11,8 +11,8 @@ public enum AppTab: String, CaseIterable, Identifiable {
 
     public var title: String {
         switch self {
-        case .dashboard:
-            return "Dashboard"
+        case .today:
+            return "Today"
         case .goals:
             return "Goals"
         case .insights:
@@ -24,8 +24,8 @@ public enum AppTab: String, CaseIterable, Identifiable {
 
     public var iconName: String {
         switch self {
-        case .dashboard:
-            return "square.grid.2x2"
+        case .today:
+            return "sun.max.fill"
         case .goals:
             return "target"
         case .insights:

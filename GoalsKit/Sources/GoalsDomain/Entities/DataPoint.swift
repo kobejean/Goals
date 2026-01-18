@@ -39,19 +39,51 @@ public struct TypeQuickerStats: Sendable, Equatable, Codable {
     public let accuracy: Double
     public let practiceTimeMinutes: Int
     public let sessionsCount: Int
+    public let byMode: [TypeQuickerModeStats]?
 
     public init(
         date: Date,
         wordsPerMinute: Double,
         accuracy: Double,
         practiceTimeMinutes: Int,
-        sessionsCount: Int
+        sessionsCount: Int,
+        byMode: [TypeQuickerModeStats]? = nil
     ) {
         self.date = date
         self.wordsPerMinute = wordsPerMinute
         self.accuracy = accuracy
         self.practiceTimeMinutes = practiceTimeMinutes
         self.sessionsCount = sessionsCount
+        self.byMode = byMode
+    }
+}
+
+/// TypeQuicker statistics grouped by mode (e.g., "words", "quotes", "numbers")
+public struct TypeQuickerModeStats: Sendable, Equatable, Codable, Identifiable {
+    public var id: String { mode }
+    public let mode: String
+    public let wordsPerMinute: Double
+    public let accuracy: Double
+    public let practiceTimeMinutes: Int
+    public let sessionsCount: Int
+
+    public init(
+        mode: String,
+        wordsPerMinute: Double,
+        accuracy: Double,
+        practiceTimeMinutes: Int,
+        sessionsCount: Int
+    ) {
+        self.mode = mode
+        self.wordsPerMinute = wordsPerMinute
+        self.accuracy = accuracy
+        self.practiceTimeMinutes = practiceTimeMinutes
+        self.sessionsCount = sessionsCount
+    }
+
+    /// Display name for the mode
+    public var displayName: String {
+        mode.capitalized
     }
 }
 
