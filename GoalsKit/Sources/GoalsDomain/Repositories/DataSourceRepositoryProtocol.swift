@@ -82,11 +82,11 @@ public extension TypeQuickerDataSourceProtocol {
 
 /// Protocol for AtCoder data source
 public protocol AtCoderDataSourceProtocol: DataSourceRepositoryProtocol {
-    /// Fetches AtCoder statistics
-    func fetchStats() async throws -> AtCoderStats?
+    /// Fetches current AtCoder statistics (point-in-time snapshot, not cached)
+    func fetchStats() async throws -> AtCoderCurrentStats?
 
-    /// Fetches contest history
-    func fetchContestHistory() async throws -> [AtCoderStats]
+    /// Fetches contest history (historical records, cached)
+    func fetchContestHistory() async throws -> [AtCoderContestResult]
 
     /// Fetches daily effort data (submissions grouped by day and difficulty)
     func fetchDailyEffort(from fromDate: Date?) async throws -> [AtCoderDailyEffort]
@@ -97,7 +97,7 @@ public protocol AtCoderDataSourceProtocol: DataSourceRepositoryProtocol {
     // MARK: - Cache Methods (optional, for stale-while-revalidate pattern)
 
     /// Returns cached contest history without fetching from remote
-    func fetchCachedContestHistory() async throws -> [AtCoderStats]
+    func fetchCachedContestHistory() async throws -> [AtCoderContestResult]
 
     /// Returns cached daily effort without fetching from remote
     func fetchCachedDailyEffort(from startDate: Date) async throws -> [AtCoderDailyEffort]
@@ -111,7 +111,7 @@ public protocol AtCoderDataSourceProtocol: DataSourceRepositoryProtocol {
 
 // Default implementations for non-cached data sources
 public extension AtCoderDataSourceProtocol {
-    func fetchCachedContestHistory() async throws -> [AtCoderStats] {
+    func fetchCachedContestHistory() async throws -> [AtCoderContestResult] {
         []
     }
 

@@ -17,7 +17,8 @@ public actor AtCoderDataSource: AtCoderDataSourceProtocol {
     }
 
     public nonisolated func metricValue(for key: String, from stats: Any) -> Double? {
-        guard let stat = stats as? AtCoderStats else { return nil }
+        // Handle both AtCoderCurrentStats and AtCoderContestResult via the shared protocol
+        guard let stat = stats as? any AtCoderStatsProtocol else { return nil }
         switch key {
         case "rating": return Double(stat.rating)
         case "highestRating": return Double(stat.highestRating)
@@ -64,7 +65,7 @@ public actor AtCoderDataSource: AtCoderDataSourceProtocol {
         return metricValue(for: metricKey, from: stats)
     }
 
-    public func fetchStats() async throws -> AtCoderStats? {
+    public func fetchStats() async throws -> AtCoderCurrentStats? {
         guard let username = username else {
             throw DataSourceError.notConfigured
         }
@@ -81,7 +82,7 @@ public actor AtCoderDataSource: AtCoderDataSourceProtocol {
         guard let latest = contestHistory.last else {
             // User has no contest history, but might still have solved problems
             if let acRank {
-                return AtCoderStats(
+                return AtCoderCurrentStats(
                     date: Date(),
                     rating: 0,
                     highestRating: 0,
@@ -93,7 +94,7 @@ public actor AtCoderDataSource: AtCoderDataSourceProtocol {
             return nil
         }
 
-        return AtCoderStats(
+        return AtCoderCurrentStats(
             date: Date(),
             rating: latest.NewRating,
             highestRating: contestHistory.map { $0.NewRating }.max() ?? 0,
@@ -103,7 +104,7 @@ public actor AtCoderDataSource: AtCoderDataSourceProtocol {
         )
     }
 
-    public func fetchContestHistory() async throws -> [AtCoderStats] {
+    public func fetchContestHistory() async throws -> [AtCoderContestResult] {
         guard let username = username else {
             throw DataSourceError.notConfigured
         }
@@ -119,7 +120,7 @@ public actor AtCoderDataSource: AtCoderDataSourceProtocol {
         var highestSoFar = 0
         return contestHistory.enumerated().map { (index, result) in
             highestSoFar = max(highestSoFar, result.NewRating)
-            return AtCoderStats(
+            return AtCoderContestResult(
                 date: result.endTime,
                 rating: result.NewRating,
                 highestRating: highestSoFar,
@@ -276,7 +277,7 @@ public actor AtCoderDataSource: AtCoderDataSourceProtocol {
     }
 
     /// Fetches contest history from official AtCoder API
-    private func fetchContestHistoryFromAPI(username: String) async throws -> [AtCoderContestResult] {
+    private func fetchContestHistoryFromAPI(username: String) async throws -> [AtCoderContestHistoryResponse] {
         let url = atCoderBaseURL.appendingPathComponent("users/\(username)/history/json")
         return try await httpClient.get(url)
     }
@@ -325,8 +326,8 @@ public actor AtCoderDataSource: AtCoderDataSourceProtocol {
 
 // MARK: - API Response Models
 
-/// AtCoder contest result from official history API
-private struct AtCoderContestResult: Codable {
+/// AtCoder contest history response from official history API
+private struct AtCoderContestHistoryResponse: Codable {
     let IsRated: Bool
     let Place: Int
     let OldRating: Int

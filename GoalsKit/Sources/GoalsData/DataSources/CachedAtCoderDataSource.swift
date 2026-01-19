@@ -21,19 +21,19 @@ public actor CachedAtCoderDataSource: AtCoderDataSourceProtocol, CachingDataSour
 
     // MARK: - AtCoderDataSourceProtocol
 
-    public func fetchStats() async throws -> AtCoderStats? {
+    public func fetchStats() async throws -> AtCoderCurrentStats? {
         // Always fetch fresh stats from remote (current snapshot)
         // Don't cache - this is a point-in-time snapshot, not historical data
         try await remote.fetchStats()
     }
 
-    public func fetchContestHistory() async throws -> [AtCoderStats] {
+    public func fetchContestHistory() async throws -> [AtCoderContestResult] {
         // Fetch from remote and store in cache
         let freshHistory = try await remote.fetchContestHistory()
         try await cache.store(freshHistory)
 
         // Single source of truth: always return from cache
-        return try await fetchCached(AtCoderStats.self).filter { $0.isContestResult }
+        return try await fetchCached(AtCoderContestResult.self)
     }
 
     public func fetchSubmissions(from fromDate: Date?) async throws -> [AtCoderSubmission] {
@@ -116,8 +116,8 @@ public actor CachedAtCoderDataSource: AtCoderDataSourceProtocol, CachingDataSour
 
     // MARK: - Cache-Only Methods (for instant display)
 
-    public func fetchCachedContestHistory() async throws -> [AtCoderStats] {
-        try await fetchCached(AtCoderStats.self).filter { $0.isContestResult }
+    public func fetchCachedContestHistory() async throws -> [AtCoderContestResult] {
+        try await fetchCached(AtCoderContestResult.self)
     }
 
     public func fetchCachedDailyEffort(from startDate: Date) async throws -> [AtCoderDailyEffort] {
@@ -129,7 +129,7 @@ public actor CachedAtCoderDataSource: AtCoderDataSourceProtocol, CachingDataSour
     }
 
     public func hasCachedContestHistory() async throws -> Bool {
-        try await hasCached(AtCoderStats.self)
+        try await hasCached(AtCoderContestResult.self)
     }
 
     public func hasCachedDailyEffort() async throws -> Bool {

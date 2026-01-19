@@ -13,8 +13,8 @@ public final class AtCoderInsightsViewModel: InsightsSectionViewModel {
 
     // MARK: - Published State
 
-    public private(set) var stats: AtCoderStats?
-    public private(set) var contestHistory: [AtCoderStats] = []
+    public private(set) var stats: AtCoderCurrentStats?
+    public private(set) var contestHistory: [AtCoderContestResult] = []
     public private(set) var dailyEffort: [AtCoderDailyEffort] = []
     public private(set) var goals: [Goal] = []
     public private(set) var errorMessage: String?
@@ -45,7 +45,7 @@ public final class AtCoderInsightsViewModel: InsightsSectionViewModel {
     }
 
     /// Filter contest history by time range
-    public func filteredContestHistory(for timeRange: TimeRange) -> [AtCoderStats] {
+    public func filteredContestHistory(for timeRange: TimeRange) -> [AtCoderContestResult] {
         let cutoffDate = timeRange.startDate(from: Date())
         return contestHistory.filter { $0.date >= cutoffDate }
     }
@@ -138,7 +138,9 @@ public final class AtCoderInsightsViewModel: InsightsSectionViewModel {
         // Display cached data immediately
         if let cachedHistory = try? await dataSource.fetchCachedContestHistory(), !cachedHistory.isEmpty {
             contestHistory = cachedHistory
-            stats = cachedHistory.last
+            if let lastContest = cachedHistory.last {
+                stats = AtCoderCurrentStats(from: lastContest)
+            }
         }
         if let cachedEffort = try? await dataSource.fetchCachedDailyEffort(from: yearStart), !cachedEffort.isEmpty {
             dailyEffort = cachedEffort

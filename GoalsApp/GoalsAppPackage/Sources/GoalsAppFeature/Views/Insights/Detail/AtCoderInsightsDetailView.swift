@@ -62,7 +62,7 @@ public struct AtCoderInsightsDetailView: View {
 // MARK: - Stats Row
 
 private struct StatsRow: View {
-    let stats: AtCoderStats
+    let stats: AtCoderCurrentStats
 
     var body: some View {
         HStack(spacing: 0) {
@@ -125,7 +125,7 @@ private struct StatItem: View {
 // MARK: - Rating Chart
 
 private struct RatingChart: View {
-    let contestHistory: [AtCoderStats]
+    let contestHistory: [AtCoderContestResult]
     let timeRange: TimeRange
     let ratingGoal: Int?
 

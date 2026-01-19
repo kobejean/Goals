@@ -57,9 +57,9 @@ struct DataPointTests {
         #expect(stats.sessionsCount == 3)
     }
 
-    @Test("AtCoderStats determines rank color correctly")
+    @Test("AtCoderCurrentStats determines rank color correctly")
     func atCoderRankColor() {
-        let grayRating = AtCoderStats(
+        let grayRating = AtCoderCurrentStats(
             date: Date(),
             rating: 350,
             highestRating: 350,
@@ -68,7 +68,7 @@ struct DataPointTests {
         )
         #expect(grayRating.rankColor == .gray)
 
-        let greenRating = AtCoderStats(
+        let greenRating = AtCoderCurrentStats(
             date: Date(),
             rating: 1000,
             highestRating: 1000,
@@ -77,7 +77,7 @@ struct DataPointTests {
         )
         #expect(greenRating.rankColor == .green)
 
-        let blueRating = AtCoderStats(
+        let blueRating = AtCoderCurrentStats(
             date: Date(),
             rating: 1700,
             highestRating: 1700,
@@ -86,7 +86,7 @@ struct DataPointTests {
         )
         #expect(blueRating.rankColor == .blue)
 
-        let redRating = AtCoderStats(
+        let redRating = AtCoderCurrentStats(
             date: Date(),
             rating: 2900,
             highestRating: 2900,
@@ -94,6 +94,20 @@ struct DataPointTests {
             problemsSolved: 1000
         )
         #expect(redRating.rankColor == .red)
+    }
+
+    @Test("AtCoderContestResult has valid cache key")
+    func atCoderContestResultCacheKey() {
+        let contestResult = AtCoderContestResult(
+            date: Date(),
+            rating: 1500,
+            highestRating: 1500,
+            contestsParticipated: 10,
+            problemsSolved: 50,
+            contestScreenName: "abc123"
+        )
+        #expect(contestResult.cacheKey == "ac:contest:abc123")
+        #expect(contestResult.rankColor == .cyan)
     }
 
     @Test("FinanceStats calculates net income and savings rate")

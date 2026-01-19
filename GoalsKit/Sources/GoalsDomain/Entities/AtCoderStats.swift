@@ -1,38 +1,18 @@
 import Foundation
 
-/// AtCoder competitive programming statistics
-public struct AtCoderStats: Sendable, Equatable, Codable {
-    public let date: Date
-    public let rating: Int
-    public let highestRating: Int
-    public let contestsParticipated: Int
-    public let problemsSolved: Int
-    public let longestStreak: Int?
-    public let contestScreenName: String?  // Unique contest identifier (nil for current stats snapshot)
+// MARK: - Shared Protocol
 
-    public init(
-        date: Date,
-        rating: Int,
-        highestRating: Int,
-        contestsParticipated: Int,
-        problemsSolved: Int,
-        longestStreak: Int? = nil,
-        contestScreenName: String? = nil
-    ) {
-        self.date = date
-        self.rating = rating
-        self.highestRating = highestRating
-        self.contestsParticipated = contestsParticipated
-        self.problemsSolved = problemsSolved
-        self.longestStreak = longestStreak
-        self.contestScreenName = contestScreenName
-    }
+/// Common properties shared between current stats and contest results
+public protocol AtCoderStatsProtocol: Sendable, Equatable, Codable {
+    var date: Date { get }
+    var rating: Int { get }
+    var highestRating: Int { get }
+    var contestsParticipated: Int { get }
+    var problemsSolved: Int { get }
+    var longestStreak: Int? { get }
+}
 
-    /// Whether this is a contest result (vs a stats snapshot)
-    public var isContestResult: Bool {
-        contestScreenName != nil
-    }
-
+extension AtCoderStatsProtocol {
     /// AtCoder rank color based on rating
     public var rankColor: AtCoderRankColor {
         switch rating {
@@ -56,19 +36,85 @@ public struct AtCoderStats: Sendable, Equatable, Codable {
     }
 }
 
+// MARK: - Current Stats (Not Cached)
+
+/// Current AtCoder statistics snapshot - represents the user's current state
+/// This is a point-in-time snapshot and should NOT be cached
+public struct AtCoderCurrentStats: AtCoderStatsProtocol {
+    public let date: Date
+    public let rating: Int
+    public let highestRating: Int
+    public let contestsParticipated: Int
+    public let problemsSolved: Int
+    public let longestStreak: Int?
+
+    public init(
+        date: Date,
+        rating: Int,
+        highestRating: Int,
+        contestsParticipated: Int,
+        problemsSolved: Int,
+        longestStreak: Int? = nil
+    ) {
+        self.date = date
+        self.rating = rating
+        self.highestRating = highestRating
+        self.contestsParticipated = contestsParticipated
+        self.problemsSolved = problemsSolved
+        self.longestStreak = longestStreak
+    }
+
+    /// Creates a current stats snapshot from a contest result (for fallback display)
+    public init(from contestResult: AtCoderContestResult) {
+        self.date = contestResult.date
+        self.rating = contestResult.rating
+        self.highestRating = contestResult.highestRating
+        self.contestsParticipated = contestResult.contestsParticipated
+        self.problemsSolved = contestResult.problemsSolved
+        self.longestStreak = contestResult.longestStreak
+    }
+}
+
+// MARK: - Contest Result (Cached)
+
+/// AtCoder contest result - represents a single contest participation
+/// These are historical records and should be cached
+public struct AtCoderContestResult: AtCoderStatsProtocol {
+    public let date: Date
+    public let rating: Int
+    public let highestRating: Int
+    public let contestsParticipated: Int
+    public let problemsSolved: Int
+    public let longestStreak: Int?
+    public let contestScreenName: String  // Required - this is the cache key
+
+    public init(
+        date: Date,
+        rating: Int,
+        highestRating: Int,
+        contestsParticipated: Int,
+        problemsSolved: Int,
+        longestStreak: Int? = nil,
+        contestScreenName: String
+    ) {
+        self.date = date
+        self.rating = rating
+        self.highestRating = highestRating
+        self.contestsParticipated = contestsParticipated
+        self.problemsSolved = problemsSolved
+        self.longestStreak = longestStreak
+        self.contestScreenName = contestScreenName
+    }
+}
+
 // MARK: - CacheableRecord
 
-extension AtCoderStats: CacheableRecord {
+extension AtCoderContestResult: CacheableRecord {
     public static var dataSource: DataSourceType { .atCoder }
     public static var recordType: String { "contest_history" }
 
     public var cacheKey: String {
-        // Contest screen name is the unique identifier for contest results
-        // Only contest results should be cached - stats snapshots should not be stored
-        guard let contestScreenName = contestScreenName else {
-            fatalError("AtCoderStats.cacheKey called on non-contest entry. Only contest results should be cached.")
-        }
-        return "ac:contest:\(contestScreenName)"
+        "ac:contest:\(contestScreenName)"
     }
 
     public var recordDate: Date { date }
