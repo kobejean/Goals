@@ -6,13 +6,7 @@
    height="1024"
    viewBox="0 0 1024 1024"
    xmlns="http://www.w3.org/2000/svg">
-<rect
-   fill="#ffffff"
-   x="0"
-   y="0"
-   width="1024"
-   height="1024"
-   id="background" />
+<!-- Background removed for iOS 26 glass effect -->
 <g id="content" transform="translate(61, 107) scale(1.85)">
   <circle
      fill="#7aae21"

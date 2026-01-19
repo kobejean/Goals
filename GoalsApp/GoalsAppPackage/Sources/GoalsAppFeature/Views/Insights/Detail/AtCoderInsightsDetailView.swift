@@ -69,32 +69,32 @@ private struct StatsRow: View {
             StatItem(
                 label: "Rating",
                 value: "\(stats.rating)",
-                color: stats.rankColor.swiftUIColor
+                color: Color.accentColor
             )
             Spacer()
             StatItem(
                 label: "Best",
                 value: "\(stats.highestRating)",
-                color: .orange
+                color: Color.accentColor
             )
             Spacer()
             StatItem(
                 label: "Contests",
                 value: "\(stats.contestsParticipated)",
-                color: .blue
+                color: Color.accentColor
             )
             Spacer()
             StatItem(
                 label: "Solved",
                 value: "\(stats.problemsSolved)",
-                color: .green
+                color: Color.accentColor
             )
             if let streak = stats.longestStreak {
                 Spacer()
                 StatItem(
                     label: "Streak",
                     value: "\(streak)d",
-                    color: .red
+                    color: Color.accentColor
                 )
             }
         }
