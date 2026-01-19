@@ -3,7 +3,7 @@
 This is a native **iOS application** built with **Swift 6.1+** and **SwiftUI**. The codebase targets **iOS 18.0 and later**, allowing full use of modern Swift and iOS APIs. All concurrency is handled with **Swift Concurrency** (async/await, actors, @MainActor isolation) ensuring thread-safe code.
 
 - **Frameworks & Tech:** SwiftUI for UI, Swift Concurrency with strict mode, Swift Package Manager for modular architecture
-- **Architecture:** Model-View (MV) pattern using pure SwiftUI state management. We avoid MVVM and instead leverage SwiftUI's built-in state mechanisms (@State, @Observable, @Environment, @Binding)
+- **Architecture:** Model-View (MV) pattern using SwiftUI state management. Leverage SwiftUI's built-in state mechanisms (@State, @Observable, @Environment, @Binding) for simple views; use ViewModels for complex presentation logic
 - **Testing:** Swift Testing framework with modern @Test macros and #expect/#require assertions
 - **Platform:** iOS (Simulator and Device)
 - **Accessibility:** Full accessibility support using SwiftUI's accessibility modifiers
@@ -13,28 +13,28 @@ This is a native **iOS application** built with **Swift 6.1+** and **SwiftUI**. 
 The project follows a **workspace + SPM package** architecture:
 
 ```
-YourApp/
+GoalsApp/
 ├── Config/                         # XCConfig build settings
 │   ├── Debug.xcconfig
 │   ├── Release.xcconfig
 │   ├── Shared.xcconfig
 │   └── Tests.xcconfig
-├── YourApp.xcworkspace/            # Workspace container
-├── YourApp.xcodeproj/              # App shell (minimal wrapper)
-├── YourApp/                        # App target - just the entry point
+├── GoalsApp.xcworkspace/           # Workspace container
+├── GoalsApp.xcodeproj/             # App shell (minimal wrapper)
+├── GoalsApp/                       # App target - just the entry point
 │   ├── Assets.xcassets/
-│   ├── YourAppApp.swift           # @main entry point only
-│   └── YourApp.xctestplan
-├── YourAppPackage/                 # All features and business logic
+│   ├── GoalsAppApp.swift           # @main entry point only
+│   └── GoalsApp.xctestplan
+├── GoalsAppPackage/                # All features and business logic
 │   ├── Package.swift
 │   ├── Sources/
-│   │   └── YourAppFeature/        # Feature modules
+│   │   └── GoalsAppFeature/        # Feature modules
 │   └── Tests/
-│       └── YourAppFeatureTests/   # Swift Testing tests
-└── YourAppUITests/                 # UI automation tests
+│       └── GoalsAppFeatureTests/   # Swift Testing tests
+└── GoalsAppUITests/                # UI automation tests
 ```
 
-**Important:** All development work should be done in the **YourAppPackage** Swift Package, not in the app project. The app project is merely a thin wrapper that imports and launches the package features.
+**Important:** All development work should be done in the **GoalsAppPackage** Swift Package, not in the app project. The app project is merely a thin wrapper that imports and launches the package features.
 
 # Code Quality & Style Guidelines
 
@@ -54,8 +54,8 @@ YourApp/
 
 # Modern SwiftUI Architecture Guidelines (2025)
 
-### No ViewModels - Use Native SwiftUI Data Flow
-**New features MUST follow these patterns:**
+### Prefer Native SwiftUI Data Flow
+**For simple views, use native SwiftUI state. For complex views, use ViewModels:**
 
 1. **Views as Pure State Expressions**
    ```swift
@@ -88,24 +88,22 @@ YourApp/
    - Use `.task(id:)` and `.onChange(of:)` for side effects
    - Pass state between views using `@Binding`
 
-4. **No ViewModels Required**
+4. **Simple Views Don't Need ViewModels**
    - Views should be lightweight and disposable
-   - Business logic belongs in services/clients
+   - Business logic belongs in services/use cases
    - Test services independently, not views
    - Use SwiftUI previews for visual testing
 
 5. **When Views Get Complex**
-   - Split into smaller subviews
+   - First try splitting into smaller subviews
    - Use compound views that compose smaller views
    - Pass state via bindings between views
-   - For simple complexity, prefer splitting views over ViewModels
 
 6. **ViewModels for Complex Presentation Logic**
-   Use `@Observable` ViewModels for complex views with significant presentation logic (charts, computed data, multiple data sources). ViewModels should:
+   Use `@Observable` ViewModels when views have significant presentation logic (charts, computed data, multiple data sources). This project uses ViewModels for `TypeQuickerInsightsViewModel`, `AtCoderInsightsViewModel`, and `InsightsSectionViewModel`. ViewModels should:
    - Be in separate files under `ViewModels/`
    - Receive dependencies via init for testability
-   - Be created via AppContainer factory methods
-   - Simple views can use `@State` directly
+   - Be created via `AppContainer` factory methods
 
 # iOS 26 Features (Optional)
 
@@ -197,7 +195,8 @@ struct ModernButton: View {
 - **@Environment:** For dependency injection and shared app state
 - **@Binding:** For two-way data flow between parent and child views
 - **@Bindable:** For creating bindings to @Observable objects
-- Avoid ViewModels - put view logic directly in SwiftUI views using these state mechanisms
+- For simple views, put logic directly in views using these state mechanisms
+- Use ViewModels for complex views with charts, computed data, or multiple data sources
 - Keep views focused and extract reusable components
 
 Example with @Observable:
@@ -624,8 +623,8 @@ get_sim_app_path_name_ws({
 
 # Development Workflow
 
-1. **Make changes in the Package**: All feature development happens in YourAppPackage/Sources/
-2. **Write tests**: Add Swift Testing tests in YourAppPackage/Tests/
+1. **Make changes in the Package**: All feature development happens in GoalsAppPackage/Sources/
+2. **Write tests**: Add Swift Testing tests in GoalsAppPackage/Tests/
 3. **Build and test**: Use XcodeBuildMCP tools to build and run tests
 4. **Run on simulator**: Deploy to simulator for manual testing
 5. **UI automation**: Use describe_ui and automation tools for UI testing
@@ -737,4 +736,4 @@ struct TaskListView: View {
 
 ---
 
-Remember: This project prioritizes clean, simple SwiftUI code using the platform's native state management. Keep the app shell minimal and implement all features in the Swift Package.
+Remember: This project prioritizes clean SwiftUI code. Use native state management for simple views and ViewModels for complex presentation logic. Keep the app shell minimal and implement all features in GoalsAppPackage.

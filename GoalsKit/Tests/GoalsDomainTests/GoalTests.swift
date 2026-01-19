@@ -5,113 +5,79 @@ import Foundation
 @Suite("Goal Entity Tests")
 struct GoalTests {
 
-    @Test("Numeric goal calculates progress correctly")
-    func numericGoalProgress() {
+    @Test("Goal calculates progress correctly")
+    func goalProgress() {
         let goal = Goal(
-            title: "Save Money",
-            type: .numeric,
-            targetValue: 10000,
-            currentValue: 2500,
-            unit: "USD"
+            title: "Reach 100 WPM",
+            dataSource: .typeQuicker,
+            metricKey: "wpm",
+            targetValue: 100,
+            currentValue: 25,
+            unit: "WPM"
         )
 
         #expect(goal.progress == 0.25)
         #expect(!goal.isAchieved)
     }
 
-    @Test("Numeric goal with 100% progress is achieved")
-    func numericGoalAchieved() {
+    @Test("Goal with 100% progress is achieved")
+    func goalAchieved() {
         let goal = Goal(
-            title: "Save Money",
-            type: .numeric,
-            targetValue: 10000,
-            currentValue: 10000,
-            unit: "USD"
+            title: "Reach 100 WPM",
+            dataSource: .typeQuicker,
+            metricKey: "wpm",
+            targetValue: 100,
+            currentValue: 100,
+            unit: "WPM"
         )
 
         #expect(goal.progress == 1.0)
         #expect(goal.isAchieved)
     }
 
-    @Test("Numeric goal with excess progress caps at 100%")
-    func numericGoalExcessProgress() {
+    @Test("Goal with excess progress caps at 100%")
+    func goalExcessProgress() {
         let goal = Goal(
-            title: "Save Money",
-            type: .numeric,
-            targetValue: 10000,
-            currentValue: 15000,
-            unit: "USD"
+            title: "Reach 100 WPM",
+            dataSource: .typeQuicker,
+            metricKey: "wpm",
+            targetValue: 100,
+            currentValue: 150,
+            unit: "WPM"
         )
 
         #expect(goal.progress == 1.0)
         #expect(goal.isAchieved)
     }
 
-    @Test("Habit goal calculates progress based on streak")
-    func habitGoalProgress() {
+    @Test("Goal with zero target value handles progress gracefully")
+    func goalZeroTarget() {
         let goal = Goal(
-            title: "Exercise Daily",
-            type: .habit,
-            frequency: .weekly,
-            targetCount: 5,
-            currentStreak: 3
-        )
-
-        #expect(goal.progress == 0.6)
-        #expect(!goal.isAchieved)
-    }
-
-    @Test("Habit goal is achieved when streak meets target")
-    func habitGoalAchieved() {
-        let goal = Goal(
-            title: "Exercise Daily",
-            type: .habit,
-            frequency: .weekly,
-            targetCount: 5,
-            currentStreak: 5
-        )
-
-        #expect(goal.progress == 1.0)
-        #expect(goal.isAchieved)
-    }
-
-    @Test("Milestone goal progress is binary")
-    func milestoneGoalProgress() {
-        let incompleteGoal = Goal(
-            title: "Run Marathon",
-            type: .milestone
-        )
-
-        #expect(incompleteGoal.progress == 0.0)
-        #expect(!incompleteGoal.isAchieved)
-
-        let completeGoal = Goal(
-            title: "Run Marathon",
-            type: .milestone,
-            isCompleted: true
-        )
-
-        #expect(completeGoal.progress == 1.0)
-        #expect(completeGoal.isAchieved)
-    }
-
-    @Test("Goal with nil values handles progress gracefully")
-    func goalWithNilValues() {
-        let goal = Goal(
-            title: "Incomplete Goal",
-            type: .numeric
+            title: "Zero Target",
+            dataSource: .typeQuicker,
+            metricKey: "wpm",
+            targetValue: 0,
+            currentValue: 50,
+            unit: "WPM"
         )
 
         #expect(goal.progress == 0.0)
         #expect(!goal.isAchieved)
     }
 
-    @Test("Goal type has correct display names")
-    func goalTypeDisplayNames() {
-        #expect(GoalType.numeric.displayName == "Numeric")
-        #expect(GoalType.habit.displayName == "Habit")
-        #expect(GoalType.milestone.displayName == "Milestone")
-        #expect(GoalType.compound.displayName == "Compound")
+    @Test("Goal with zero current value has zero progress")
+    func goalZeroCurrent() {
+        let goal = Goal(
+            title: "Fresh Goal",
+            dataSource: .atCoder,
+            metricKey: "rating",
+            targetValue: 1600,
+            currentValue: 0,
+            unit: ""
+        )
+
+        #expect(goal.progress == 0.0)
+        #expect(!goal.isAchieved)
     }
 
     @Test("Goal color has correct display names")
@@ -119,5 +85,66 @@ struct GoalTests {
         #expect(GoalColor.blue.displayName == "Blue")
         #expect(GoalColor.green.displayName == "Green")
         #expect(GoalColor.orange.displayName == "Orange")
+        #expect(GoalColor.purple.displayName == "Purple")
+        #expect(GoalColor.red.displayName == "Red")
+        #expect(GoalColor.pink.displayName == "Pink")
+        #expect(GoalColor.yellow.displayName == "Yellow")
+        #expect(GoalColor.teal.displayName == "Teal")
+    }
+
+    @Test("Goal is Equatable")
+    func goalEquatable() {
+        let id = UUID()
+        let date = Date()
+
+        let goal1 = Goal(
+            id: id,
+            title: "Test Goal",
+            dataSource: .typeQuicker,
+            createdAt: date,
+            updatedAt: date,
+            metricKey: "wpm",
+            targetValue: 100,
+            currentValue: 50,
+            unit: "WPM"
+        )
+
+        let goal2 = Goal(
+            id: id,
+            title: "Test Goal",
+            dataSource: .typeQuicker,
+            createdAt: date,
+            updatedAt: date,
+            metricKey: "wpm",
+            targetValue: 100,
+            currentValue: 50,
+            unit: "WPM"
+        )
+
+        #expect(goal1 == goal2)
+    }
+
+    @Test("Goal archived state")
+    func goalArchivedState() {
+        let activeGoal = Goal(
+            title: "Active Goal",
+            dataSource: .typeQuicker,
+            metricKey: "wpm",
+            targetValue: 100,
+            unit: "WPM",
+            isArchived: false
+        )
+
+        let archivedGoal = Goal(
+            title: "Archived Goal",
+            dataSource: .typeQuicker,
+            metricKey: "wpm",
+            targetValue: 100,
+            unit: "WPM",
+            isArchived: true
+        )
+
+        #expect(!activeGoal.isArchived)
+        #expect(archivedGoal.isArchived)
     }
 }

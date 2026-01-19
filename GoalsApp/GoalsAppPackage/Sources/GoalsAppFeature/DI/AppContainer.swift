@@ -38,6 +38,7 @@ public final class AppContainer {
     // MARK: - Repositories
 
     public let goalRepository: GoalRepositoryProtocol
+    public let badgeRepository: BadgeRepositoryProtocol
 
     // MARK: - Caching
 
@@ -56,6 +57,11 @@ public final class AppContainer {
 
     public let createGoalUseCase: CreateGoalUseCase
     public let syncDataSourcesUseCase: SyncDataSourcesUseCase
+    public let badgeEvaluationUseCase: BadgeEvaluationUseCase
+
+    // MARK: - Managers
+
+    public let badgeNotificationManager: BadgeNotificationManager
 
     // MARK: - Initialization
 
@@ -64,6 +70,7 @@ public final class AppContainer {
         let schema = Schema([
             GoalModel.self,
             CachedDataEntry.self,
+            EarnedBadgeModel.self,
         ])
 
         let modelConfiguration = ModelConfiguration(
@@ -80,6 +87,8 @@ public final class AppContainer {
         // Initialize repositories
         let goalRepo = SwiftDataGoalRepository(modelContainer: modelContainer)
         self.goalRepository = goalRepo
+        let badgeRepo = SwiftDataBadgeRepository(modelContainer: modelContainer)
+        self.badgeRepository = badgeRepo
 
         // Initialize caching
         self.dataCache = DataCache(modelContainer: modelContainer)
@@ -109,6 +118,13 @@ public final class AppContainer {
                 .atCoder: atCoderDataSource
             ]
         )
+        self.badgeEvaluationUseCase = BadgeEvaluationUseCase(
+            goalRepository: goalRepo,
+            badgeRepository: badgeRepo
+        )
+
+        // Initialize managers
+        self.badgeNotificationManager = BadgeNotificationManager()
     }
 
     /// Creates an in-memory container for previews and testing
@@ -120,6 +136,7 @@ public final class AppContainer {
         let schema = Schema([
             GoalModel.self,
             CachedDataEntry.self,
+            EarnedBadgeModel.self,
         ])
 
         let modelConfiguration = ModelConfiguration(
@@ -135,6 +152,8 @@ public final class AppContainer {
 
         let goalRepo = SwiftDataGoalRepository(modelContainer: modelContainer)
         self.goalRepository = goalRepo
+        let badgeRepo = SwiftDataBadgeRepository(modelContainer: modelContainer)
+        self.badgeRepository = badgeRepo
 
         // Initialize caching
         self.dataCache = DataCache(modelContainer: modelContainer)
@@ -163,5 +182,12 @@ public final class AppContainer {
                 .atCoder: atCoderDataSource
             ]
         )
+        self.badgeEvaluationUseCase = BadgeEvaluationUseCase(
+            goalRepository: goalRepo,
+            badgeRepository: badgeRepo
+        )
+
+        // Initialize managers
+        self.badgeNotificationManager = BadgeNotificationManager()
     }
 }

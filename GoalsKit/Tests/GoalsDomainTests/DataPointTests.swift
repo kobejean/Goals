@@ -14,14 +14,14 @@ struct DataPointTests {
             goalId: goalId,
             value: 100.5,
             timestamp: timestamp,
-            source: .manual,
+            source: .typeQuicker,
             note: "Test note"
         )
 
         #expect(dataPoint.goalId == goalId)
         #expect(dataPoint.value == 100.5)
         #expect(dataPoint.timestamp == timestamp)
-        #expect(dataPoint.source == .manual)
+        #expect(dataPoint.source == .typeQuicker)
         #expect(dataPoint.note == "Test note")
     }
 
@@ -59,6 +59,7 @@ struct DataPointTests {
 
     @Test("AtCoderCurrentStats determines rank color correctly")
     func atCoderRankColor() {
+        // Gray: 0-399
         let grayRating = AtCoderCurrentStats(
             date: Date(),
             rating: 350,
@@ -68,6 +69,7 @@ struct DataPointTests {
         )
         #expect(grayRating.rankColor == .gray)
 
+        // Green: 800-1199
         let greenRating = AtCoderCurrentStats(
             date: Date(),
             rating: 1000,
@@ -77,6 +79,7 @@ struct DataPointTests {
         )
         #expect(greenRating.rankColor == .green)
 
+        // Blue: 1600-1999
         let blueRating = AtCoderCurrentStats(
             date: Date(),
             rating: 1700,
@@ -86,6 +89,7 @@ struct DataPointTests {
         )
         #expect(blueRating.rankColor == .blue)
 
+        // Red: 2800+
         let redRating = AtCoderCurrentStats(
             date: Date(),
             rating: 2900,
@@ -98,6 +102,7 @@ struct DataPointTests {
 
     @Test("AtCoderContestResult has valid cache key")
     func atCoderContestResultCacheKey() {
+        // Cyan: 1200-1599
         let contestResult = AtCoderContestResult(
             date: Date(),
             rating: 1500,
@@ -110,28 +115,28 @@ struct DataPointTests {
         #expect(contestResult.rankColor == .cyan)
     }
 
-    @Test("FinanceStats calculates net income and savings rate")
-    func financeStatsCalculations() {
-        let stats = FinanceStats(
-            date: Date(),
-            income: 5000,
-            expenses: 3500,
-            savings: 1000
-        )
-
-        #expect(stats.netIncome == 1500)
-        #expect(stats.savingsRate == 0.2)
+    @Test("AtCoderRankColor from difficulty")
+    func atCoderRankColorFromDifficulty() {
+        #expect(AtCoderRankColor.from(difficulty: nil) == .gray)
+        #expect(AtCoderRankColor.from(difficulty: 200) == .gray)
+        #expect(AtCoderRankColor.from(difficulty: 500) == .brown)
+        #expect(AtCoderRankColor.from(difficulty: 900) == .green)
+        #expect(AtCoderRankColor.from(difficulty: 1300) == .cyan)
+        #expect(AtCoderRankColor.from(difficulty: 1800) == .blue)
+        #expect(AtCoderRankColor.from(difficulty: 2200) == .yellow)
+        #expect(AtCoderRankColor.from(difficulty: 2600) == .orange)
+        #expect(AtCoderRankColor.from(difficulty: 3000) == .red)
     }
 
-    @Test("FinanceStats handles zero income gracefully")
-    func financeStatsZeroIncome() {
-        let stats = FinanceStats(
-            date: Date(),
-            income: 0,
-            expenses: 100,
-            savings: 0
-        )
-
-        #expect(stats.savingsRate == 0)
+    @Test("AtCoderRankColor has correct rating ranges")
+    func atCoderRankColorRatingRanges() {
+        #expect(AtCoderRankColor.gray.ratingRange == "0-399")
+        #expect(AtCoderRankColor.brown.ratingRange == "400-799")
+        #expect(AtCoderRankColor.green.ratingRange == "800-1199")
+        #expect(AtCoderRankColor.cyan.ratingRange == "1200-1599")
+        #expect(AtCoderRankColor.blue.ratingRange == "1600-1999")
+        #expect(AtCoderRankColor.yellow.ratingRange == "2000-2399")
+        #expect(AtCoderRankColor.orange.ratingRange == "2400-2799")
+        #expect(AtCoderRankColor.red.ratingRange == "2800+")
     }
 }

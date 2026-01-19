@@ -2,6 +2,7 @@ import SwiftUI
 
 /// Root content view with tab navigation
 public struct ContentView: View {
+    @Environment(AppContainer.self) private var container
     @State private var selectedTab: AppTab = .insights
 
     public var body: some View {
@@ -20,6 +21,16 @@ public struct ContentView: View {
                 .tag(AppTab.settings)
                 .tabItem { AppTab.settings.label }
                 .accessibilityIdentifier("tab-settings")
+        }
+        .overlay(alignment: .top) {
+            if let notification = container.badgeNotificationManager.currentNotification {
+                BadgeToastView(notification: notification) {
+                    container.badgeNotificationManager.dismiss()
+                }
+                .padding(.top, 8)
+                .transition(.move(edge: .top).combined(with: .opacity))
+                .animation(.spring(duration: 0.3), value: notification.id)
+            }
         }
     }
 

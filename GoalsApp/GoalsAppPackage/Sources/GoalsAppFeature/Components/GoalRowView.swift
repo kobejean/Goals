@@ -4,9 +4,11 @@ import GoalsDomain
 /// A row view for displaying a goal in a list
 public struct GoalRowView: View {
     let goal: Goal
+    var relatedBadges: [EarnedBadge]
 
-    public init(goal: Goal) {
+    public init(goal: Goal, relatedBadges: [EarnedBadge] = []) {
         self.goal = goal
+        self.relatedBadges = relatedBadges
     }
 
     public var body: some View {
@@ -40,10 +42,35 @@ public struct GoalRowView: View {
 
             Spacer()
 
+            // Badge indicator
+            if !relatedBadges.isEmpty {
+                badgeIndicator
+            }
+
             // Status indicator
             statusIndicator
         }
         .padding(.vertical, 4)
+    }
+
+    @ViewBuilder
+    private var badgeIndicator: some View {
+        HStack(spacing: 2) {
+            ForEach(relatedBadges.prefix(2)) { badge in
+                Image(systemName: badge.symbolName)
+                    .font(.caption)
+                    .foregroundStyle(tierColor(for: badge.tier))
+            }
+        }
+    }
+
+    private func tierColor(for tier: BadgeTier?) -> Color {
+        guard let tier else { return .yellow }
+        switch tier {
+        case .bronze: return .orange
+        case .silver: return .gray
+        case .gold: return .yellow
+        }
     }
 
     @ViewBuilder

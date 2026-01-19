@@ -7,20 +7,14 @@ struct DataSourceTypeTests {
 
     @Test("DataSourceType has correct display names")
     func dataSourceDisplayNames() {
-        #expect(DataSourceType.manual.displayName == "Manual Entry")
         #expect(DataSourceType.typeQuicker.displayName == "TypeQuicker")
         #expect(DataSourceType.atCoder.displayName == "AtCoder")
-        #expect(DataSourceType.finance.displayName == "Finance")
-        #expect(DataSourceType.location.displayName == "Location")
     }
 
     @Test("DataSourceType has correct icon names")
     func dataSourceIconNames() {
-        #expect(DataSourceType.manual.iconName == "pencil.circle")
         #expect(DataSourceType.typeQuicker.iconName == "keyboard")
         #expect(DataSourceType.atCoder.iconName == "chevron.left.forwardslash.chevron.right")
-        #expect(DataSourceType.finance.iconName == "dollarsign.circle")
-        #expect(DataSourceType.location.iconName == "location.circle")
     }
 
     @Test("DataSourceType has descriptions")
