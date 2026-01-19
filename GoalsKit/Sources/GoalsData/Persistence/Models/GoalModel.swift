@@ -5,7 +5,7 @@ import GoalsDomain
 /// SwiftData model for persisting Goal entities
 @Model
 public final class GoalModel {
-    @Attribute(.unique) public var id: UUID
+    public var id: UUID
     public var title: String
     public var goalDescription: String?
     public var dataSourceRawValue: String

@@ -6,9 +6,9 @@ import GoalsDomain
 /// Each entry represents a single domain object (e.g., TypeQuickerStats, AtCoderSubmission)
 @Model
 public final class CachedDataEntry {
-    /// Unique identifier combining data source, record type, and record-specific key
+    /// Identifier combining data source, record type, and record-specific key
     /// Format: "{dataSource}:{recordType}:{uniqueKey}"
-    @Attribute(.unique) public var cacheKey: String
+    public var cacheKey: String
 
     /// Raw value of the DataSourceType enum
     public var dataSourceRaw: String
