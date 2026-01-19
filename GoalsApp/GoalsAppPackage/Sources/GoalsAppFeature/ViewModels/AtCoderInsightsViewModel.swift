@@ -18,7 +18,6 @@ public final class AtCoderInsightsViewModel: InsightsSectionViewModel {
     public private(set) var dailyEffort: [AtCoderDailyEffort] = []
     public private(set) var goals: [Goal] = []
     public private(set) var errorMessage: String?
-    public var isLoading: Bool { false }  // No loading state - show cached data immediately
 
     // MARK: - Dependencies
 

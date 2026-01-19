@@ -3,38 +3,16 @@ import GoalsDomain
 
 /// Cached wrapper around TypeQuickerDataSource
 /// Checks cache first, then fetches only missing data from remote
-public actor CachedTypeQuickerDataSource: TypeQuickerDataSourceProtocol {
-    public let dataSourceType: DataSourceType = .typeQuicker
-
-    public nonisolated var availableMetrics: [MetricInfo] {
-        remote.availableMetrics
-    }
-
-    public nonisolated func metricValue(for key: String, from stats: Any) -> Double? {
-        remote.metricValue(for: key, from: stats)
-    }
-
-    private let remote: TypeQuickerDataSource
-    private let cache: DataCache
+public actor CachedTypeQuickerDataSource: TypeQuickerDataSourceProtocol, CachingDataSourceWrapper {
+    public let remote: TypeQuickerDataSource
+    public let cache: DataCache
 
     public init(remote: TypeQuickerDataSource, cache: DataCache) {
         self.remote = remote
         self.cache = cache
     }
 
-    // MARK: - DataSourceRepositoryProtocol
-
-    public func isConfigured() async -> Bool {
-        await remote.isConfigured()
-    }
-
-    public func configure(settings: DataSourceSettings) async throws {
-        try await remote.configure(settings: settings)
-    }
-
-    public func clearConfiguration() async throws {
-        try await remote.clearConfiguration()
-    }
+    // MARK: - Configuration passthrough provided by CachingDataSourceWrapper
 
     public func fetchLatestMetricValue(for metricKey: String) async throws -> Double? {
         guard let stats = try await fetchLatestStats() else { return nil }
@@ -47,11 +25,7 @@ public actor CachedTypeQuickerDataSource: TypeQuickerDataSourceProtocol {
         let calendar = Calendar.current
 
         // Get cached data to determine what's missing
-        let cachedStats = try await cache.fetch(
-            TypeQuickerStats.self,
-            from: startDate,
-            to: endDate
-        )
+        let cachedStats = try await fetchCached(TypeQuickerStats.self, from: startDate, to: endDate)
         let cachedDates = Set(cachedStats.map { calendar.startOfDay(for: $0.date) })
 
         // Determine which dates need to be fetched
@@ -89,8 +63,7 @@ public actor CachedTypeQuickerDataSource: TypeQuickerDataSourceProtocol {
         }
 
         // Single source of truth: always return from cache
-        // Cache handles deduplication via cacheKey during store
-        return try await cache.fetch(TypeQuickerStats.self, from: startDate, to: endDate)
+        return try await fetchCached(TypeQuickerStats.self, from: startDate, to: endDate)
     }
 
     public func fetchLatestStats() async throws -> TypeQuickerStats? {
@@ -102,15 +75,12 @@ public actor CachedTypeQuickerDataSource: TypeQuickerDataSourceProtocol {
 
     // MARK: - Cache-Only Methods (for instant display)
 
-    /// Returns cached stats without fetching from remote
-    /// Use this for instant display while updating in background
     public func fetchCachedStats(from startDate: Date, to endDate: Date) async throws -> [TypeQuickerStats] {
-        try await cache.fetch(TypeQuickerStats.self, from: startDate, to: endDate)
+        try await fetchCached(TypeQuickerStats.self, from: startDate, to: endDate)
     }
 
-    /// Returns true if there's any cached data available
     public func hasCachedData() async throws -> Bool {
-        try await cache.hasCachedData(for: TypeQuickerStats.self)
+        try await hasCached(TypeQuickerStats.self)
     }
 
     // MARK: - Mode Stats

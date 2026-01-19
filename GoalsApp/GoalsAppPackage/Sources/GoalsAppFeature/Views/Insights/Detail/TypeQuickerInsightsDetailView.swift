@@ -50,7 +50,7 @@ struct TypeQuickerInsightsDetailView: View {
 
     // MARK: - Filtered Data
 
-    private var filteredStats: [ModeDataPoint] {
+    private var filteredStats: [TypeQuickerModeDataPoint] {
         let cutoffDate = timeRange.startDate(from: Date())
         return viewModel.modeChartData.filter { $0.date >= cutoffDate }
     }
@@ -72,7 +72,7 @@ struct TypeQuickerInsightsDetailView: View {
 
     private var metricPicker: some View {
         Picker("Metric", selection: $viewModel.selectedMetric) {
-            ForEach(ChartMetric.allCases, id: \.self) { metric in
+            ForEach(TypeQuickerMetric.allCases, id: \.self) { metric in
                 Text(metric.displayName).tag(metric)
             }
         }
@@ -160,7 +160,7 @@ struct TypeQuickerInsightsDetailView: View {
 
     // MARK: - Helpers
 
-    private func formatMetricValue(_ value: Double, for metric: ChartMetric, suffix: String = "") -> String {
+    private func formatMetricValue(_ value: Double, for metric: TypeQuickerMetric, suffix: String = "") -> String {
         switch metric {
         case .wpm:
             return String(format: "%.0f WPM%@", value, suffix)

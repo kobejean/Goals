@@ -11,10 +11,7 @@ public struct AtCoderInsightsDetailView: View {
     public var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 16) {
-                if viewModel.isLoading {
-                    ProgressView("Loading AtCoder data...")
-                        .frame(maxWidth: .infinity, minHeight: 200)
-                } else if let error = viewModel.errorMessage {
+                if let error = viewModel.errorMessage {
                     ContentUnavailableView {
                         Label("Unable to Load", systemImage: "exclamationmark.triangle")
                     } description: {

@@ -15,8 +15,7 @@ public final class TypeQuickerInsightsViewModel: InsightsSectionViewModel {
 
     public private(set) var stats: [TypeQuickerStats] = []
     public private(set) var goals: [Goal] = []
-    public var isLoading: Bool { false }  // No loading state - show cached data immediately
-    public var selectedMetric: ChartMetric = .wpm
+    public var selectedMetric: TypeQuickerMetric = .wpm
 
     // MARK: - Dependencies
 
@@ -36,12 +35,12 @@ public final class TypeQuickerInsightsViewModel: InsightsSectionViewModel {
     // MARK: - Computed Properties
 
     /// Flattened data points for charting by mode
-    public var modeChartData: [ModeDataPoint] {
-        var points: [ModeDataPoint] = []
+    public var modeChartData: [TypeQuickerModeDataPoint] {
+        var points: [TypeQuickerModeDataPoint] = []
         for stat in stats {
             if let byMode = stat.byMode, !byMode.isEmpty {
                 for modeStat in byMode {
-                    points.append(ModeDataPoint(
+                    points.append(TypeQuickerModeDataPoint(
                         date: stat.date,
                         mode: modeStat.mode,
                         wpm: modeStat.wordsPerMinute,
@@ -50,7 +49,7 @@ public final class TypeQuickerInsightsViewModel: InsightsSectionViewModel {
                     ))
                 }
             } else {
-                points.append(ModeDataPoint(
+                points.append(TypeQuickerModeDataPoint(
                     date: stat.date,
                     mode: "overall",
                     wpm: stat.wordsPerMinute,
@@ -130,7 +129,7 @@ public final class TypeQuickerInsightsViewModel: InsightsSectionViewModel {
     }
 
     /// Get the goal target for a specific metric
-    public func goalTarget(for metric: ChartMetric) -> Double? {
+    public func goalTarget(for metric: TypeQuickerMetric) -> Double? {
         let metricKey: String
         switch metric {
         case .wpm: metricKey = "wpm"
@@ -179,56 +178,5 @@ public final class TypeQuickerInsightsViewModel: InsightsSectionViewModel {
 
     public func makeDetailView() -> AnyView {
         AnyView(TypeQuickerInsightsDetailView(viewModel: self))
-    }
-}
-
-// MARK: - Supporting Types
-
-/// Metric options for the TypeQuicker chart
-public enum ChartMetric: String, CaseIterable, Sendable {
-    case wpm
-    case accuracy
-    case time
-
-    public var displayName: String {
-        switch self {
-        case .wpm: return "WPM"
-        case .accuracy: return "Accuracy"
-        case .time: return "Time"
-        }
-    }
-
-    public var yAxisLabel: String {
-        switch self {
-        case .wpm: return "WPM"
-        case .accuracy: return "%"
-        case .time: return "min"
-        }
-    }
-}
-
-/// Data point for charting mode-specific stats over time
-public struct ModeDataPoint: Identifiable, Sendable {
-    public let id = UUID()
-    public let date: Date
-    public let mode: String
-    public let wpm: Double
-    public let accuracy: Double
-    public let timeMinutes: Int
-
-    public init(date: Date, mode: String, wpm: Double, accuracy: Double, timeMinutes: Int) {
-        self.date = date
-        self.mode = mode
-        self.wpm = wpm
-        self.accuracy = accuracy
-        self.timeMinutes = timeMinutes
-    }
-
-    public func value(for metric: ChartMetric) -> Double {
-        switch metric {
-        case .wpm: return wpm
-        case .accuracy: return accuracy
-        case .time: return Double(timeMinutes)
-        }
     }
 }

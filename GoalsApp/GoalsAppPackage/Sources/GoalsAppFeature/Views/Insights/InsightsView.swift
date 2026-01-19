@@ -13,23 +13,19 @@ public struct InsightsView: View {
             ScrollView {
                 LazyVStack(spacing: 16) {
                     ForEach(Array(viewModels.enumerated()), id: \.offset) { _, vm in
-                        if vm.isLoading || vm.summary != nil {
-                            NavigationLink {
-                                vm.makeDetailView()
-                            } label: {
-                                InsightCard(
-                                    title: vm.title,
-                                    systemImage: vm.systemImage,
-                                    color: vm.color,
-                                    summary: vm.summary,
-                                    activityData: vm.activityData,
-                                    mode: displayMode,
-                                    isLoading: vm.isLoading
-                                )
-                            }
-                            .buttonStyle(.plain)
-                            .disabled(vm.isLoading)
+                        NavigationLink {
+                            vm.makeDetailView()
+                        } label: {
+                            InsightCard(
+                                title: vm.title,
+                                systemImage: vm.systemImage,
+                                color: vm.color,
+                                summary: vm.summary,
+                                activityData: vm.activityData,
+                                mode: displayMode
+                            )
                         }
+                        .buttonStyle(.plain)
                     }
                 }
                 .padding()

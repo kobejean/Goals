@@ -3,38 +3,16 @@ import GoalsDomain
 
 /// Cached wrapper around AtCoderDataSource
 /// Checks cache first, then fetches only missing data from remote
-public actor CachedAtCoderDataSource: AtCoderDataSourceProtocol {
-    public let dataSourceType: DataSourceType = .atCoder
-
-    public nonisolated var availableMetrics: [MetricInfo] {
-        remote.availableMetrics
-    }
-
-    public nonisolated func metricValue(for key: String, from stats: Any) -> Double? {
-        remote.metricValue(for: key, from: stats)
-    }
-
-    private let remote: AtCoderDataSource
-    private let cache: DataCache
+public actor CachedAtCoderDataSource: AtCoderDataSourceProtocol, CachingDataSourceWrapper {
+    public let remote: AtCoderDataSource
+    public let cache: DataCache
 
     public init(remote: AtCoderDataSource, cache: DataCache) {
         self.remote = remote
         self.cache = cache
     }
 
-    // MARK: - DataSourceRepositoryProtocol
-
-    public func isConfigured() async -> Bool {
-        await remote.isConfigured()
-    }
-
-    public func configure(settings: DataSourceSettings) async throws {
-        try await remote.configure(settings: settings)
-    }
-
-    public func clearConfiguration() async throws {
-        try await remote.clearConfiguration()
-    }
+    // MARK: - Configuration passthrough provided by CachingDataSourceWrapper
 
     public func fetchLatestMetricValue(for metricKey: String) async throws -> Double? {
         guard let stats = try await fetchStats() else { return nil }
@@ -55,8 +33,7 @@ public actor CachedAtCoderDataSource: AtCoderDataSourceProtocol {
         try await cache.store(freshHistory)
 
         // Single source of truth: always return from cache
-        // Cache handles deduplication via cacheKey during store
-        return try await cache.fetch(AtCoderStats.self).filter { $0.isContestResult }
+        return try await fetchCached(AtCoderStats.self).filter { $0.isContestResult }
     }
 
     public func fetchSubmissions(from fromDate: Date?) async throws -> [AtCoderSubmission] {
@@ -94,8 +71,7 @@ public actor CachedAtCoderDataSource: AtCoderDataSourceProtocol {
         }
 
         // Single source of truth: always return from cache
-        // Cache handles deduplication via cacheKey during store
-        return try await cache.fetch(AtCoderSubmission.self, from: startDate)
+        return try await fetchCached(AtCoderSubmission.self, from: startDate)
             .sorted { $0.date < $1.date }
     }
 
@@ -106,7 +82,7 @@ public actor CachedAtCoderDataSource: AtCoderDataSourceProtocol {
         let calendar = Calendar.current
         let today = calendar.startOfDay(for: Date())
         let latestCachedDate = try await cache.latestRecordDate(for: AtCoderDailyEffort.self)
-        let hasCachedData = try await cache.hasCachedData(for: AtCoderDailyEffort.self)
+        let hasCachedData = try await hasCached(AtCoderDailyEffort.self)
 
         // Determine what data to fetch based on cache state
         if let latestDate = latestCachedDate, hasCachedData {
@@ -135,52 +111,42 @@ public actor CachedAtCoderDataSource: AtCoderDataSourceProtocol {
         }
 
         // Single source of truth: always return from cache
-        // Cache handles deduplication via cacheKey during store
-        return try await cache.fetch(AtCoderDailyEffort.self, from: startDate)
+        return try await fetchCached(AtCoderDailyEffort.self, from: startDate)
     }
 
     // MARK: - Cache-Only Methods (for instant display)
 
-    /// Returns cached contest history without fetching from remote
     public func fetchCachedContestHistory() async throws -> [AtCoderStats] {
-        // Filter to only include actual contest results (with contestScreenName)
-        try await cache.fetch(AtCoderStats.self).filter { $0.isContestResult }
+        try await fetchCached(AtCoderStats.self).filter { $0.isContestResult }
     }
 
-    /// Returns cached daily effort without fetching from remote
     public func fetchCachedDailyEffort(from startDate: Date) async throws -> [AtCoderDailyEffort] {
-        try await cache.fetch(AtCoderDailyEffort.self, from: startDate)
+        try await fetchCached(AtCoderDailyEffort.self, from: startDate)
     }
 
-    /// Returns cached submissions without fetching from remote
     public func fetchCachedSubmissions(from startDate: Date) async throws -> [AtCoderSubmission] {
-        try await cache.fetch(AtCoderSubmission.self, from: startDate)
+        try await fetchCached(AtCoderSubmission.self, from: startDate)
     }
 
-    /// Returns true if there's any cached contest history
     public func hasCachedContestHistory() async throws -> Bool {
-        try await cache.hasCachedData(for: AtCoderStats.self)
+        try await hasCached(AtCoderStats.self)
     }
 
-    /// Returns true if there's any cached daily effort
     public func hasCachedDailyEffort() async throws -> Bool {
-        try await cache.hasCachedData(for: AtCoderDailyEffort.self)
+        try await hasCached(AtCoderDailyEffort.self)
     }
 
     // MARK: - Private Helpers
 
     /// Computes daily effort from cached submissions
     private func computeDailyEffort(from startDate: Date) async throws -> [AtCoderDailyEffort] {
-        let submissions = try await cache.fetch(AtCoderSubmission.self, from: startDate)
-
         // We need problem difficulties - this would require another cache or API call
         // For now, delegate to remote which has this logic
-        return try await remote.fetchDailyEffort(from: startDate)
+        try await remote.fetchDailyEffort(from: startDate)
     }
 
     /// Performs one-time historical backfill from 2022 to earliest cached date
     /// Runs silently in the background with 1.5s rate limiting
-    /// - Parameter endDate: The date to backfill up to (usually earliest cached submission or now)
     private func performHistoricalBackfill(to endDate: Date) async throws {
         let backfillStart = DateComponents(calendar: .current, year: 2022, month: 1, day: 1).date!
 

@@ -13,9 +13,6 @@ public protocol InsightsSectionViewModel: AnyObject, Observable, Sendable {
     /// Static color for the insight (available before loading)
     var color: Color { get }
 
-    /// Whether the section is currently loading data
-    var isLoading: Bool { get }
-
     /// Summary data for the overview card
     var summary: InsightSummary? { get }
 
