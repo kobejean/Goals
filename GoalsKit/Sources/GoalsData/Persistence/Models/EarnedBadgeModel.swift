@@ -5,7 +5,7 @@ import GoalsDomain
 /// SwiftData model for persisting EarnedBadge entities
 @Model
 public final class EarnedBadgeModel {
-    @Attribute(.unique) public var id: UUID
+    public var id: UUID
     public var categoryRawValue: String
     public var tierRawValue: String?
     public var earnCount: Int
