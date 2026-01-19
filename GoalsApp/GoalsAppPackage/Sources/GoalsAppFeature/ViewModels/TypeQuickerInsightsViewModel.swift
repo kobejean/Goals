@@ -9,7 +9,7 @@ public final class TypeQuickerInsightsViewModel: InsightsSectionViewModel {
 
     public let title = "Typing"
     public let systemImage = "keyboard"
-    public let color: Color = .blue
+    public let color: Color = Color.accentColor
 
     // MARK: - Published State
 
@@ -100,7 +100,7 @@ public final class TypeQuickerInsightsViewModel: InsightsSectionViewModel {
         return InsightSummary(
             title: "Typing",
             systemImage: "keyboard",
-            color: .blue,
+            color: Color.accentColor,
             dataPoints: dataPoints,
             currentValueFormatted: String(format: "%.0f WPM", current),
             trend: metricTrend,
@@ -120,7 +120,7 @@ public final class TypeQuickerInsightsViewModel: InsightsSectionViewModel {
 
             return InsightActivityDay(
                 date: stat.date,
-                color: .blue,
+                color: Color.accentColor,
                 intensity: intensity
             )
         }

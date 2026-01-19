@@ -12,7 +12,7 @@ struct TypeQuickerInsightsDetailView: View {
             VStack(alignment: .leading, spacing: 12) {
                 HStack {
                     Image(systemName: "keyboard")
-                        .foregroundStyle(.blue)
+                        .foregroundStyle(Color.accentColor)
                     Text("Typing Progress")
                         .font(.headline)
                     Spacer()
@@ -173,12 +173,9 @@ struct TypeQuickerInsightsDetailView: View {
 
     private func colorForMode(_ mode: String) -> Color {
         switch mode.lowercased() {
-        case "words": return .blue
-        case "quotes": return .purple
-        case "numbers": return .orange
-        case "custom": return .green
-        case "code": return .cyan
-        default: return .gray
+        case "text": return .gray
+        case "code": return Color.accentColor
+        default: return Color.accentColor
         }
     }
 }
