@@ -25,21 +25,18 @@ public struct SettingsView: View {
                         title: "TypeQuicker",
                         icon: "keyboard",
                         username: $typeQuickerUsername,
-                        placeholder: "Enter username",
-                        saveState: typeQuickerSaveState
+                        placeholder: "Enter username"
                     )
 
                     DataSourceRow(
                         title: "AtCoder",
                         icon: "chevron.left.forwardslash.chevron.right",
                         username: $atCoderUsername,
-                        placeholder: "Enter username",
-                        saveState: atCoderSaveState
+                        placeholder: "Enter username"
                     )
                 } header: {
                     Text("Data Sources")
                 } footer: {
-                    Text("Settings are saved automatically")
                 }
 
                 // About
@@ -128,7 +125,6 @@ struct DataSourceRow: View {
     let icon: String
     @Binding var username: String
     let placeholder: String
-    let saveState: SettingsView.SaveState
 
     var body: some View {
         HStack {
@@ -142,18 +138,6 @@ struct DataSourceRow: View {
                 .autocorrectionDisabled()
                 .foregroundStyle(.secondary)
 
-            // Save status indicator
-            switch saveState {
-            case .idle:
-                EmptyView()
-                    .frame(width: 0)
-            case .saving:
-                ProgressView()
-                    .scaleEffect(0.7)
-            case .saved:
-                Image(systemName: "checkmark.circle.fill")
-                    .foregroundStyle(.green)
-            }
         }
     }
 }
