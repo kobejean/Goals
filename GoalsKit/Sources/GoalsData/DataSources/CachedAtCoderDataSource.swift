@@ -1,11 +1,19 @@
 import Foundation
 import GoalsDomain
+import os.log
+
+private let logger = Logger(subsystem: "com.kobejean.goals", category: "CachedAtCoderDataSource")
 
 /// Cached wrapper around AtCoderDataSource
-/// Checks cache first, then fetches only missing data from remote
+/// Uses count-based cache validation (inspired by AtCoderProblems)
 public actor CachedAtCoderDataSource: AtCoderDataSourceProtocol, CachingDataSourceWrapper {
     public let remote: AtCoderDataSource
     public let cache: DataCache
+
+    /// Time interval to always re-fetch (in seconds) - 2 days
+    /// Recent submissions within this window are always fetched fresh
+    /// Older data is validated by comparing local vs server counts
+    private static let alwaysFetchInterval = 3600 * 24 * 2
 
     public init(remote: AtCoderDataSource, cache: DataCache) {
         self.remote = remote
@@ -37,81 +45,110 @@ public actor CachedAtCoderDataSource: AtCoderDataSourceProtocol, CachingDataSour
     }
 
     public func fetchSubmissions(from fromDate: Date?) async throws -> [AtCoderSubmission] {
-        let startDate = fromDate ?? Calendar.current.date(byAdding: .year, value: -1, to: Date())!
+        // Load cached submissions (all of them for validation)
+        let cachedSubmissions = try await fetchCached(AtCoderSubmission.self)
+        logger.notice("Cached submissions count: \(cachedSubmissions.count)")
+        NSLog("[CachedAtCoderDataSource] Cached submissions count: %d", cachedSubmissions.count)
 
-        // Check if historical backfill is needed
-        let earliestCached = try await cache.earliestRecordDate(for: AtCoderSubmission.self)
-        let backfillCutoff = DateComponents(calendar: .current, year: 2022, month: 1, day: 1).date!
+        // Sort by epoch second to find latest
+        let sortedCache = cachedSubmissions.sorted { $0.epochSecond < $1.epochSecond }
 
-        if earliestCached == nil || earliestCached! > backfillCutoff {
-            // Perform historical backfill (silent, no progress UI)
-            try await performHistoricalBackfill(to: earliestCached ?? Date())
-        }
+        let fetchFromSecond: Int
 
-        // Determine if we need to fetch more data
-        // If we have cached data, only fetch from the latest cached submission onwards
-        let fetchFromDate: Date
-        if let latestCachedDate = try await cache.latestRecordDate(for: AtCoderSubmission.self),
-           latestCachedDate >= startDate {
-            // Fetch from day after latest cached submission
-            fetchFromDate = Calendar.current.date(byAdding: .second, value: 1, to: latestCachedDate) ?? latestCachedDate
-        } else {
-            // No relevant cache, fetch from the requested start date
-            fetchFromDate = startDate
-        }
+        if let latestSubmission = sortedCache.last {
+            // Calculate validation boundary (latest - 2 days)
+            // We always re-fetch submissions within this window to catch any updates
+            let validationBoundary = latestSubmission.epochSecond - Self.alwaysFetchInterval
+            logger.info("Latest submission epoch: \(latestSubmission.epochSecond)")
+            logger.info("Validation boundary: \(validationBoundary)")
 
-        // Only fetch if the fetch date is before now
-        if fetchFromDate < Date() {
-            let newSubmissions = try await remote.fetchSubmissions(from: fetchFromDate)
+            // Count local submissions before the boundary
+            let localCount = sortedCache.filter { $0.epochSecond < validationBoundary }.count
+            logger.info("Local count before boundary: \(localCount)")
 
-            // Store in cache
-            if !newSubmissions.isEmpty {
-                try await cache.store(newSubmissions)
+            // Get server count before the boundary to validate cache integrity
+            let serverCount = try await remote.fetchSubmissionCount(
+                fromSecond: 0,
+                toSecond: validationBoundary
+            )
+            logger.notice("Server count before boundary: \(serverCount)")
+            NSLog("[CachedAtCoderDataSource] Local: %d, Server: %d, Boundary: %d", localCount, serverCount, validationBoundary)
+
+            // Validate cache by comparing counts
+            let isCacheValid = localCount == serverCount
+            logger.notice("Cache valid: \(isCacheValid)")
+            NSLog("[CachedAtCoderDataSource] Cache valid: %@, will fetch from: %d", isCacheValid ? "YES" : "NO", isCacheValid ? validationBoundary : 0)
+
+            if isCacheValid {
+                // Cache is valid - only fetch from the validation boundary
+                fetchFromSecond = validationBoundary
+            } else {
+                // Cache is invalid (count mismatch) - fetch everything from beginning
+                fetchFromSecond = 0
             }
+        } else {
+            // No cached data - fetch from the beginning
+            logger.info("No cached data, fetching from beginning")
+            fetchFromSecond = 0
+        }
+
+        logger.info("Fetching from second: \(fetchFromSecond)")
+
+        // Fetch new submissions
+        let newSubmissions = try await remote.fetchSubmissions(fromSecond: fetchFromSecond)
+        logger.notice("Fetched \(newSubmissions.count) new submissions")
+        NSLog("[CachedAtCoderDataSource] Fetched %d new submissions from API", newSubmissions.count)
+
+        // Store in cache
+        if !newSubmissions.isEmpty {
+            try await cache.store(newSubmissions)
+            logger.info("Stored \(newSubmissions.count) submissions in cache")
         }
 
         // Single source of truth: always return from cache
-        return try await fetchCached(AtCoderSubmission.self, from: startDate)
+        // If fromDate is nil, return all submissions; otherwise filter by date
+        let result = try await fetchCached(AtCoderSubmission.self, from: fromDate)
             .sorted { $0.date < $1.date }
+        logger.info("Returning \(result.count) submissions (from: \(fromDate?.description ?? "all time"))")
+        return result
     }
 
     public func fetchDailyEffort(from fromDate: Date?) async throws -> [AtCoderDailyEffort] {
-        let startDate = fromDate ?? Calendar.current.date(byAdding: .year, value: -1, to: Date())!
+        logger.info("fetchDailyEffort called with fromDate: \(fromDate?.description ?? "all time")")
 
-        // Check if we have recent cached data
+        // Use our cached fetchSubmissions which has count-based validation
+        // This ensures we have all historical submissions before computing daily effort
+        let submissions = try await fetchSubmissions(from: fromDate)
+        logger.info("Got \(submissions.count) submissions for daily effort calculation")
+
+        // Fetch problem difficulties for effort calculation
+        let difficulties = try await remote.fetchProblemDifficulties()
+
+        // Group submissions by day and compute effort
         let calendar = Calendar.current
-        let today = calendar.startOfDay(for: Date())
-        let latestCachedDate = try await cache.latestRecordDate(for: AtCoderDailyEffort.self)
-        let hasCachedData = try await hasCached(AtCoderDailyEffort.self)
+        var dailyData: [Date: [AtCoderRankColor: Int]] = [:]
 
-        // Determine what data to fetch based on cache state
-        if let latestDate = latestCachedDate, hasCachedData {
-            let daysSinceLatest = calendar.dateComponents([.day], from: latestDate, to: today).day ?? 0
-            if daysSinceLatest <= 1 {
-                // Cache is current - only fetch recent days to check for updates
-                let recentStart = calendar.date(byAdding: .day, value: -7, to: today) ?? today
-                let recentSubmissions = try await remote.fetchSubmissions(from: recentStart)
+        for submission in submissions {
+            let dayStart = calendar.startOfDay(for: submission.date)
+            let difficulty = difficulties[submission.problemId]
+            let color = AtCoderRankColor.from(difficulty: difficulty)
 
-                // Update cache with recent submissions
-                if !recentSubmissions.isEmpty {
-                    try await cache.store(recentSubmissions)
-                    // Recalculate daily effort for affected days and store
-                    let updatedEffort = try await computeDailyEffort(from: startDate)
-                    try await cache.store(updatedEffort)
-                }
-            } else {
-                // Cache is stale - fetch fresh data
-                let effort = try await remote.fetchDailyEffort(from: startDate)
-                try await cache.store(effort)
+            if dailyData[dayStart] == nil {
+                dailyData[dayStart] = [:]
             }
-        } else {
-            // No cache - fetch fresh data
-            let effort = try await remote.fetchDailyEffort(from: startDate)
-            try await cache.store(effort)
+            dailyData[dayStart]![color, default: 0] += 1
         }
 
-        // Single source of truth: always return from cache
-        return try await fetchCached(AtCoderDailyEffort.self, from: startDate)
+        // Convert to array and sort by date
+        let effort = dailyData.map { date, submissions in
+            AtCoderDailyEffort(date: date, submissionsByDifficulty: submissions)
+        }.sorted { $0.date < $1.date }
+
+        // Store computed effort in cache
+        try await cache.store(effort)
+        logger.info("Stored \(effort.count) daily effort records in cache")
+
+        return effort
     }
 
     // MARK: - Cache-Only Methods (for instant display)
@@ -120,7 +157,7 @@ public actor CachedAtCoderDataSource: AtCoderDataSourceProtocol, CachingDataSour
         try await fetchCached(AtCoderContestResult.self)
     }
 
-    public func fetchCachedDailyEffort(from startDate: Date) async throws -> [AtCoderDailyEffort] {
+    public func fetchCachedDailyEffort(from startDate: Date?) async throws -> [AtCoderDailyEffort] {
         try await fetchCached(AtCoderDailyEffort.self, from: startDate)
     }
 
@@ -134,31 +171,5 @@ public actor CachedAtCoderDataSource: AtCoderDataSourceProtocol, CachingDataSour
 
     public func hasCachedDailyEffort() async throws -> Bool {
         try await hasCached(AtCoderDailyEffort.self)
-    }
-
-    // MARK: - Private Helpers
-
-    /// Computes daily effort from cached submissions
-    private func computeDailyEffort(from startDate: Date) async throws -> [AtCoderDailyEffort] {
-        // We need problem difficulties - this would require another cache or API call
-        // For now, delegate to remote which has this logic
-        try await remote.fetchDailyEffort(from: startDate)
-    }
-
-    /// Performs one-time historical backfill from 2022 to earliest cached date
-    /// Runs silently in the background with 1.5s rate limiting
-    private func performHistoricalBackfill(to endDate: Date) async throws {
-        let backfillStart = DateComponents(calendar: .current, year: 2022, month: 1, day: 1).date!
-
-        let submissions = try await remote.fetchSubmissionsWithRateLimit(
-            fromSecond: Int(backfillStart.timeIntervalSince1970),
-            toSecond: Int(endDate.timeIntervalSince1970),
-            sleepDuration: .milliseconds(1500)
-        )
-
-        // Store all fetched submissions
-        if !submissions.isEmpty {
-            try await cache.store(submissions)
-        }
     }
 }

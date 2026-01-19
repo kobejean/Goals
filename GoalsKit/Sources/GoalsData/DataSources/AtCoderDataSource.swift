@@ -134,42 +134,39 @@ public actor AtCoderDataSource: AtCoderDataSourceProtocol {
 
     // MARK: - Submission APIs
 
+    /// Fetches user submissions (protocol-conforming method)
+    /// - Parameter fromDate: Start date (nil means all time)
+    /// - Returns: Array of submissions
+    public func fetchSubmissions(from fromDate: Date?) async throws -> [AtCoderSubmission] {
+        let fromSecond = fromDate.map { Int($0.timeIntervalSince1970) } ?? 0
+        return try await fetchSubmissions(fromSecond: fromSecond)
+    }
+
     /// Fetches user submissions from kenkoooo API
     /// - Parameters:
-    ///   - fromDate: Start date for submissions (defaults to 1 year ago)
+    ///   - fromSecond: Unix timestamp to start from (defaults to 0 for all history)
     /// - Returns: Array of submissions
-    public func fetchSubmissions(from fromDate: Date? = nil) async throws -> [AtCoderSubmission] {
+    public func fetchSubmissions(fromSecond: Int = 0) async throws -> [AtCoderSubmission] {
         guard let username = username else {
             throw DataSourceError.notConfigured
         }
-
-        let startDate = fromDate ?? Calendar.current.date(byAdding: .year, value: -1, to: Date())!
-        let fromSecond = Int(startDate.timeIntervalSince1970)
 
         return try await fetchSubmissionsFromAPI(username: username, fromSecond: fromSecond)
     }
 
-    /// Fetches submissions with configurable rate limiting for backfill operations
+    /// Fetches the count of submissions in a time range (for cache validation)
     /// - Parameters:
     ///   - fromSecond: Unix timestamp to start from
-    ///   - toSecond: Unix timestamp to end at (optional, defaults to now)
-    ///   - sleepDuration: Duration to sleep between API calls (default 1.5s)
-    /// - Returns: Array of submissions within the specified time range
-    public func fetchSubmissionsWithRateLimit(
-        fromSecond: Int,
-        toSecond: Int? = nil,
-        sleepDuration: Duration = .milliseconds(1500)
-    ) async throws -> [AtCoderSubmission] {
+    ///   - toSecond: Unix timestamp to end at
+    /// - Returns: Number of submissions in the range
+    public func fetchSubmissionCount(fromSecond: Int, toSecond: Int) async throws -> Int {
         guard let username = username else {
             throw DataSourceError.notConfigured
         }
 
-        return try await fetchSubmissionsFromAPI(
-            username: username,
-            fromSecond: fromSecond,
-            toSecond: toSecond,
-            sleepDuration: sleepDuration
-        )
+        let url = try buildSubmissionCountURL(username: username, fromSecond: fromSecond, toSecond: toSecond)
+        let response: SubmissionCountResponse = try await httpClient.get(url, decoder: HTTPClient.snakeCaseDecoder)
+        return response.count
     }
 
     /// Fetches problem difficulties from kenkoooo API
@@ -185,11 +182,13 @@ public actor AtCoderDataSource: AtCoderDataSourceProtocol {
     }
 
     /// Fetches daily effort data (submissions grouped by day and difficulty)
-    /// - Parameter fromDate: Start date (defaults to 1 year ago)
+    /// - Parameter fromDate: Start date (nil means all time)
     /// - Returns: Array of daily effort summaries sorted by date
     public func fetchDailyEffort(from fromDate: Date? = nil) async throws -> [AtCoderDailyEffort] {
+        let fromSecond = fromDate.map { Int($0.timeIntervalSince1970) } ?? 0
+
         // Fetch submissions and difficulties concurrently
-        async let submissionsTask = fetchSubmissions(from: fromDate)
+        async let submissionsTask = fetchSubmissions(fromSecond: fromSecond)
         async let difficultiesTask = fetchProblemDifficulties()
 
         let submissions = try await submissionsTask
@@ -311,6 +310,22 @@ public actor AtCoderDataSource: AtCoderDataSourceProtocol {
         return requestURL
     }
 
+    private func buildSubmissionCountURL(username: String, fromSecond: Int, toSecond: Int) throws -> URL {
+        let url = kenkooooBaseURL.appendingPathComponent("user/submission_count")
+        var components = URLComponents(url: url, resolvingAgainstBaseURL: false)!
+        components.queryItems = [
+            URLQueryItem(name: "user", value: username),
+            URLQueryItem(name: "from_second", value: String(fromSecond)),
+            URLQueryItem(name: "to_second", value: String(toSecond))
+        ]
+
+        guard let requestURL = components.url else {
+            throw DataSourceError.invalidURL
+        }
+
+        return requestURL
+    }
+
     private func buildKenkooooURL(path: String, username: String) throws -> URL {
         let url = kenkooooBaseURL.appendingPathComponent(path)
         var components = URLComponents(url: url, resolvingAgainstBaseURL: false)!
@@ -349,6 +364,11 @@ private struct AtCoderContestHistoryResponse: Codable {
 private struct KenkooooRankResponse: Codable {
     let count: Int
     let rank: Int
+}
+
+/// Response from kenkoooo's submission count API
+private struct SubmissionCountResponse: Codable {
+    let count: Int
 }
 
 /// Submission response from kenkoooo API

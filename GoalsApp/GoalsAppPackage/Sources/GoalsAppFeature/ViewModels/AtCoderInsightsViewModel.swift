@@ -130,8 +130,6 @@ public final class AtCoderInsightsViewModel: InsightsSectionViewModel {
             return
         }
 
-        let yearStart = TimeRange.year.startDate(from: Date())
-
         // Load goals
         goals = (try? await goalRepository.fetch(dataSource: .atCoder)) ?? []
 
@@ -142,14 +140,14 @@ public final class AtCoderInsightsViewModel: InsightsSectionViewModel {
                 stats = AtCoderCurrentStats(from: lastContest)
             }
         }
-        if let cachedEffort = try? await dataSource.fetchCachedDailyEffort(from: yearStart), !cachedEffort.isEmpty {
+        if let cachedEffort = try? await dataSource.fetchCachedDailyEffort(from: nil), !cachedEffort.isEmpty {
             dailyEffort = cachedEffort
         }
 
         // Fetch fresh data (updates cache internally), then update UI
         do {
             async let statsTask = dataSource.fetchStats()
-            async let effortTask = dataSource.fetchDailyEffort(from: yearStart)
+            async let effortTask = dataSource.fetchDailyEffort(from: nil)
             async let historyTask = dataSource.fetchContestHistory()
 
             stats = try await statsTask

@@ -100,7 +100,7 @@ public protocol AtCoderDataSourceProtocol: DataSourceRepositoryProtocol {
     func fetchCachedContestHistory() async throws -> [AtCoderContestResult]
 
     /// Returns cached daily effort without fetching from remote
-    func fetchCachedDailyEffort(from startDate: Date) async throws -> [AtCoderDailyEffort]
+    func fetchCachedDailyEffort(from startDate: Date?) async throws -> [AtCoderDailyEffort]
 
     /// Returns true if there's any cached contest history
     func hasCachedContestHistory() async throws -> Bool
@@ -115,7 +115,7 @@ public extension AtCoderDataSourceProtocol {
         []
     }
 
-    func fetchCachedDailyEffort(from startDate: Date) async throws -> [AtCoderDailyEffort] {
+    func fetchCachedDailyEffort(from startDate: Date?) async throws -> [AtCoderDailyEffort] {
         []
     }
 
