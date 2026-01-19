@@ -7,12 +7,14 @@ public struct InsightsView: View {
     @Environment(AppContainer.self) private var container
     @State private var viewModels: [any InsightsSectionViewModel] = []
     @State private var displayMode: InsightDisplayMode = .chart
+    // Force refresh after data loads - needed because type erasure breaks @Observable tracking
+    @State private var refreshTrigger = false
 
     public var body: some View {
         NavigationStack {
             ScrollView {
                 LazyVStack(spacing: 16) {
-                    ForEach(Array(viewModels.enumerated()), id: \.offset) { _, vm in
+                    ForEach(Array(viewModels.enumerated()), id: \.offset) { index, vm in
                         NavigationLink {
                             vm.makeDetailView()
                         } label: {
@@ -26,6 +28,8 @@ public struct InsightsView: View {
                             )
                         }
                         .buttonStyle(.plain)
+                        // Force view recreation when refresh triggers
+                        .id("\(index)-\(refreshTrigger)")
                     }
                 }
                 .padding()
@@ -51,11 +55,13 @@ public struct InsightsView: View {
             .task {
                 viewModels = container.makeInsightsViewModels()
                 await loadAll()
+                refreshTrigger.toggle()
             }
             .task(id: container.settingsRevision) {
                 guard container.settingsRevision > 0 else { return }
                 viewModels = container.makeInsightsViewModels()
                 await loadAll()
+                refreshTrigger.toggle()
             }
         }
     }

@@ -1,8 +1,5 @@
 import Foundation
 import GoalsDomain
-import os.log
-
-private let logger = Logger(subsystem: "com.kobejean.goals", category: "CachedAtCoderDataSource")
 
 /// Cached wrapper around AtCoderDataSource
 /// Uses count-based cache validation (inspired by AtCoderProblems)
@@ -47,8 +44,6 @@ public actor CachedAtCoderDataSource: AtCoderDataSourceProtocol, CachingDataSour
     public func fetchSubmissions(from fromDate: Date?) async throws -> [AtCoderSubmission] {
         // Load cached submissions (all of them for validation)
         let cachedSubmissions = try await fetchCached(AtCoderSubmission.self)
-        logger.notice("Cached submissions count: \(cachedSubmissions.count)")
-        NSLog("[CachedAtCoderDataSource] Cached submissions count: %d", cachedSubmissions.count)
 
         // Sort by epoch second to find latest
         let sortedCache = cachedSubmissions.sorted { $0.epochSecond < $1.epochSecond }
@@ -59,25 +54,18 @@ public actor CachedAtCoderDataSource: AtCoderDataSourceProtocol, CachingDataSour
             // Calculate validation boundary (latest - 2 days)
             // We always re-fetch submissions within this window to catch any updates
             let validationBoundary = latestSubmission.epochSecond - Self.alwaysFetchInterval
-            logger.info("Latest submission epoch: \(latestSubmission.epochSecond)")
-            logger.info("Validation boundary: \(validationBoundary)")
 
             // Count local submissions before the boundary
             let localCount = sortedCache.filter { $0.epochSecond < validationBoundary }.count
-            logger.info("Local count before boundary: \(localCount)")
 
             // Get server count before the boundary to validate cache integrity
             let serverCount = try await remote.fetchSubmissionCount(
                 fromSecond: 0,
                 toSecond: validationBoundary
             )
-            logger.notice("Server count before boundary: \(serverCount)")
-            NSLog("[CachedAtCoderDataSource] Local: %d, Server: %d, Boundary: %d", localCount, serverCount, validationBoundary)
 
             // Validate cache by comparing counts
             let isCacheValid = localCount == serverCount
-            logger.notice("Cache valid: \(isCacheValid)")
-            NSLog("[CachedAtCoderDataSource] Cache valid: %@, will fetch from: %d", isCacheValid ? "YES" : "NO", isCacheValid ? validationBoundary : 0)
 
             if isCacheValid {
                 // Cache is valid - only fetch from the validation boundary
@@ -88,38 +76,27 @@ public actor CachedAtCoderDataSource: AtCoderDataSourceProtocol, CachingDataSour
             }
         } else {
             // No cached data - fetch from the beginning
-            logger.info("No cached data, fetching from beginning")
             fetchFromSecond = 0
         }
 
-        logger.info("Fetching from second: \(fetchFromSecond)")
-
         // Fetch new submissions
         let newSubmissions = try await remote.fetchSubmissions(fromSecond: fetchFromSecond)
-        logger.notice("Fetched \(newSubmissions.count) new submissions")
-        NSLog("[CachedAtCoderDataSource] Fetched %d new submissions from API", newSubmissions.count)
 
         // Store in cache
         if !newSubmissions.isEmpty {
             try await cache.store(newSubmissions)
-            logger.info("Stored \(newSubmissions.count) submissions in cache")
         }
 
         // Single source of truth: always return from cache
         // If fromDate is nil, return all submissions; otherwise filter by date
-        let result = try await fetchCached(AtCoderSubmission.self, from: fromDate)
+        return try await fetchCached(AtCoderSubmission.self, from: fromDate)
             .sorted { $0.date < $1.date }
-        logger.info("Returning \(result.count) submissions (from: \(fromDate?.description ?? "all time"))")
-        return result
     }
 
     public func fetchDailyEffort(from fromDate: Date?) async throws -> [AtCoderDailyEffort] {
-        logger.info("fetchDailyEffort called with fromDate: \(fromDate?.description ?? "all time")")
-
         // Use our cached fetchSubmissions which has count-based validation
         // This ensures we have all historical submissions before computing daily effort
         let submissions = try await fetchSubmissions(from: fromDate)
-        logger.info("Got \(submissions.count) submissions for daily effort calculation")
 
         // Fetch problem difficulties for effort calculation
         let difficulties = try await remote.fetchProblemDifficulties()
@@ -146,7 +123,6 @@ public actor CachedAtCoderDataSource: AtCoderDataSourceProtocol, CachingDataSour
 
         // Store computed effort in cache
         try await cache.store(effort)
-        logger.info("Stored \(effort.count) daily effort records in cache")
 
         return effort
     }

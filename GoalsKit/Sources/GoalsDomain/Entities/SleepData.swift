@@ -90,8 +90,14 @@ public struct SleepSession: Codable, Sendable, Equatable, Identifiable {
     }
 
     /// Total actual sleep time (excluding awake/in-bed stages)
+    /// Falls back to time in bed if no detailed sleep stages are recorded
     public var totalSleepTime: TimeInterval {
-        stages.filter { $0.type.isActualSleep }.reduce(0) { $0 + $1.duration }
+        let actualSleepTime = stages.filter { $0.type.isActualSleep }.reduce(0) { $0 + $1.duration }
+        // If no actual sleep stages recorded (only inBed), use total time in bed as approximation
+        if actualSleepTime == 0 && !stages.isEmpty {
+            return totalTimeInBed
+        }
+        return actualSleepTime
     }
 
     /// Total sleep time in hours

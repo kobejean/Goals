@@ -5,7 +5,7 @@ import GoalsDomain
 /// Sleep insights detail view with full charts and stage breakdown
 struct SleepInsightsDetailView: View {
     @Bindable var viewModel: SleepInsightsViewModel
-    @State private var timeRange: TimeRange = .week
+    @State private var timeRange: TimeRange = .month
 
     var body: some View {
         ScrollView {
@@ -14,8 +14,10 @@ struct SleepInsightsDetailView: View {
                     loadingView
                 } else if !viewModel.isAuthorized {
                     authorizationRequestView
-                } else if filteredData.isEmpty {
+                } else if viewModel.sleepData.isEmpty {
                     emptyStateView
+                } else if filteredData.isEmpty {
+                    noDataInRangeView
                 } else {
                     summaryCards
                     sleepRangeSection
@@ -30,12 +32,12 @@ struct SleepInsightsDetailView: View {
             if viewModel.isAuthorized && !viewModel.sleepData.isEmpty {
                 ToolbarItem(placement: .principal) {
                     Picker("Time Range", selection: $timeRange) {
-                        ForEach([TimeRange.week, .month, .quarter], id: \.self) { range in
+                        ForEach([TimeRange.month, .quarter, .year, .all], id: \.self) { range in
                             Text(range.displayName).tag(range)
                         }
                     }
                     .pickerStyle(.segmented)
-                    .frame(width: 180)
+                    .frame(width: 240)
                 }
             }
         }
@@ -45,11 +47,19 @@ struct SleepInsightsDetailView: View {
 
     private var filteredData: [SleepDailySummary] {
         let cutoffDate = timeRange.startDate(from: Date())
-        return viewModel.sleepData.filter { $0.date >= cutoffDate }
+        let filtered = viewModel.sleepData.filter { $0.date >= cutoffDate }
+
+        // For "all" time range, limit to most recent 90 entries for chart performance
+        if timeRange == .all && filtered.count > 90 {
+            return Array(filtered.suffix(90))
+        }
+        return filtered
     }
 
     private var filteredRangeData: [SleepRangeDataPoint] {
-        filteredData.map { SleepRangeDataPoint(from: $0) }
+        // For range chart, limit to most recent 30 entries for readability
+        let dataToShow = filteredData.count > 30 ? Array(filteredData.suffix(30)) : filteredData
+        return dataToShow.map { SleepRangeDataPoint(from: $0) }
     }
 
     // MARK: - Subviews
@@ -100,13 +110,41 @@ struct SleepInsightsDetailView: View {
             Image(systemName: "moon.zzz")
                 .font(.title)
                 .foregroundStyle(.secondary)
-            Text("No sleep data for this period")
+            Text("No sleep data")
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
             Text("Sleep data will appear here once recorded in the Health app.")
                 .font(.caption)
                 .foregroundStyle(.tertiary)
                 .multilineTextAlignment(.center)
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 40)
+    }
+
+    private var noDataInRangeView: some View {
+        VStack(spacing: 12) {
+            Image(systemName: "calendar.badge.clock")
+                .font(.title)
+                .foregroundStyle(.secondary)
+            Text("No sleep data in this range")
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+
+            if let lastDate = viewModel.sleepData.last?.date {
+                Text("Last recorded: \(lastDate, format: .dateTime.month().day().year())")
+                    .font(.caption)
+                    .foregroundStyle(.tertiary)
+            }
+
+            Button {
+                timeRange = .all
+            } label: {
+                Text("Show All Data")
+                    .font(.subheadline)
+            }
+            .buttonStyle(.bordered)
+            .tint(.indigo)
         }
         .frame(maxWidth: .infinity)
         .padding(.vertical, 40)

@@ -144,8 +144,14 @@ public final class SleepInsightsViewModel: InsightsSectionViewModel {
     // MARK: - Data Loading
 
     public func loadData() async {
-        // Check authorization first
-        isAuthorized = await dataSource.isAuthorized()
+        // Always request authorization first - this won't re-prompt if already responded
+        // HealthKit doesn't reveal read authorization status for privacy, so we must
+        // request first and then try to fetch data
+        do {
+            isAuthorized = try await dataSource.requestAuthorization()
+        } catch {
+            isAuthorized = false
+        }
         authorizationChecked = true
 
         guard isAuthorized else { return }

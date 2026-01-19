@@ -76,10 +76,11 @@ public actor HealthKitSleepDataSource: HealthKitSleepDataSourceProtocol {
     }
 
     public func isAuthorized() async -> Bool {
-        guard HKHealthStore.isHealthDataAvailable() else { return false }
-        let status = healthStore.authorizationStatus(for: sleepType)
-        // Note: .sharingAuthorized means we can read (not write) when toShare is nil
-        return status == .sharingAuthorized || status == .notDetermined
+        // Note: HealthKit doesn't reveal read authorization status for privacy reasons.
+        // authorizationStatus(for:) only works for WRITE permissions.
+        // For read-only access, we return true if HealthKit is available and let
+        // the data fetch handle it - denied access returns empty results, not errors.
+        HKHealthStore.isHealthDataAvailable()
     }
 
     // MARK: - Data Fetching
@@ -156,14 +157,11 @@ public actor HealthKitSleepDataSource: HealthKitSleepDataSourceProtocol {
     }
 
     private func groupSamplesIntoSessions(_ samples: [HKCategorySample]) -> [SleepSession] {
-        // Filter out "inBed" samples when we have detailed sleep stage data
-        let sleepSamples = samples.filter { sample in
-            let value = sample.value
-            // Keep all samples that aren't inBed, or inBed samples when there's no stage data
-            return value != HKCategoryValueSleepAnalysis.inBed.rawValue
-        }
+        guard !samples.isEmpty else { return [] }
 
-        guard !sleepSamples.isEmpty else { return [] }
+        // Keep all samples - don't filter globally as it can remove valid recent data
+        // when old detailed samples exist. The session grouping will handle this naturally.
+        let sleepSamples = samples
 
         // Group samples into sessions (2hr gap = new session)
         let gapThreshold: TimeInterval = 2 * 60 * 60 // 2 hours
@@ -236,17 +234,16 @@ public actor HealthKitSleepDataSource: HealthKitSleepDataSourceProtocol {
             sessionsByWakeDate[wakeDate, default: []].append(session)
         }
 
-        // Create daily summaries only for dates in the requested range
-        var summaries: [SleepDailySummary] = []
+        // Create daily summaries only for dates that have sessions
+        // (don't iterate day-by-day which would be slow for large date ranges)
         let startDay = calendar.startOfDay(for: startDate)
         let endDay = calendar.startOfDay(for: endDate)
 
-        var currentDate = startDay
-        while currentDate <= endDay {
-            if let sessions = sessionsByWakeDate[currentDate], !sessions.isEmpty {
-                summaries.append(SleepDailySummary(date: currentDate, sessions: sessions))
-            }
-            currentDate = calendar.date(byAdding: .day, value: 1, to: currentDate) ?? currentDate
+        let summaries = sessionsByWakeDate.compactMap { (date, sessions) -> SleepDailySummary? in
+            // Filter to only include dates within the requested range
+            guard date >= startDay && date <= endDay else { return nil }
+            guard !sessions.isEmpty else { return nil }
+            return SleepDailySummary(date: date, sessions: sessions)
         }
 
         return summaries.sorted { $0.date < $1.date }
