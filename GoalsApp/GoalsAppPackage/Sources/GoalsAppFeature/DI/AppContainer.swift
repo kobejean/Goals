@@ -28,6 +28,10 @@ public final class AppContainer {
             AtCoderInsightsViewModel(
                 dataSource: atCoderDataSource,
                 goalRepository: goalRepository
+            ),
+            SleepInsightsViewModel(
+                dataSource: healthKitSleepDataSource,
+                goalRepository: goalRepository
             )
         ]
     }
@@ -52,6 +56,7 @@ public final class AppContainer {
 
     public let typeQuickerDataSource: CachedTypeQuickerDataSource
     public let atCoderDataSource: CachedAtCoderDataSource
+    public let healthKitSleepDataSource: CachedHealthKitSleepDataSource
 
     // MARK: - Use Cases
 
@@ -99,6 +104,7 @@ public final class AppContainer {
         // Initialize data sources with caching
         let remoteTypeQuicker = TypeQuickerDataSource(httpClient: httpClient)
         let remoteAtCoder = AtCoderDataSource(httpClient: httpClient)
+        let remoteHealthKitSleep = HealthKitSleepDataSource()
 
         self.typeQuickerDataSource = CachedTypeQuickerDataSource(
             remote: remoteTypeQuicker,
@@ -108,6 +114,10 @@ public final class AppContainer {
             remote: remoteAtCoder,
             cache: dataCache
         )
+        self.healthKitSleepDataSource = CachedHealthKitSleepDataSource(
+            remote: remoteHealthKitSleep,
+            cache: dataCache
+        )
 
         // Initialize use cases
         self.createGoalUseCase = CreateGoalUseCase(goalRepository: goalRepo)
@@ -115,7 +125,8 @@ public final class AppContainer {
             goalRepository: goalRepo,
             dataSources: [
                 .typeQuicker: typeQuickerDataSource,
-                .atCoder: atCoderDataSource
+                .atCoder: atCoderDataSource,
+                .healthKitSleep: healthKitSleepDataSource
             ]
         )
         self.badgeEvaluationUseCase = BadgeEvaluationUseCase(
@@ -164,6 +175,7 @@ public final class AppContainer {
         // Initialize data sources with caching
         let remoteTypeQuicker = TypeQuickerDataSource(httpClient: httpClient)
         let remoteAtCoder = AtCoderDataSource(httpClient: httpClient)
+        let remoteHealthKitSleep = HealthKitSleepDataSource()
 
         self.typeQuickerDataSource = CachedTypeQuickerDataSource(
             remote: remoteTypeQuicker,
@@ -173,13 +185,18 @@ public final class AppContainer {
             remote: remoteAtCoder,
             cache: dataCache
         )
+        self.healthKitSleepDataSource = CachedHealthKitSleepDataSource(
+            remote: remoteHealthKitSleep,
+            cache: dataCache
+        )
 
         self.createGoalUseCase = CreateGoalUseCase(goalRepository: goalRepo)
         self.syncDataSourcesUseCase = SyncDataSourcesUseCase(
             goalRepository: goalRepo,
             dataSources: [
                 .typeQuicker: typeQuickerDataSource,
-                .atCoder: atCoderDataSource
+                .atCoder: atCoderDataSource,
+                .healthKitSleep: healthKitSleepDataSource
             ]
         )
         self.badgeEvaluationUseCase = BadgeEvaluationUseCase(

@@ -33,7 +33,10 @@ let package = Package(
         // Data Layer - Repository implementations, persistence, networking
         .target(
             name: "GoalsData",
-            dependencies: ["GoalsDomain", "GoalsCore"]
+            dependencies: ["GoalsDomain", "GoalsCore"],
+            linkerSettings: [
+                .linkedFramework("HealthKit", .when(platforms: [.iOS]))
+            ]
         ),
         .testTarget(
             name: "GoalsDataTests",

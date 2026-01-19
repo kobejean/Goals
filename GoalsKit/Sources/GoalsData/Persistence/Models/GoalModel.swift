@@ -5,25 +5,25 @@ import GoalsDomain
 /// SwiftData model for persisting Goal entities
 @Model
 public final class GoalModel {
-    public var id: UUID
-    public var title: String
+    public var id: UUID = UUID()
+    public var title: String = ""
     public var goalDescription: String?
-    public var dataSourceRawValue: String
-    public var createdAt: Date
-    public var updatedAt: Date
+    public var dataSourceRawValue: String = ""
+    public var createdAt: Date = Date()
+    public var updatedAt: Date = Date()
 
     // Data source metric key
-    public var metricKey: String
+    public var metricKey: String = ""
 
     // Target and current values
-    public var targetValue: Double
-    public var currentValue: Double
-    public var unit: String
+    public var targetValue: Double = 0
+    public var currentValue: Double = 0
+    public var unit: String = ""
 
     // Common properties
     public var deadline: Date?
-    public var isArchived: Bool
-    public var colorRawValue: String
+    public var isArchived: Bool = false
+    public var colorRawValue: String = "blue"
 
     public init(
         id: UUID = UUID(),

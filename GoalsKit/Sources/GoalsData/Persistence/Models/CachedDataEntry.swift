@@ -8,22 +8,22 @@ import GoalsDomain
 public final class CachedDataEntry {
     /// Identifier combining data source, record type, and record-specific key
     /// Format: "{dataSource}:{recordType}:{uniqueKey}"
-    public var cacheKey: String
+    public var cacheKey: String = ""
 
     /// Raw value of the DataSourceType enum
-    public var dataSourceRaw: String
+    public var dataSourceRaw: String = ""
 
     /// Type of record (e.g., "stats", "submission", "effort")
-    public var recordType: String
+    public var recordType: String = ""
 
     /// Date associated with the record (for date range queries)
-    public var recordDate: Date
+    public var recordDate: Date = Date()
 
     /// JSON-encoded domain object
-    public var payload: Data
+    public var payload: Data = Data()
 
     /// When this record was fetched from the remote API
-    public var fetchedAt: Date
+    public var fetchedAt: Date = Date()
 
     public init(
         cacheKey: String,

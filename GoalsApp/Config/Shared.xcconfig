@@ -26,6 +26,7 @@ TARGETED_DEVICE_FAMILY = 1,2
 GENERATE_INFOPLIST_FILE = YES
 INFOPLIST_KEY_UISupportedInterfaceOrientations = portrait landscape-left landscape-right
 INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = UIInterfaceOrientationLandscapeRight UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown
+INFOPLIST_KEY_NSHealthShareUsageDescription = Goals uses your sleep data to track sleep patterns and help you achieve your sleep goals.
 
 // ==========================================
 // Entitlements

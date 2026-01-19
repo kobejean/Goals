@@ -132,7 +132,7 @@ public struct CreateGoalView: View {
     }
 
     private var availableDataSources: [DataSourceType] {
-        [.typeQuicker, .atCoder]
+        [.typeQuicker, .atCoder, .healthKitSleep]
     }
 
     private func metricsForDataSource(_ dataSource: DataSourceType) -> [MetricInfo] {
@@ -141,6 +141,8 @@ public struct CreateGoalView: View {
             return container.typeQuickerDataSource.availableMetrics
         case .atCoder:
             return container.atCoderDataSource.availableMetrics
+        case .healthKitSleep:
+            return container.healthKitSleepDataSource.availableMetrics
         }
     }
 

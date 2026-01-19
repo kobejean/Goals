@@ -79,6 +79,8 @@ public struct GoalDetailView: View {
             metrics = container.typeQuickerDataSource.availableMetrics
         case .atCoder:
             metrics = container.atCoderDataSource.availableMetrics
+        case .healthKitSleep:
+            metrics = container.healthKitSleepDataSource.availableMetrics
         }
         return metrics.first { $0.key == goal.metricKey }?.name ?? goal.metricKey.capitalized
     }

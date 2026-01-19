@@ -127,3 +127,42 @@ public extension AtCoderDataSourceProtocol {
         false
     }
 }
+
+/// Protocol for HealthKit Sleep data source
+public protocol HealthKitSleepDataSourceProtocol: DataSourceRepositoryProtocol {
+    /// Fetches sleep data for a date range
+    /// - Parameters:
+    ///   - from: Start date (wake date)
+    ///   - to: End date (wake date)
+    /// - Returns: Array of daily sleep summaries
+    func fetchSleepData(from: Date, to: Date) async throws -> [SleepDailySummary]
+
+    /// Fetches the most recent sleep data
+    func fetchLatestSleep() async throws -> SleepDailySummary?
+
+    /// Requests HealthKit authorization for sleep data
+    /// - Returns: true if authorization was granted
+    func requestAuthorization() async throws -> Bool
+
+    /// Checks if HealthKit authorization has been granted
+    func isAuthorized() async -> Bool
+
+    // MARK: - Cache Methods (optional, for stale-while-revalidate pattern)
+
+    /// Returns cached sleep data without fetching from HealthKit (for instant display)
+    func fetchCachedSleepData(from startDate: Date, to endDate: Date) async throws -> [SleepDailySummary]
+
+    /// Returns true if there's any cached sleep data available
+    func hasCachedData() async throws -> Bool
+}
+
+// Default implementations for non-cached HealthKit data sources
+public extension HealthKitSleepDataSourceProtocol {
+    func fetchCachedSleepData(from startDate: Date, to endDate: Date) async throws -> [SleepDailySummary] {
+        []
+    }
+
+    func hasCachedData() async throws -> Bool {
+        false
+    }
+}

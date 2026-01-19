@@ -8,6 +8,9 @@ public enum DataSourceType: String, Codable, Sendable, CaseIterable {
     /// AtCoder competitive programming statistics
     case atCoder
 
+    /// HealthKit sleep data
+    case healthKitSleep
+
     /// Display name for the data source
     public var displayName: String {
         switch self {
@@ -15,6 +18,8 @@ public enum DataSourceType: String, Codable, Sendable, CaseIterable {
             return "TypeQuicker"
         case .atCoder:
             return "AtCoder"
+        case .healthKitSleep:
+            return "Sleep"
         }
     }
 
@@ -25,6 +30,8 @@ public enum DataSourceType: String, Codable, Sendable, CaseIterable {
             return "keyboard"
         case .atCoder:
             return "chevron.left.forwardslash.chevron.right"
+        case .healthKitSleep:
+            return "bed.double.fill"
         }
     }
 
@@ -35,6 +42,8 @@ public enum DataSourceType: String, Codable, Sendable, CaseIterable {
             return "Typing speed, accuracy, and practice time from TypeQuicker"
         case .atCoder:
             return "Competitive programming rating, contests, and problems solved"
+        case .healthKitSleep:
+            return "Sleep duration, stages, and quality from HealthKit"
         }
     }
 }

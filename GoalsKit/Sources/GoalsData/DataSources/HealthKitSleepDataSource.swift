@@ -1,0 +1,273 @@
+import Foundation
+import HealthKit
+import GoalsDomain
+
+/// Data source implementation for HealthKit sleep data
+public actor HealthKitSleepDataSource: HealthKitSleepDataSourceProtocol {
+    public let dataSourceType: DataSourceType = .healthKitSleep
+
+    public nonisolated var availableMetrics: [MetricInfo] {
+        [
+            MetricInfo(key: "sleepDuration", name: "Sleep Duration", unit: "hrs", icon: "bed.double"),
+            MetricInfo(key: "sleepEfficiency", name: "Sleep Efficiency", unit: "%", icon: "percent"),
+            MetricInfo(key: "remDuration", name: "REM Sleep", unit: "min", icon: "moon.stars"),
+            MetricInfo(key: "deepDuration", name: "Deep Sleep", unit: "min", icon: "moon.zzz"),
+            MetricInfo(key: "coreDuration", name: "Core Sleep", unit: "min", icon: "moon"),
+            MetricInfo(key: "bedtime", name: "Bedtime", unit: "hr", icon: "moon.fill"),
+            MetricInfo(key: "wakeTime", name: "Wake Time", unit: "hr", icon: "sun.max"),
+        ]
+    }
+
+    public nonisolated func metricValue(for key: String, from stats: Any) -> Double? {
+        guard let summary = stats as? SleepDailySummary else { return nil }
+        switch key {
+        case "sleepDuration": return summary.totalSleepHours
+        case "sleepEfficiency": return summary.averageEfficiency
+        case "remDuration": return summary.totalDurationMinutes(for: .rem)
+        case "deepDuration": return summary.totalDurationMinutes(for: .deep)
+        case "coreDuration": return summary.totalDurationMinutes(for: .core)
+        case "bedtime": return summary.bedtimeHour
+        case "wakeTime": return summary.wakeTimeHour
+        default: return nil
+        }
+    }
+
+    private let healthStore: HKHealthStore
+    private let sleepType: HKCategoryType
+
+    public init() {
+        self.healthStore = HKHealthStore()
+        self.sleepType = HKCategoryType(.sleepAnalysis)
+    }
+
+    // MARK: - Configuration
+
+    public func isConfigured() async -> Bool {
+        // HealthKit doesn't require user credentials, just authorization
+        await isAuthorized()
+    }
+
+    public func configure(settings: DataSourceSettings) async throws {
+        // No configuration needed for HealthKit - uses system authorization
+    }
+
+    public func clearConfiguration() async throws {
+        // No configuration to clear
+    }
+
+    // MARK: - Authorization
+
+    public func requestAuthorization() async throws -> Bool {
+        guard HKHealthStore.isHealthDataAvailable() else {
+            throw HealthKitSleepError.healthKitNotAvailable
+        }
+
+        let typesToRead: Set<HKObjectType> = [sleepType]
+
+        return try await withCheckedThrowingContinuation { continuation in
+            healthStore.requestAuthorization(toShare: nil, read: typesToRead) { success, error in
+                if let error = error {
+                    continuation.resume(throwing: error)
+                } else {
+                    continuation.resume(returning: success)
+                }
+            }
+        }
+    }
+
+    public func isAuthorized() async -> Bool {
+        guard HKHealthStore.isHealthDataAvailable() else { return false }
+        let status = healthStore.authorizationStatus(for: sleepType)
+        // Note: .sharingAuthorized means we can read (not write) when toShare is nil
+        return status == .sharingAuthorized || status == .notDetermined
+    }
+
+    // MARK: - Data Fetching
+
+    public func fetchLatestMetricValue(for metricKey: String) async throws -> Double? {
+        guard let summary = try await fetchLatestSleep() else { return nil }
+        return metricValue(for: metricKey, from: summary)
+    }
+
+    public func fetchSleepData(from startDate: Date, to endDate: Date) async throws -> [SleepDailySummary] {
+        let samples = try await querySleepSamples(from: startDate, to: endDate)
+        let sessions = groupSamplesIntoSessions(samples)
+        return groupSessionsByWakeDate(sessions, from: startDate, to: endDate)
+    }
+
+    public func fetchLatestSleep() async throws -> SleepDailySummary? {
+        let endDate = Date()
+        let startDate = Calendar.current.date(byAdding: .day, value: -7, to: endDate) ?? endDate
+        let summaries = try await fetchSleepData(from: startDate, to: endDate)
+        return summaries.last
+    }
+
+    // MARK: - Private Helpers
+
+    private func querySleepSamples(from startDate: Date, to endDate: Date) async throws -> [HKCategorySample] {
+        // Query sleep samples that end within the date range
+        // We extend the start by 24 hours to catch overnight sessions
+        let adjustedStart = Calendar.current.date(byAdding: .day, value: -1, to: startDate) ?? startDate
+
+        let predicate = HKQuery.predicateForSamples(
+            withStart: adjustedStart,
+            end: Calendar.current.date(byAdding: .day, value: 1, to: endDate),
+            options: .strictEndDate
+        )
+
+        let sortDescriptor = NSSortDescriptor(key: HKSampleSortIdentifierStartDate, ascending: true)
+
+        return try await withCheckedThrowingContinuation { continuation in
+            let query = HKSampleQuery(
+                sampleType: sleepType,
+                predicate: predicate,
+                limit: HKObjectQueryNoLimit,
+                sortDescriptors: [sortDescriptor]
+            ) { _, samples, error in
+                if let error = error {
+                    continuation.resume(throwing: error)
+                } else {
+                    let categorySamples = samples as? [HKCategorySample] ?? []
+                    continuation.resume(returning: categorySamples)
+                }
+            }
+            healthStore.execute(query)
+        }
+    }
+
+    private func mapSleepValue(_ value: Int) -> SleepStageType {
+        // Map HKCategoryValueSleepAnalysis values to our SleepStageType
+        switch value {
+        case HKCategoryValueSleepAnalysis.inBed.rawValue:
+            return .inBed
+        case HKCategoryValueSleepAnalysis.asleepUnspecified.rawValue:
+            return .asleep
+        case HKCategoryValueSleepAnalysis.awake.rawValue:
+            return .awake
+        case HKCategoryValueSleepAnalysis.asleepCore.rawValue:
+            return .core
+        case HKCategoryValueSleepAnalysis.asleepDeep.rawValue:
+            return .deep
+        case HKCategoryValueSleepAnalysis.asleepREM.rawValue:
+            return .rem
+        default:
+            return .asleep
+        }
+    }
+
+    private func groupSamplesIntoSessions(_ samples: [HKCategorySample]) -> [SleepSession] {
+        // Filter out "inBed" samples when we have detailed sleep stage data
+        let sleepSamples = samples.filter { sample in
+            let value = sample.value
+            // Keep all samples that aren't inBed, or inBed samples when there's no stage data
+            return value != HKCategoryValueSleepAnalysis.inBed.rawValue
+        }
+
+        guard !sleepSamples.isEmpty else { return [] }
+
+        // Group samples into sessions (2hr gap = new session)
+        let gapThreshold: TimeInterval = 2 * 60 * 60 // 2 hours
+
+        var sessions: [SleepSession] = []
+        var currentSessionSamples: [HKCategorySample] = []
+        var lastEndDate: Date?
+
+        for sample in sleepSamples {
+            if let last = lastEndDate {
+                let gap = sample.startDate.timeIntervalSince(last)
+                if gap > gapThreshold {
+                    // Start new session
+                    if !currentSessionSamples.isEmpty {
+                        if let session = createSession(from: currentSessionSamples) {
+                            sessions.append(session)
+                        }
+                    }
+                    currentSessionSamples = [sample]
+                } else {
+                    currentSessionSamples.append(sample)
+                }
+            } else {
+                currentSessionSamples.append(sample)
+            }
+            lastEndDate = sample.endDate
+        }
+
+        // Don't forget the last session
+        if !currentSessionSamples.isEmpty {
+            if let session = createSession(from: currentSessionSamples) {
+                sessions.append(session)
+            }
+        }
+
+        return sessions
+    }
+
+    private func createSession(from samples: [HKCategorySample]) -> SleepSession? {
+        guard let firstSample = samples.first,
+              let lastSample = samples.last else { return nil }
+
+        let stages = samples.map { sample in
+            SleepStage(
+                type: mapSleepValue(sample.value),
+                startDate: sample.startDate,
+                endDate: sample.endDate
+            )
+        }
+
+        // Get source device name
+        let source = samples.first?.sourceRevision.source.name
+
+        return SleepSession(
+            startDate: firstSample.startDate,
+            endDate: lastSample.endDate,
+            stages: stages,
+            source: source
+        )
+    }
+
+    private func groupSessionsByWakeDate(_ sessions: [SleepSession], from startDate: Date, to endDate: Date) -> [SleepDailySummary] {
+        let calendar = Calendar.current
+
+        // Group sessions by wake date (the date the session ends)
+        var sessionsByWakeDate: [Date: [SleepSession]] = [:]
+
+        for session in sessions {
+            let wakeDate = calendar.startOfDay(for: session.endDate)
+            sessionsByWakeDate[wakeDate, default: []].append(session)
+        }
+
+        // Create daily summaries only for dates in the requested range
+        var summaries: [SleepDailySummary] = []
+        let startDay = calendar.startOfDay(for: startDate)
+        let endDay = calendar.startOfDay(for: endDate)
+
+        var currentDate = startDay
+        while currentDate <= endDay {
+            if let sessions = sessionsByWakeDate[currentDate], !sessions.isEmpty {
+                summaries.append(SleepDailySummary(date: currentDate, sessions: sessions))
+            }
+            currentDate = calendar.date(byAdding: .day, value: 1, to: currentDate) ?? currentDate
+        }
+
+        return summaries.sorted { $0.date < $1.date }
+    }
+}
+
+// MARK: - Errors
+
+public enum HealthKitSleepError: Error, LocalizedError {
+    case healthKitNotAvailable
+    case authorizationDenied
+    case queryFailed(Error)
+
+    public var errorDescription: String? {
+        switch self {
+        case .healthKitNotAvailable:
+            return "HealthKit is not available on this device"
+        case .authorizationDenied:
+            return "HealthKit authorization was denied"
+        case .queryFailed(let error):
+            return "Failed to query sleep data: \(error.localizedDescription)"
+        }
+    }
+}
