@@ -178,12 +178,6 @@ public final class SleepInsightsViewModel: InsightsSectionViewModel {
         }
     }
 
-    // MARK: - InsightsSectionViewModel
-
-    public func makeDetailView() -> AnyView {
-        AnyView(SleepInsightsDetailView(viewModel: self))
-    }
-
     // MARK: - Formatting Helpers
 
     public func formatSleepHours(_ hours: Double) -> String {

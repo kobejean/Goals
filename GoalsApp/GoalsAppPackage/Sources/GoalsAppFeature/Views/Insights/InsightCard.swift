@@ -1,15 +1,58 @@
 import SwiftUI
 
-/// Minimalistic card component for insight overview
-struct InsightCard: View {
-    let title: String
-    let systemImage: String
-    let color: Color
-    let summary: InsightSummary?
-    let activityData: InsightActivityData?
-    let mode: InsightDisplayMode
+/// Configuration for an insight card in the overview
+public struct InsightCardConfig: Identifiable {
+    public let id = UUID()
+    public let title: String
+    public let systemImage: String
+    public let color: Color
+    public let summary: InsightSummary?
+    public let activityData: InsightActivityData?
+    public let makeDetailView: @MainActor () -> AnyView
 
-    var body: some View {
+    public init(
+        title: String,
+        systemImage: String,
+        color: Color,
+        summary: InsightSummary?,
+        activityData: InsightActivityData?,
+        makeDetailView: @escaping @MainActor () -> AnyView
+    ) {
+        self.title = title
+        self.systemImage = systemImage
+        self.color = color
+        self.summary = summary
+        self.activityData = activityData
+        self.makeDetailView = makeDetailView
+    }
+}
+
+/// Minimalistic card component for insight overview
+public struct InsightCard: View {
+    public let title: String
+    public let systemImage: String
+    public let color: Color
+    public let summary: InsightSummary?
+    public let activityData: InsightActivityData?
+    public let mode: InsightDisplayMode
+
+    public init(
+        title: String,
+        systemImage: String,
+        color: Color,
+        summary: InsightSummary?,
+        activityData: InsightActivityData?,
+        mode: InsightDisplayMode
+    ) {
+        self.title = title
+        self.systemImage = systemImage
+        self.color = color
+        self.summary = summary
+        self.activityData = activityData
+        self.mode = mode
+    }
+
+    public var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             // Header: icon + title + trend (trend only in chart mode)
             HStack {
