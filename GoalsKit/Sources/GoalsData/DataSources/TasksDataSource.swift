@@ -37,13 +37,20 @@ public final class TasksDataSource: DataSourceRepositoryProtocol, Sendable {
 
     // MARK: - Metric Fetching
 
-    public func fetchLatestMetricValue(for metricKey: String) async throws -> Double? {
+    public func fetchLatestMetricValue(for metricKey: String, taskId: UUID?) async throws -> Double? {
         let calendar = Calendar.current
         let now = Date()
         let startOfDay = calendar.startOfDay(for: now)
         let endOfDay = calendar.date(byAdding: .day, value: 1, to: startOfDay) ?? now
 
-        let sessions = try await taskRepository.fetchSessions(from: startOfDay, to: endOfDay)
+        // Fetch sessions, optionally filtered by taskId
+        let sessions: [TaskSession]
+        if let taskId {
+            let allTaskSessions = try await taskRepository.fetchSessions(taskId: taskId)
+            sessions = allTaskSessions.filter { $0.startDate >= startOfDay && $0.startDate < endOfDay }
+        } else {
+            sessions = try await taskRepository.fetchSessions(from: startOfDay, to: endOfDay)
+        }
 
         switch metricKey {
         case "dailyDuration":
@@ -57,7 +64,7 @@ public final class TasksDataSource: DataSourceRepositoryProtocol, Sendable {
 
         case "totalDuration":
             // All-time total in hours (not just today)
-            let allSessions = try await fetchAllSessions()
+            let allSessions = try await fetchAllSessions(taskId: taskId)
             let totalHours = allSessions.totalDuration / 3600.0
             return totalHours
 
@@ -73,10 +80,14 @@ public final class TasksDataSource: DataSourceRepositoryProtocol, Sendable {
 
     // MARK: - Private Helpers
 
-    private func fetchAllSessions() async throws -> [TaskSession] {
-        // Fetch sessions from the beginning of time
-        let startDate = Date.distantPast
-        let endDate = Date()
-        return try await taskRepository.fetchSessions(from: startDate, to: endDate)
+    private func fetchAllSessions(taskId: UUID?) async throws -> [TaskSession] {
+        if let taskId {
+            return try await taskRepository.fetchSessions(taskId: taskId)
+        } else {
+            // Fetch sessions from the beginning of time
+            let startDate = Date.distantPast
+            let endDate = Date()
+            return try await taskRepository.fetchSessions(from: startDate, to: endDate)
+        }
     }
 }

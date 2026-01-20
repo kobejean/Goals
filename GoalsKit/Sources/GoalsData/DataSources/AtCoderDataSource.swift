@@ -60,7 +60,7 @@ public actor AtCoderDataSource: AtCoderDataSourceProtocol {
         username = nil
     }
 
-    public func fetchLatestMetricValue(for metricKey: String) async throws -> Double? {
+    public func fetchLatestMetricValue(for metricKey: String, taskId: UUID?) async throws -> Double? {
         guard let stats = try await fetchStats() else { return nil }
         return metricValue(for: metricKey, from: stats)
     }

@@ -14,6 +14,9 @@ public enum DataSourceType: String, Codable, Sendable, CaseIterable {
     /// Manual task time tracking
     case tasks
 
+    /// Anki spaced repetition learning statistics
+    case anki
+
     /// Display name for the data source
     public var displayName: String {
         switch self {
@@ -25,6 +28,8 @@ public enum DataSourceType: String, Codable, Sendable, CaseIterable {
             return "Sleep"
         case .tasks:
             return "Tasks"
+        case .anki:
+            return "Anki"
         }
     }
 
@@ -39,6 +44,8 @@ public enum DataSourceType: String, Codable, Sendable, CaseIterable {
             return "bed.double.fill"
         case .tasks:
             return "timer"
+        case .anki:
+            return "rectangle.stack"
         }
     }
 
@@ -53,6 +60,8 @@ public enum DataSourceType: String, Codable, Sendable, CaseIterable {
             return "Sleep duration, stages, and quality from HealthKit"
         case .tasks:
             return "Manual time tracking for tasks and activities"
+        case .anki:
+            return "Reviews, study time, retention, and streak from Anki"
         }
     }
 }

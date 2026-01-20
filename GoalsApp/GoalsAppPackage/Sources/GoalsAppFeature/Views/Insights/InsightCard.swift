@@ -85,6 +85,14 @@ public struct InsightCard: View {
                                 DurationRangeChart(data: rangeData)
                                     .frame(height: 40)
                             }
+                        case .scatterWithMovingAverage:
+                            ScatterMovingAverageChart(
+                                scatterPoints: summary.dataPoints,
+                                movingAveragePoints: summary.movingAveragePoints ?? [],
+                                color: summary.color,
+                                goalValue: summary.goalValue
+                            )
+                            .frame(height: 40)
                         }
                     } else {
                         // Empty placeholder when no data

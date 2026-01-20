@@ -7,13 +7,25 @@ public struct SettingsView: View {
     @Environment(AppContainer.self) private var container
     @State private var typeQuickerUsername = ""
     @State private var atCoderUsername = ""
+    @State private var ankiHost = ""
+    @State private var ankiPort = "8765"
+    @State private var ankiDecks = ""
+    @State private var ankiConnectionStatus: AnkiConnectionStatus = .unknown
     @State private var typeQuickerSaveState: SaveState = .idle
     @State private var atCoderSaveState: SaveState = .idle
+    @State private var ankiSaveState: SaveState = .idle
 
     enum SaveState {
         case idle
         case saving
         case saved
+    }
+
+    enum AnkiConnectionStatus {
+        case unknown
+        case testing
+        case connected
+        case disconnected
     }
 
     public var body: some View {
@@ -37,6 +49,61 @@ public struct SettingsView: View {
                 } header: {
                     Text("Data Sources")
                 } footer: {
+                }
+
+                // Anki Settings
+                Section {
+                    HStack {
+                        Label("Host", systemImage: "network")
+                        Spacer()
+                        TextField("localhost", text: $ankiHost)
+                            .multilineTextAlignment(.trailing)
+                            .textInputAutocapitalization(.never)
+                            .autocorrectionDisabled()
+                            .foregroundStyle(.secondary)
+                    }
+
+                    HStack {
+                        Label("Port", systemImage: "number")
+                        Spacer()
+                        TextField("8765", text: $ankiPort)
+                            .multilineTextAlignment(.trailing)
+                            .keyboardType(.numberPad)
+                            .foregroundStyle(.secondary)
+                    }
+
+                    HStack {
+                        Label("Decks", systemImage: "rectangle.stack")
+                        Spacer()
+                        TextField("All decks", text: $ankiDecks)
+                            .multilineTextAlignment(.trailing)
+                            .textInputAutocapitalization(.never)
+                            .autocorrectionDisabled()
+                            .foregroundStyle(.secondary)
+                    }
+
+                    HStack {
+                        Text("Status")
+                        Spacer()
+                        ankiStatusView
+                    }
+
+                    Button {
+                        Task {
+                            await testAnkiConnection()
+                        }
+                    } label: {
+                        HStack {
+                            Spacer()
+                            Text("Test Connection")
+                            Spacer()
+                        }
+                    }
+                    .disabled(ankiHost.isEmpty)
+                } header: {
+                    Text("Anki")
+                } footer: {
+                    Text("Enter comma-separated deck names to track specific decks, or leave empty for all decks. Anki must be running with AnkiConnect installed.")
                 }
 
                 // About
@@ -72,12 +139,60 @@ public struct SettingsView: View {
                     await saveAtCoderSettings(username: newValue)
                 }
             }
+            .onChange(of: ankiHost) { _, _ in
+                Task {
+                    await saveAnkiSettings()
+                }
+            }
+            .onChange(of: ankiPort) { _, _ in
+                Task {
+                    await saveAnkiSettings()
+                }
+            }
+            .onChange(of: ankiDecks) { _, _ in
+                Task {
+                    await saveAnkiSettings()
+                }
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var ankiStatusView: some View {
+        switch ankiConnectionStatus {
+        case .unknown:
+            Text("Not tested")
+                .foregroundStyle(.secondary)
+        case .testing:
+            HStack(spacing: 4) {
+                ProgressView()
+                    .scaleEffect(0.8)
+                Text("Testing...")
+                    .foregroundStyle(.secondary)
+            }
+        case .connected:
+            HStack(spacing: 4) {
+                Image(systemName: "checkmark.circle.fill")
+                    .foregroundStyle(.green)
+                Text("Connected")
+                    .foregroundStyle(.green)
+            }
+        case .disconnected:
+            HStack(spacing: 4) {
+                Image(systemName: "xmark.circle.fill")
+                    .foregroundStyle(.red)
+                Text("Disconnected")
+                    .foregroundStyle(.red)
+            }
         }
     }
 
     private func loadSettings() async {
         typeQuickerUsername = UserDefaults.standard.typeQuickerUsername ?? ""
         atCoderUsername = UserDefaults.standard.atCoderUsername ?? ""
+        ankiHost = UserDefaults.standard.ankiHost ?? ""
+        ankiPort = UserDefaults.standard.ankiPort ?? "8765"
+        ankiDecks = UserDefaults.standard.ankiDecks ?? ""
     }
 
     private func saveTypeQuickerSettings(username: String) async {
@@ -114,6 +229,47 @@ public struct SettingsView: View {
         atCoderSaveState = .saved
         try? await Task.sleep(for: .seconds(1.5))
         atCoderSaveState = .idle
+    }
+
+    private func saveAnkiSettings() async {
+        ankiSaveState = .saving
+        UserDefaults.standard.ankiHost = ankiHost
+        UserDefaults.standard.ankiPort = ankiPort
+        UserDefaults.standard.ankiDecks = ankiDecks
+
+        if !ankiHost.isEmpty {
+            let settings = DataSourceSettings(
+                dataSourceType: .anki,
+                options: ["host": ankiHost, "port": ankiPort, "decks": ankiDecks]
+            )
+            try? await container.ankiDataSource.configure(settings: settings)
+        }
+
+        container.notifySettingsChanged()
+        ankiSaveState = .saved
+        try? await Task.sleep(for: .seconds(1.5))
+        ankiSaveState = .idle
+    }
+
+    private func testAnkiConnection() async {
+        ankiConnectionStatus = .testing
+
+        // Configure first if not already
+        if !ankiHost.isEmpty {
+            let settings = DataSourceSettings(
+                dataSourceType: .anki,
+                options: ["host": ankiHost, "port": ankiPort, "decks": ankiDecks]
+            )
+            try? await container.ankiDataSource.configure(settings: settings)
+        }
+
+        // Test connection
+        do {
+            let connected = try await container.ankiDataSource.testConnection()
+            ankiConnectionStatus = connected ? .connected : .disconnected
+        } catch {
+            ankiConnectionStatus = .disconnected
+        }
     }
 
     public init() {}

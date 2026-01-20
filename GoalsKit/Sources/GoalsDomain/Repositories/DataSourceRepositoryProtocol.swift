@@ -18,9 +18,11 @@ public protocol DataSourceRepositoryProtocol: Sendable {
     func clearConfiguration() async throws
 
     /// Fetches the latest value for a specific metric
-    /// - Parameter metricKey: The metric key (e.g., "wpm", "accuracy", "rating")
+    /// - Parameters:
+    ///   - metricKey: The metric key (e.g., "wpm", "accuracy", "rating")
+    ///   - taskId: Optional task ID for per-task filtering (used by Tasks data source)
     /// - Returns: The current value for the metric, or nil if unavailable
-    func fetchLatestMetricValue(for metricKey: String) async throws -> Double?
+    func fetchLatestMetricValue(for metricKey: String, taskId: UUID?) async throws -> Double?
 
     /// Extract a metric value from stats data (for UI display with cached stats)
     /// - Parameters:
@@ -159,6 +161,40 @@ public protocol HealthKitSleepDataSourceProtocol: DataSourceRepositoryProtocol {
 // Default implementations for non-cached HealthKit data sources
 public extension HealthKitSleepDataSourceProtocol {
     func fetchCachedSleepData(from startDate: Date, to endDate: Date) async throws -> [SleepDailySummary] {
+        []
+    }
+
+    func hasCachedData() async throws -> Bool {
+        false
+    }
+}
+
+/// Protocol for Anki data source
+public protocol AnkiDataSourceProtocol: DataSourceRepositoryProtocol {
+    /// Fetches daily Anki statistics for a date range
+    func fetchDailyStats(from startDate: Date, to endDate: Date) async throws -> [AnkiDailyStats]
+
+    /// Fetches the latest daily stats
+    func fetchLatestStats() async throws -> AnkiDailyStats?
+
+    /// Fetches available deck names
+    func fetchDeckNames() async throws -> [String]
+
+    /// Tests the connection to AnkiConnect
+    func testConnection() async throws -> Bool
+
+    // MARK: - Cache Methods (optional, for stale-while-revalidate pattern)
+
+    /// Returns cached stats without fetching from remote (for instant display)
+    func fetchCachedDailyStats(from startDate: Date, to endDate: Date) async throws -> [AnkiDailyStats]
+
+    /// Returns true if there's any cached data available
+    func hasCachedData() async throws -> Bool
+}
+
+// Default implementations for non-cached Anki data sources
+public extension AnkiDataSourceProtocol {
+    func fetchCachedDailyStats(from startDate: Date, to endDate: Date) async throws -> [AnkiDailyStats] {
         []
     }
 

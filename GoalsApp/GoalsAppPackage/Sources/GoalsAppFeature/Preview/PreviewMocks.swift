@@ -14,7 +14,7 @@ actor PreviewHealthKitSleepDataSource: HealthKitSleepDataSourceProtocol {
     func isConfigured() async -> Bool { true }
     func configure(settings: DataSourceSettings) async throws {}
     func clearConfiguration() async throws {}
-    func fetchLatestMetricValue(for metricKey: String) async throws -> Double? { nil }
+    func fetchLatestMetricValue(for metricKey: String, taskId: UUID?) async throws -> Double? { nil }
     func fetchSleepData(from: Date, to: Date) async throws -> [SleepDailySummary] { [] }
     func fetchLatestSleep() async throws -> SleepDailySummary? { nil }
     func requestAuthorization() async throws -> Bool { true }

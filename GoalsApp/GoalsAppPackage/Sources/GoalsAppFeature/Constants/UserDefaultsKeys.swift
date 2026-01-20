@@ -4,6 +4,9 @@ import Foundation
 public enum UserDefaultsKeys {
     public static let typeQuickerUsername = "typeQuickerUsername"
     public static let atCoderUsername = "atCoderUsername"
+    public static let ankiHost = "ankiHost"
+    public static let ankiPort = "ankiPort"
+    public static let ankiDecks = "ankiDecks"
 }
 
 // MARK: - UserDefaults Convenience Extensions
@@ -17,5 +20,20 @@ public extension UserDefaults {
     var atCoderUsername: String? {
         get { string(forKey: UserDefaultsKeys.atCoderUsername) }
         set { set(newValue, forKey: UserDefaultsKeys.atCoderUsername) }
+    }
+
+    var ankiHost: String? {
+        get { string(forKey: UserDefaultsKeys.ankiHost) }
+        set { set(newValue, forKey: UserDefaultsKeys.ankiHost) }
+    }
+
+    var ankiPort: String? {
+        get { string(forKey: UserDefaultsKeys.ankiPort) }
+        set { set(newValue, forKey: UserDefaultsKeys.ankiPort) }
+    }
+
+    var ankiDecks: String? {
+        get { string(forKey: UserDefaultsKeys.ankiDecks) }
+        set { set(newValue, forKey: UserDefaultsKeys.ankiDecks) }
     }
 }

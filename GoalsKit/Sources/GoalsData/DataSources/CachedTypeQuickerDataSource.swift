@@ -14,7 +14,7 @@ public actor CachedTypeQuickerDataSource: TypeQuickerDataSourceProtocol, Caching
 
     // MARK: - Configuration passthrough provided by CachingDataSourceWrapper
 
-    public func fetchLatestMetricValue(for metricKey: String) async throws -> Double? {
+    public func fetchLatestMetricValue(for metricKey: String, taskId: UUID?) async throws -> Double? {
         guard let stats = try await fetchLatestStats() else { return nil }
         return metricValue(for: metricKey, from: stats)
     }

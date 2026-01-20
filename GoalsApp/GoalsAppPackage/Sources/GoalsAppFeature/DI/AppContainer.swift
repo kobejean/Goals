@@ -24,6 +24,7 @@ public final class AppContainer {
         case .atCoder: return atCoderDataSource.availableMetrics
         case .healthKitSleep: return healthKitSleepDataSource.availableMetrics
         case .tasks: return tasksDataSource.availableMetrics
+        case .anki: return ankiDataSource.availableMetrics
         }
     }
 
@@ -48,6 +49,17 @@ public final class AppContainer {
             try? await atCoderDataSource.configure(settings: settings)
         }
 
+        // Configure Anki
+        if let host = UserDefaults.standard.ankiHost, !host.isEmpty {
+            let port = UserDefaults.standard.ankiPort ?? "8765"
+            let decks = UserDefaults.standard.ankiDecks ?? ""
+            let settings = DataSourceSettings(
+                dataSourceType: .anki,
+                options: ["host": host, "port": port, "decks": decks]
+            )
+            try? await ankiDataSource.configure(settings: settings)
+        }
+
         // HealthKit doesn't need configuration - it uses system authorization
     }
 
@@ -66,7 +78,8 @@ public final class AppContainer {
             atCoderDataSource: atCoderDataSource,
             sleepDataSource: healthKitSleepDataSource,
             taskRepository: taskRepository,
-            goalRepository: goalRepository
+            goalRepository: goalRepository,
+            ankiDataSource: ankiDataSource
         )
         _insightsViewModel = vm
         return vm
@@ -106,6 +119,7 @@ public final class AppContainer {
     public let atCoderDataSource: CachedAtCoderDataSource
     public let healthKitSleepDataSource: CachedHealthKitSleepDataSource
     public let tasksDataSource: TasksDataSource
+    public let ankiDataSource: CachedAnkiDataSource
 
     // MARK: - Use Cases
 
@@ -191,6 +205,10 @@ public final class AppContainer {
             cache: dataCache
         )
         self.tasksDataSource = TasksDataSource(taskRepository: taskRepo)
+        self.ankiDataSource = CachedAnkiDataSource(
+            remote: AnkiDataSource(),
+            cache: dataCache
+        )
 
         // Initialize use cases
         self.createGoalUseCase = CreateGoalUseCase(goalRepository: goalRepo)
@@ -200,7 +218,8 @@ public final class AppContainer {
                 .typeQuicker: typeQuickerDataSource,
                 .atCoder: atCoderDataSource,
                 .healthKitSleep: healthKitSleepDataSource,
-                .tasks: tasksDataSource
+                .tasks: tasksDataSource,
+                .anki: ankiDataSource
             ]
         )
         self.badgeEvaluationUseCase = BadgeEvaluationUseCase(

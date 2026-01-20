@@ -23,6 +23,9 @@ public struct Goal: Sendable, Equatable, UUIDIdentifiable {
     public var isArchived: Bool
     public var color: GoalColor
 
+    // Per-task tracking (for .tasks data source)
+    public var taskId: UUID?
+
     public init(
         id: UUID = UUID(),
         title: String,
@@ -36,7 +39,8 @@ public struct Goal: Sendable, Equatable, UUIDIdentifiable {
         unit: String,
         deadline: Date? = nil,
         isArchived: Bool = false,
-        color: GoalColor = .blue
+        color: GoalColor = .blue,
+        taskId: UUID? = nil
     ) {
         self.id = id
         self.title = title
@@ -51,6 +55,7 @@ public struct Goal: Sendable, Equatable, UUIDIdentifiable {
         self.deadline = deadline
         self.isArchived = isArchived
         self.color = color
+        self.taskId = taskId
     }
 
     /// Progress percentage (0.0 to 1.0)

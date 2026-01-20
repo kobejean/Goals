@@ -9,4 +9,5 @@ public enum DataSourceError: Error, Sendable {
     case invalidResponse
     case httpError(statusCode: Int)
     case parseError(String)
+    case connectionFailed(String)
 }

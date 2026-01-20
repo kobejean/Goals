@@ -86,7 +86,7 @@ public struct SyncDataSourcesUseCase: Sendable {
         // Update each goal's current value based on its metric key
         var updatedCount = 0
         for goal in goals {
-            if let value = try await repository.fetchLatestMetricValue(for: goal.metricKey) {
+            if let value = try await repository.fetchLatestMetricValue(for: goal.metricKey, taskId: goal.taskId) {
                 try await goalRepository.updateProgress(goalId: goal.id, currentValue: value)
                 updatedCount += 1
             }

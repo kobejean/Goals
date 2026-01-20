@@ -27,8 +27,9 @@ public struct DateRange: Sendable {
 
 /// Chart type for insight cards
 public enum InsightChartType: String, Sendable {
-    case sparkline      // Line chart for continuous values
-    case durationRange  // Vertical bars showing time ranges
+    case sparkline              // Line chart for continuous values
+    case durationRange          // Vertical bars showing time ranges
+    case scatterWithMovingAverage  // Scatter plot with moving average line
 }
 
 /// A single time segment within a day (e.g., sleep period, focus session)

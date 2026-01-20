@@ -85,7 +85,7 @@ public actor HealthKitSleepDataSource: HealthKitSleepDataSourceProtocol {
 
     // MARK: - Data Fetching
 
-    public func fetchLatestMetricValue(for metricKey: String) async throws -> Double? {
+    public func fetchLatestMetricValue(for metricKey: String, taskId: UUID?) async throws -> Double? {
         guard let summary = try await fetchLatestSleep() else { return nil }
         return metricValue(for: metricKey, from: summary)
     }

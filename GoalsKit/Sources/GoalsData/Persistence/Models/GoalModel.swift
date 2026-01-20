@@ -25,6 +25,9 @@ public final class GoalModel {
     public var isArchived: Bool = false
     public var colorRawValue: String = "blue"
 
+    // Per-task tracking (for .tasks data source)
+    public var taskId: UUID?
+
     public init(
         id: UUID = UUID(),
         title: String,
@@ -38,7 +41,8 @@ public final class GoalModel {
         unit: String,
         deadline: Date? = nil,
         isArchived: Bool = false,
-        colorRawValue: String = "blue"
+        colorRawValue: String = "blue",
+        taskId: UUID? = nil
     ) {
         self.id = id
         self.title = title
@@ -53,6 +57,7 @@ public final class GoalModel {
         self.deadline = deadline
         self.isArchived = isArchived
         self.colorRawValue = colorRawValue
+        self.taskId = taskId
     }
 }
 
@@ -74,7 +79,8 @@ public extension GoalModel {
             unit: unit,
             deadline: deadline,
             isArchived: isArchived,
-            color: GoalColor(rawValue: colorRawValue) ?? .blue
+            color: GoalColor(rawValue: colorRawValue) ?? .blue,
+            taskId: taskId
         )
     }
 
@@ -93,7 +99,8 @@ public extension GoalModel {
             unit: goal.unit,
             deadline: goal.deadline,
             isArchived: goal.isArchived,
-            colorRawValue: goal.color.rawValue
+            colorRawValue: goal.color.rawValue,
+            taskId: goal.taskId
         )
     }
 
@@ -110,5 +117,6 @@ public extension GoalModel {
         deadline = goal.deadline
         isArchived = goal.isArchived
         colorRawValue = goal.color.rawValue
+        taskId = goal.taskId
     }
 }

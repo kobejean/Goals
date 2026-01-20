@@ -13,6 +13,11 @@ public struct CreateGoalView: View {
     @State private var color: GoalColor = .blue
     @State private var isSaving = false
 
+    // Task-specific state (for .tasks data source)
+    @State private var trackAllTasks = true
+    @State private var selectedTask: TaskDefinition?
+    @State private var availableTasks: [TaskDefinition] = []
+
     var onSave: (() async -> Void)?
 
     public init(onSave: (() async -> Void)? = nil) {
@@ -28,6 +33,9 @@ public struct CreateGoalView: View {
                         Button {
                             selectedDataSource = source
                             selectedMetric = nil // Reset metric when source changes
+                            // Reset task selection when source changes
+                            trackAllTasks = true
+                            selectedTask = nil
                         } label: {
                             HStack {
                                 Label(source.displayName, systemImage: source.iconName)
@@ -74,6 +82,46 @@ public struct CreateGoalView: View {
                     } footer: {
                         Text("Select which metric you want to track")
                     }
+
+                    // Step 2.5: Task Selection (shown only for .tasks data source)
+                    if dataSource == .tasks {
+                        Section {
+                            Toggle("Track All Tasks", isOn: $trackAllTasks)
+
+                            if !trackAllTasks {
+                                if availableTasks.isEmpty {
+                                    Text("No tasks available")
+                                        .foregroundStyle(.secondary)
+                                } else {
+                                    ForEach(availableTasks, id: \.id) { task in
+                                        Button {
+                                            selectedTask = task
+                                        } label: {
+                                            HStack {
+                                                Label(task.name, systemImage: task.icon)
+                                                    .foregroundStyle(.primary)
+                                                Spacer()
+                                                if selectedTask?.id == task.id {
+                                                    Image(systemName: "checkmark")
+                                                        .foregroundStyle(.blue)
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        } header: {
+                            Text("Task Scope")
+                        } footer: {
+                            if trackAllTasks {
+                                Text("Goal will track metrics from all tasks combined")
+                            } else if selectedTask != nil {
+                                Text("Goal will track metrics from the selected task only")
+                            } else {
+                                Text("Select a specific task to track")
+                            }
+                        }
+                    }
                 }
 
                 // Step 3: Set Target Value (shown after metric is selected)
@@ -112,6 +160,9 @@ public struct CreateGoalView: View {
             }
             .navigationTitle("New Goal")
             .navigationBarTitleDisplayMode(.inline)
+            .task {
+                await loadAvailableTasks()
+            }
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") {
@@ -132,16 +183,22 @@ public struct CreateGoalView: View {
     }
 
     private var availableDataSources: [DataSourceType] {
-        [.typeQuicker, .atCoder, .healthKitSleep]
+        [.typeQuicker, .atCoder, .healthKitSleep, .tasks]
     }
 
     private var isValid: Bool {
-        guard selectedDataSource != nil,
+        guard let dataSource = selectedDataSource,
               selectedMetric != nil,
               let target = Double(targetValue),
               target > 0 else {
             return false
         }
+
+        // For tasks data source, require task selection if not tracking all tasks
+        if dataSource == .tasks && !trackAllTasks && selectedTask == nil {
+            return false
+        }
+
         return true
     }
 
@@ -155,14 +212,24 @@ public struct CreateGoalView: View {
         isSaving = true
         defer { isSaving = false }
 
+        // Determine taskId and title based on task selection
+        let taskId: UUID? = (dataSource == .tasks && !trackAllTasks) ? selectedTask?.id : nil
+        let title: String
+        if let task = selectedTask, dataSource == .tasks && !trackAllTasks {
+            title = "\(task.name) \(metric.name) Goal"
+        } else {
+            title = "\(metric.name) Goal"
+        }
+
         do {
             _ = try await container.createGoalUseCase.createGoal(
-                title: "\(metric.name) Goal",
+                title: title,
                 dataSource: dataSource,
                 metricKey: metric.key,
                 targetValue: target,
                 unit: metric.unit,
-                color: color
+                color: color,
+                taskId: taskId
             )
             // Configure data source and sync to populate the initial value
             await container.configureDataSources()
@@ -171,6 +238,14 @@ public struct CreateGoalView: View {
             dismiss()
         } catch {
             print("Failed to create goal: \(error)")
+        }
+    }
+
+    private func loadAvailableTasks() async {
+        do {
+            availableTasks = try await container.taskRepository.fetchActiveTasks()
+        } catch {
+            print("Failed to load tasks: \(error)")
         }
     }
 }

@@ -7,6 +7,7 @@ import GoalsData
 public struct GoalDetailView: View {
     @Environment(AppContainer.self) private var container
     @State private var goal: Goal
+    @State private var linkedTaskName: String?
 
     public init(goal: Goal) {
         self._goal = State(initialValue: goal)
@@ -87,6 +88,15 @@ public struct GoalDetailView: View {
                 DetailRow(label: "Source", value: goal.dataSource.displayName, icon: goal.dataSource.iconName)
                 DetailRow(label: "Metric", value: metricDisplayName, icon: "chart.line.uptrend.xyaxis")
 
+                // Show linked task for task-based goals
+                if goal.taskId != nil {
+                    DetailRow(
+                        label: "Task",
+                        value: linkedTaskName ?? "Unknown Task",
+                        icon: "checkmark.circle"
+                    )
+                }
+
                 if let deadline = goal.deadline {
                     DetailRow(
                         label: "Deadline",
@@ -119,6 +129,13 @@ public struct GoalDetailView: View {
     private func loadData() async {
         if let updatedGoal = try? await container.goalRepository.fetch(id: goal.id) {
             goal = updatedGoal
+        }
+
+        // Load linked task name if this is a per-task goal
+        if let taskId = goal.taskId {
+            if let task = try? await container.taskRepository.fetchTask(id: taskId) {
+                linkedTaskName = task.name
+            }
         }
     }
 }

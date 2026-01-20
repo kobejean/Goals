@@ -45,6 +45,7 @@ public struct InsightSummary: Sendable {
     public let systemImage: String
     public let color: Color
     public let dataPoints: [InsightDataPoint]
+    public let movingAveragePoints: [InsightDataPoint]?  // For scatter + moving average charts
     public let currentValueFormatted: String
     public let trend: Double?  // percentage change, nil if insufficient data
     public let goalValue: Double?  // optional goal target to show as line
@@ -65,6 +66,7 @@ public struct InsightSummary: Sendable {
         self.systemImage = systemImage
         self.color = color
         self.dataPoints = dataPoints
+        self.movingAveragePoints = nil
         self.currentValueFormatted = currentValueFormatted
         self.trend = trend
         self.goalValue = goalValue
@@ -85,10 +87,34 @@ public struct InsightSummary: Sendable {
         self.systemImage = systemImage
         self.color = color
         self.dataPoints = []
+        self.movingAveragePoints = nil
         self.currentValueFormatted = currentValueFormatted
         self.trend = trend
         self.goalValue = nil
         self.chartType = .durationRange
         self.durationRangeData = durationRangeData
+    }
+
+    /// Initialize with scatter + moving average chart type
+    public init(
+        title: String,
+        systemImage: String,
+        color: Color,
+        scatterPoints: [InsightDataPoint],
+        movingAveragePoints: [InsightDataPoint],
+        currentValueFormatted: String,
+        trend: Double?,
+        goalValue: Double? = nil
+    ) {
+        self.title = title
+        self.systemImage = systemImage
+        self.color = color
+        self.dataPoints = scatterPoints
+        self.movingAveragePoints = movingAveragePoints
+        self.currentValueFormatted = currentValueFormatted
+        self.trend = trend
+        self.goalValue = goalValue
+        self.chartType = .scatterWithMovingAverage
+        self.durationRangeData = nil
     }
 }
