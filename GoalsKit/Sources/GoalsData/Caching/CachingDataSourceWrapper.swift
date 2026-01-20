@@ -34,6 +34,50 @@ public extension CachingDataSourceWrapper {
     }
 }
 
+// MARK: - Date Range Calculation
+
+public extension CachingDataSourceWrapper {
+    /// Calculate missing date ranges that need to be fetched from remote
+    /// - Parameters:
+    ///   - startDate: Start of the desired date range
+    ///   - endDate: End of the desired date range
+    ///   - cachedDates: Set of dates that are already cached
+    /// - Returns: Array of (start, end) date tuples representing missing ranges
+    func calculateMissingDateRanges(
+        from startDate: Date,
+        to endDate: Date,
+        cachedDates: Set<Date>
+    ) -> [(start: Date, end: Date)] {
+        let calendar = Calendar.current
+        var missingRanges: [(start: Date, end: Date)] = []
+        var currentStart: Date? = nil
+
+        var checkDate = calendar.startOfDay(for: startDate)
+        let endDay = calendar.startOfDay(for: endDate)
+
+        while checkDate <= endDay {
+            if !cachedDates.contains(checkDate) {
+                if currentStart == nil {
+                    currentStart = checkDate
+                }
+            } else {
+                if let start = currentStart {
+                    let previousDay = calendar.date(byAdding: .day, value: -1, to: checkDate) ?? checkDate
+                    missingRanges.append((start, previousDay))
+                    currentStart = nil
+                }
+            }
+            checkDate = calendar.date(byAdding: .day, value: 1, to: checkDate) ?? checkDate
+        }
+
+        if let start = currentStart {
+            missingRanges.append((start, endDay))
+        }
+
+        return missingRanges
+    }
+}
+
 // MARK: - Cache Helper Methods
 
 public extension CachingDataSourceWrapper {

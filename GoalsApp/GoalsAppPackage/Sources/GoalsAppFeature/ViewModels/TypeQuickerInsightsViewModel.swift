@@ -1,6 +1,7 @@
 import SwiftUI
 import GoalsDomain
 import GoalsData
+import GoalsCore
 
 /// ViewModel for TypeQuicker insights section
 @MainActor @Observable
@@ -15,6 +16,7 @@ public final class TypeQuickerInsightsViewModel: InsightsSectionViewModel {
 
     public private(set) var stats: [TypeQuickerStats] = []
     public private(set) var goals: [Goal] = []
+    public private(set) var errorMessage: String?
     public var selectedMetric: TypeQuickerMetric = .wpm
 
     // MARK: - Dependencies
@@ -68,24 +70,14 @@ public final class TypeQuickerInsightsViewModel: InsightsSectionViewModel {
 
     /// Trend percentage for the selected metric
     public var metricTrend: Double? {
-        guard stats.count >= 2 else { return nil }
-        let first: Double
-        let last: Double
-
         switch selectedMetric {
         case .wpm:
-            first = stats.first!.wordsPerMinute
-            last = stats.last!.wordsPerMinute
+            return stats.trendPercentage { $0.wordsPerMinute }
         case .accuracy:
-            first = stats.first!.accuracy
-            last = stats.last!.accuracy
+            return stats.trendPercentage { $0.accuracy }
         case .time:
-            first = Double(stats.first!.practiceTimeMinutes)
-            last = Double(stats.last!.practiceTimeMinutes)
+            return stats.trendPercentage { Double($0.practiceTimeMinutes) }
         }
-
-        guard first > 0 else { return nil }
-        return ((last - first) / first) * 100
     }
 
     /// Summary data for the overview card
@@ -133,9 +125,50 @@ public final class TypeQuickerInsightsViewModel: InsightsSectionViewModel {
         goals.targetValue(for: metric.metricKey)
     }
 
+    // MARK: - Chart Data Helpers
+
+    /// Filter mode chart data by time range
+    public func filteredModeChartData(for timeRange: TimeRange) -> [TypeQuickerModeDataPoint] {
+        let cutoffDate = timeRange.startDate(from: Date())
+        return modeChartData.filter { $0.date >= cutoffDate }
+    }
+
+    /// Calculate Y-axis range for chart, including goal line if present
+    public func chartYAxisRange(for filteredData: [TypeQuickerModeDataPoint], metric: TypeQuickerMetric) -> ClosedRange<Double> {
+        var values = filteredData.map { $0.value(for: metric) }
+
+        if let goalTarget = goalTarget(for: metric) {
+            values.append(goalTarget)
+        }
+
+        guard let minVal = values.min(), let maxVal = values.max() else {
+            return 0...100
+        }
+
+        let range = maxVal - minVal
+        let padding = max(range * 0.15, 1)
+
+        let lower = max(0, minVal - padding)
+        let upper = maxVal + padding
+
+        return lower...upper
+    }
+
+    /// Get unique modes from filtered data with their average values
+    public func modeLegendData(for filteredData: [TypeQuickerModeDataPoint], metric: TypeQuickerMetric) -> [(mode: String, avgValue: Double)] {
+        let uniqueModes = Array(Set(filteredData.map(\.mode))).sorted()
+        return uniqueModes.map { mode in
+            let modePoints = filteredData.filter { $0.mode == mode }
+            let avgValue = modePoints.isEmpty ? 0 : modePoints.reduce(0) { $0 + $1.value(for: metric) } / Double(modePoints.count)
+            return (mode, avgValue)
+        }
+    }
+
     // MARK: - Data Loading
 
     public func loadData() async {
+        errorMessage = nil
+
         // Configure from saved settings if available
         if let username = UserDefaults.standard.typeQuickerUsername, !username.isEmpty {
             let settings = DataSourceSettings(
@@ -146,6 +179,7 @@ public final class TypeQuickerInsightsViewModel: InsightsSectionViewModel {
         }
 
         guard await dataSource.isConfigured() else {
+            errorMessage = "Configure your TypeQuicker username in Settings"
             return
         }
 
@@ -164,7 +198,10 @@ public final class TypeQuickerInsightsViewModel: InsightsSectionViewModel {
         do {
             stats = try await dataSource.fetchStats(from: startDate, to: endDate)
         } catch {
-            // Keep cached data on error (already displayed above)
+            // Keep cached data on error
+            if stats.isEmpty {
+                errorMessage = "Failed to load data: \(error.localizedDescription)"
+            }
         }
     }
 }

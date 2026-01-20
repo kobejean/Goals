@@ -10,24 +10,32 @@ struct TypeQuickerInsightsDetailView: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 12) {
-                HStack {
-                    Image(systemName: "keyboard")
-                        .foregroundStyle(Color.accentColor)
-                    Text("Typing Progress")
-                        .font(.headline)
-                    Spacer()
-                    if let trend = viewModel.metricTrend {
-                        TrendBadge(trend: trend)
+                if let error = viewModel.errorMessage {
+                    ContentUnavailableView {
+                        Label("Unable to Load", systemImage: "exclamationmark.triangle")
+                    } description: {
+                        Text(error)
                     }
-                }
-
-                if filteredStats.isEmpty {
-                    emptyStateView
                 } else {
-                    metricPicker
-                    trendChart
-                    if viewModel.uniqueModes.count > 1 {
-                        modeLegend
+                    HStack {
+                        Image(systemName: "keyboard")
+                            .foregroundStyle(Color.accentColor)
+                        Text("Typing Progress")
+                            .font(.headline)
+                        Spacer()
+                        if let trend = viewModel.metricTrend {
+                            TrendBadge(trend: trend)
+                        }
+                    }
+
+                    if filteredStats.isEmpty {
+                        emptyStateView
+                    } else {
+                        metricPicker
+                        trendChart
+                        if viewModel.uniqueModes.count > 1 {
+                            modeLegend
+                        }
                     }
                 }
             }
@@ -51,8 +59,7 @@ struct TypeQuickerInsightsDetailView: View {
     // MARK: - Filtered Data
 
     private var filteredStats: [TypeQuickerModeDataPoint] {
-        let cutoffDate = timeRange.startDate(from: Date())
-        return viewModel.modeChartData.filter { $0.date >= cutoffDate }
+        viewModel.filteredModeChartData(for: timeRange)
     }
 
     // MARK: - Subviews
@@ -107,7 +114,7 @@ struct TypeQuickerInsightsDetailView: View {
             }
         }
         .frame(height: 200)
-        .chartYScale(domain: chartYAxisRange)
+        .chartYScale(domain: viewModel.chartYAxisRange(for: filteredStats, metric: viewModel.selectedMetric))
         .chartYAxisLabel(viewModel.selectedMetric.yAxisLabel)
         .chartLegend(.hidden)
         .chartForegroundStyleScale(mapping: { (mode: String) in
@@ -115,41 +122,18 @@ struct TypeQuickerInsightsDetailView: View {
         })
     }
 
-    private var chartYAxisRange: ClosedRange<Double> {
-        var values = filteredStats.map { $0.value(for: viewModel.selectedMetric) }
-
-        if let goalTarget = viewModel.goalTarget(for: viewModel.selectedMetric) {
-            values.append(goalTarget)
-        }
-
-        guard let minVal = values.min(), let maxVal = values.max() else {
-            return 0...100
-        }
-
-        let range = maxVal - minVal
-        let padding = max(range * 0.15, 1)
-
-        let lower = max(0, minVal - padding)
-        let upper = maxVal + padding
-
-        return lower...upper
-    }
-
     private var modeLegend: some View {
-        let uniqueModes = Array(Set(filteredStats.map(\.mode))).sorted()
+        let legendData = viewModel.modeLegendData(for: filteredStats, metric: viewModel.selectedMetric)
         return VStack(spacing: 6) {
-            ForEach(uniqueModes, id: \.self) { mode in
-                let modePoints = filteredStats.filter { $0.mode == mode }
-                let avgValue = modePoints.isEmpty ? 0 : modePoints.reduce(0) { $0 + $1.value(for: viewModel.selectedMetric) } / Double(modePoints.count)
-
+            ForEach(legendData, id: \.mode) { item in
                 HStack {
                     Circle()
-                        .fill(colorForMode(mode))
+                        .fill(colorForMode(item.mode))
                         .frame(width: 8, height: 8)
-                    Text(mode.capitalized)
+                    Text(item.mode.capitalized)
                         .font(.caption)
                     Spacer()
-                    Text(formatMetricValue(avgValue, for: viewModel.selectedMetric, suffix: " avg"))
+                    Text(formatMetricValue(item.avgValue, for: viewModel.selectedMetric, suffix: " avg"))
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
