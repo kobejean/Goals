@@ -11,6 +11,7 @@ public final class InsightsViewModel {
     public let typeQuicker: TypeQuickerInsightsViewModel
     public let atCoder: AtCoderInsightsViewModel
     public let sleep: SleepInsightsViewModel
+    public let tasks: TasksInsightsViewModel
 
     // MARK: - Initialization
 
@@ -18,6 +19,7 @@ public final class InsightsViewModel {
         typeQuickerDataSource: CachedTypeQuickerDataSource,
         atCoderDataSource: CachedAtCoderDataSource,
         sleepDataSource: CachedHealthKitSleepDataSource,
+        taskRepository: TaskRepositoryProtocol,
         goalRepository: GoalRepositoryProtocol
     ) {
         self.typeQuicker = TypeQuickerInsightsViewModel(
@@ -30,6 +32,10 @@ public final class InsightsViewModel {
         )
         self.sleep = SleepInsightsViewModel(
             dataSource: sleepDataSource,
+            goalRepository: goalRepository
+        )
+        self.tasks = TasksInsightsViewModel(
+            taskRepository: taskRepository,
             goalRepository: goalRepository
         )
     }
@@ -47,6 +53,9 @@ public final class InsightsViewModel {
             },
             makeCardConfig(from: sleep) {
                 AnyView(SleepInsightsDetailView(viewModel: self.sleep))
+            },
+            makeCardConfig(from: tasks) {
+                AnyView(TasksInsightsDetailView(viewModel: self.tasks))
             }
         ]
     }
@@ -74,6 +83,7 @@ public final class InsightsViewModel {
             group.addTask { await self.typeQuicker.loadData() }
             group.addTask { await self.atCoder.loadData() }
             group.addTask { await self.sleep.loadData() }
+            group.addTask { await self.tasks.loadData() }
         }
     }
 }

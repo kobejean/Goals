@@ -65,6 +65,7 @@ public final class AppContainer {
             typeQuickerDataSource: typeQuickerDataSource,
             atCoderDataSource: atCoderDataSource,
             sleepDataSource: healthKitSleepDataSource,
+            taskRepository: taskRepository,
             goalRepository: goalRepository
         )
         _insightsViewModel = vm

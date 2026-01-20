@@ -14,21 +14,6 @@ public struct TasksView: View {
         NavigationStack {
             ScrollView {
                 VStack(spacing: 20) {
-                    // Active task banner
-                    if let activeTask = viewModel.activeTask,
-                       let activeSession = viewModel.activeSession {
-                        ActiveTaskBanner(
-                            task: activeTask,
-                            session: activeSession,
-                            timerTick: viewModel.timerTick,
-                            onStop: {
-                                Task {
-                                    await viewModel.toggleTask(activeTask)
-                                }
-                            }
-                        )
-                    }
-
                     // Task toggle panel
                     if viewModel.tasks.isEmpty {
                         EmptyTasksView {
@@ -99,65 +84,6 @@ public struct TasksView: View {
     }
 
     public init() {}
-}
-
-/// Banner showing the currently active task with live timer
-private struct ActiveTaskBanner: View {
-    let task: TaskDefinition
-    let session: TaskSession
-    let timerTick: Date
-    let onStop: () -> Void
-
-    var body: some View {
-        HStack {
-            Image(systemName: task.icon)
-                .font(.title2)
-
-            VStack(alignment: .leading, spacing: 2) {
-                Text(task.name)
-                    .font(.headline)
-                Text("Tracking...")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            }
-
-            Spacer()
-
-            Text(formattedDuration)
-                .font(.title2.monospacedDigit().bold())
-
-            Button(action: onStop) {
-                Image(systemName: "stop.fill")
-                    .font(.title3)
-                    .foregroundStyle(.white)
-                    .padding(8)
-                    .background(Circle().fill(Color.red))
-            }
-        }
-        .padding()
-        .background(
-            RoundedRectangle(cornerRadius: 16)
-                .fill(task.color.swiftUIColor.opacity(0.15))
-        )
-        .overlay(
-            RoundedRectangle(cornerRadius: 16)
-                .strokeBorder(task.color.swiftUIColor.opacity(0.3), lineWidth: 1)
-        )
-    }
-
-    private var formattedDuration: String {
-        _ = timerTick
-        let totalSeconds = Int(session.duration)
-        let hours = totalSeconds / 3600
-        let minutes = (totalSeconds % 3600) / 60
-        let seconds = totalSeconds % 60
-
-        if hours > 0 {
-            return String(format: "%d:%02d:%02d", hours, minutes, seconds)
-        } else {
-            return String(format: "%d:%02d", minutes, seconds)
-        }
-    }
 }
 
 /// Empty state view when no tasks exist

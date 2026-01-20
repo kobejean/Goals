@@ -9,26 +9,14 @@ public struct InsightsView: View {
 
     public var body: some View {
         NavigationStack {
-            ScrollView {
-                LazyVStack(spacing: 16) {
-                    ForEach(container.insightsViewModel.cards) { card in
-                        NavigationLink {
-                            card.makeDetailView()
-                        } label: {
-                            InsightCard(
-                                title: card.title,
-                                systemImage: card.systemImage,
-                                color: card.color,
-                                summary: card.summary,
-                                activityData: card.activityData,
-                                mode: displayMode
-                            )
-                        }
-                        .buttonStyle(.plain)
-                    }
-                }
-                .padding()
+            TabView(selection: $displayMode) {
+                insightsList(mode: .chart)
+                    .tag(InsightDisplayMode.chart)
+                insightsList(mode: .activity)
+                    .tag(InsightDisplayMode.activity)
             }
+            .tabViewStyle(.page(indexDisplayMode: .never))
+            .animation(.easeInOut(duration: 0.25), value: displayMode)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .principal) {
@@ -51,6 +39,30 @@ public struct InsightsView: View {
                 // Load/reload data - existing data stays visible during load
                 await container.insightsViewModel.loadAll()
             }
+        }
+    }
+
+    @ViewBuilder
+    private func insightsList(mode: InsightDisplayMode) -> some View {
+        ScrollView {
+            LazyVStack(spacing: 16) {
+                ForEach(container.insightsViewModel.cards) { card in
+                    NavigationLink {
+                        card.makeDetailView()
+                    } label: {
+                        InsightCard(
+                            title: card.title,
+                            systemImage: card.systemImage,
+                            color: card.color,
+                            summary: card.summary,
+                            activityData: card.activityData,
+                            mode: mode
+                        )
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+            .padding()
         }
     }
 
