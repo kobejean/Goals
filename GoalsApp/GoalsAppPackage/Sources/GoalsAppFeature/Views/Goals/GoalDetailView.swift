@@ -73,16 +73,8 @@ public struct GoalDetailView: View {
 
     /// Get the display name for the metric from the data source
     private var metricDisplayName: String {
-        let metrics: [MetricInfo]
-        switch goal.dataSource {
-        case .typeQuicker:
-            metrics = container.typeQuickerDataSource.availableMetrics
-        case .atCoder:
-            metrics = container.atCoderDataSource.availableMetrics
-        case .healthKitSleep:
-            metrics = container.healthKitSleepDataSource.availableMetrics
-        }
-        return metrics.first { $0.key == goal.metricKey }?.name ?? goal.metricKey.capitalized
+        container.availableMetrics(for: goal.dataSource)
+            .first { $0.key == goal.metricKey }?.name ?? goal.metricKey.capitalized
     }
 
     @ViewBuilder

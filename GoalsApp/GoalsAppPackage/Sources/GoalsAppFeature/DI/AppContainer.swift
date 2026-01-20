@@ -17,6 +17,15 @@ public final class AppContainer {
         settingsRevision += 1
     }
 
+    /// Get available metrics for a data source type
+    public func availableMetrics(for dataSource: DataSourceType) -> [MetricInfo] {
+        switch dataSource {
+        case .typeQuicker: return typeQuickerDataSource.availableMetrics
+        case .atCoder: return atCoderDataSource.availableMetrics
+        case .healthKitSleep: return healthKitSleepDataSource.availableMetrics
+        }
+    }
+
     // MARK: - ViewModels (lazily created, persist for app lifetime)
 
     private var _insightsViewModel: InsightsViewModel?

@@ -136,14 +136,7 @@ public struct CreateGoalView: View {
     }
 
     private func metricsForDataSource(_ dataSource: DataSourceType) -> [MetricInfo] {
-        switch dataSource {
-        case .typeQuicker:
-            return container.typeQuickerDataSource.availableMetrics
-        case .atCoder:
-            return container.atCoderDataSource.availableMetrics
-        case .healthKitSleep:
-            return container.healthKitSleepDataSource.availableMetrics
-        }
+        container.availableMetrics(for: dataSource)
     }
 
     private var isValid: Bool {
