@@ -76,13 +76,13 @@ public struct SettingsView: View {
     }
 
     private func loadSettings() async {
-        typeQuickerUsername = UserDefaults.standard.string(forKey: "typeQuickerUsername") ?? ""
-        atCoderUsername = UserDefaults.standard.string(forKey: "atCoderUsername") ?? ""
+        typeQuickerUsername = UserDefaults.standard.typeQuickerUsername ?? ""
+        atCoderUsername = UserDefaults.standard.atCoderUsername ?? ""
     }
 
     private func saveTypeQuickerSettings(username: String) async {
         typeQuickerSaveState = .saving
-        UserDefaults.standard.set(username, forKey: "typeQuickerUsername")
+        UserDefaults.standard.typeQuickerUsername = username
 
         if !username.isEmpty {
             let settings = DataSourceSettings(
@@ -100,7 +100,7 @@ public struct SettingsView: View {
 
     private func saveAtCoderSettings(username: String) async {
         atCoderSaveState = .saving
-        UserDefaults.standard.set(username, forKey: "atCoderUsername")
+        UserDefaults.standard.atCoderUsername = username
 
         if !username.isEmpty {
             let settings = DataSourceSettings(

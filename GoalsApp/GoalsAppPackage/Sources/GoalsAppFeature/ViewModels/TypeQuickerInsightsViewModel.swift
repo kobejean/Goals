@@ -130,20 +130,14 @@ public final class TypeQuickerInsightsViewModel: InsightsSectionViewModel {
 
     /// Get the goal target for a specific metric
     public func goalTarget(for metric: TypeQuickerMetric) -> Double? {
-        let metricKey: String
-        switch metric {
-        case .wpm: metricKey = "wpm"
-        case .accuracy: metricKey = "accuracy"
-        case .time: metricKey = "practiceTime"
-        }
-        return goals.first { $0.metricKey == metricKey && !$0.isArchived }?.targetValue
+        goals.targetValue(for: metric.metricKey)
     }
 
     // MARK: - Data Loading
 
     public func loadData() async {
         // Configure from saved settings if available
-        if let username = UserDefaults.standard.string(forKey: "typeQuickerUsername"), !username.isEmpty {
+        if let username = UserDefaults.standard.typeQuickerUsername, !username.isEmpty {
             let settings = DataSourceSettings(
                 dataSourceType: .typeQuicker,
                 credentials: ["username": username]

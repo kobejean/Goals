@@ -21,6 +21,15 @@ public enum TypeQuickerMetric: String, CaseIterable, Sendable {
         case .time: return "min"
         }
     }
+
+    /// Key used for goal metric lookup
+    public var metricKey: String {
+        switch self {
+        case .wpm: return "wpm"
+        case .accuracy: return "accuracy"
+        case .time: return "practiceTime"
+        }
+    }
 }
 
 /// Data point for charting mode-specific TypeQuicker stats over time

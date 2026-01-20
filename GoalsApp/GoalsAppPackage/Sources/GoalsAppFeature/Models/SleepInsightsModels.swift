@@ -29,6 +29,17 @@ public enum SleepMetric: String, CaseIterable, Sendable {
         case .wakeTime: return "hr"
         }
     }
+
+    /// Key used for goal metric lookup
+    public var metricKey: String {
+        switch self {
+        case .duration: return "sleepDuration"
+        case .efficiency: return "sleepEfficiency"
+        case .stages: return "deepDuration"
+        case .bedtime: return "bedtime"
+        case .wakeTime: return "wakeTime"
+        }
+    }
 }
 
 /// Data point for charting sleep data over time
