@@ -1,5 +1,30 @@
 import SwiftUI
 
+/// A date range for chart axis configuration
+public struct DateRange: Sendable {
+    public let start: Date
+    public let end: Date
+
+    public init(start: Date, end: Date) {
+        self.start = start
+        self.end = end
+    }
+
+    /// Create a date range for the last N days from a reference date
+    /// Includes 12-hour padding on both ends for proper bar centering
+    public static func lastDays(_ count: Int, from referenceDate: Date = Date()) -> DateRange {
+        let calendar = Calendar.current
+        let end = calendar.startOfDay(for: referenceDate)
+        guard let start = calendar.date(byAdding: .day, value: -(count - 1), to: end) else {
+            return DateRange(start: end, end: end)
+        }
+        // Add padding for proper bar centering
+        let paddedStart = calendar.date(byAdding: .hour, value: -12, to: start) ?? start
+        let paddedEnd = calendar.date(byAdding: .hour, value: 12, to: end) ?? end
+        return DateRange(start: paddedStart, end: paddedEnd)
+    }
+}
+
 /// Chart type for insight cards
 public enum InsightChartType: String, Sendable {
     case sparkline      // Line chart for continuous values
@@ -65,9 +90,15 @@ public struct DurationRangeDataPoint: Identifiable, Sendable {
 public struct InsightDurationRangeData: Sendable {
     public let dataPoints: [DurationRangeDataPoint]
     public let defaultColor: Color
+    public let dateRange: DateRange?  // Optional fixed X-axis range
 
-    public init(dataPoints: [DurationRangeDataPoint], defaultColor: Color) {
+    public init(
+        dataPoints: [DurationRangeDataPoint],
+        defaultColor: Color,
+        dateRange: DateRange? = nil
+    ) {
         self.dataPoints = dataPoints
         self.defaultColor = defaultColor
+        self.dateRange = dateRange
     }
 }

@@ -21,9 +21,8 @@ struct TasksInsightsDetailView: View {
                 } else if filteredSummaries.isEmpty {
                     noDataInRangeView
                 } else {
-                    summaryCards
                     scheduleChartSection
-                    taskBreakdownSection
+                    taskDistributionSection
                 }
             }
             .padding()
@@ -45,6 +44,10 @@ struct TasksInsightsDetailView: View {
         }
         .task {
             await viewModel.loadData()
+            viewModel.startLiveUpdates()
+        }
+        .onDisappear {
+            viewModel.stopLiveUpdates()
         }
     }
 
@@ -102,60 +105,6 @@ struct TasksInsightsDetailView: View {
         .padding(.vertical, 40)
     }
 
-    private var summaryCards: some View {
-        VStack(spacing: 12) {
-            HStack {
-                Image(systemName: "timer")
-                    .foregroundStyle(.orange)
-                Text("Time Summary")
-                    .font(.headline)
-                Spacer()
-                if let trend = viewModel.trackingTrend {
-                    TrendBadge(trend: trend)
-                }
-            }
-
-            LazyVGrid(columns: [
-                GridItem(.flexible()),
-                GridItem(.flexible()),
-                GridItem(.flexible())
-            ], spacing: 12) {
-                summaryCard(
-                    title: "Today",
-                    value: viewModel.formatHours(viewModel.todayTotalHours),
-                    icon: "clock"
-                )
-                summaryCard(
-                    title: "Weekly Avg",
-                    value: viewModel.weeklyAverageHours.map { viewModel.formatHours($0) } ?? "-",
-                    icon: "chart.bar"
-                )
-                summaryCard(
-                    title: "Total Days",
-                    value: "\(viewModel.dailySummaries.count)",
-                    icon: "calendar"
-                )
-            }
-        }
-    }
-
-    private func summaryCard(title: String, value: String, icon: String) -> some View {
-        VStack(spacing: 4) {
-            Image(systemName: icon)
-                .font(.title3)
-                .foregroundStyle(.orange)
-            Text(value)
-                .font(.headline)
-            Text(title)
-                .font(.caption)
-                .foregroundStyle(.secondary)
-        }
-        .frame(maxWidth: .infinity)
-        .padding(.vertical, 12)
-        .background(.regularMaterial)
-        .clipShape(RoundedRectangle(cornerRadius: 8))
-    }
-
     private var scheduleChartSection: some View {
         VStack(alignment: .leading, spacing: 8) {
             Text("Daily Schedule")
@@ -164,18 +113,19 @@ struct TasksInsightsDetailView: View {
 
             TaskScheduleChart(
                 summaries: filteredSummaries,
-                tasks: viewModel.tasks
+                tasks: viewModel.tasks,
+                referenceDate: viewModel.referenceDate
             )
         }
     }
 
-    private var taskBreakdownSection: some View {
+    private var taskDistributionSection: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text("Task Breakdown")
+            Text("Time Distribution (\(timeRange.displayName))")
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
 
-            TaskBreakdownList(
+            TaskDistributionChart(
                 summaries: filteredSummaries,
                 tasks: viewModel.tasks,
                 formatDuration: viewModel.formatDuration
@@ -210,6 +160,7 @@ private struct ScheduleSegment: Identifiable {
 private struct TaskScheduleChart: View {
     let summaries: [TaskDailySummary]
     let tasks: [TaskDefinition]
+    let referenceDate: Date
 
     /// Convert sessions to schedule segments with time of day
     private var segments: [ScheduleSegment] {
@@ -218,7 +169,11 @@ private struct TaskScheduleChart: View {
 
         for summary in summaries {
             for session in summary.sessions {
-                guard let endDate = session.endDate else { continue }
+                // Use referenceDate for active sessions
+                let endDate = session.endDate ?? referenceDate
+
+                // Skip if session started after reference date
+                guard session.startDate <= referenceDate else { continue }
 
                 let task = tasks.first { $0.id == session.taskId }
                 let color = task?.color.swiftUIColor ?? .orange
@@ -406,9 +361,9 @@ private struct FlowLayout: Layout {
     }
 }
 
-// MARK: - Task Breakdown List
+// MARK: - Task Distribution Chart (Pie Chart)
 
-private struct TaskBreakdownList: View {
+private struct TaskDistributionChart: View {
     let summaries: [TaskDailySummary]
     let tasks: [TaskDefinition]
     let formatDuration: (TimeInterval) -> String
@@ -433,42 +388,60 @@ private struct TaskBreakdownList: View {
     }
 
     var body: some View {
-        VStack(spacing: 8) {
-            ForEach(taskTotals, id: \.task.id) { item in
-                HStack {
-                    Image(systemName: item.task.icon)
-                        .font(.title3)
-                        .foregroundStyle(item.task.color.swiftUIColor)
-                        .frame(width: 28)
-
-                    Text(item.task.name)
-                        .font(.subheadline)
-
-                    Spacer()
-
-                    VStack(alignment: .trailing) {
-                        Text(formatDuration(item.duration))
-                            .font(.subheadline.monospacedDigit())
-
-                        if totalDuration > 0 {
-                            Text("\(Int((item.duration / totalDuration) * 100))%")
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                        }
-                    }
-                }
-                .padding(.horizontal, 12)
-                .padding(.vertical, 8)
-                .background(item.task.color.swiftUIColor.opacity(0.1))
-                .clipShape(RoundedRectangle(cornerRadius: 8))
-            }
-
+        VStack(spacing: 16) {
             if taskTotals.isEmpty {
                 Text("No task data in selected range")
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
                     .frame(maxWidth: .infinity)
-                    .padding()
+                    .padding(.vertical, 40)
+            } else {
+                HStack(alignment: .center, spacing: 24) {
+                    // Pie chart
+                    Chart(taskTotals, id: \.task.id) { item in
+                        SectorMark(
+                            angle: .value("Duration", item.duration),
+                            innerRadius: .ratio(0.5),
+                            angularInset: 1.5
+                        )
+                        .foregroundStyle(item.task.color.swiftUIColor.gradient)
+                        .cornerRadius(4)
+                    }
+                    .frame(width: 140, height: 140)
+
+                    // Legend with stats
+                    VStack(alignment: .leading, spacing: 8) {
+                        ForEach(taskTotals, id: \.task.id) { item in
+                            HStack(spacing: 8) {
+                                Circle()
+                                    .fill(item.task.color.swiftUIColor.gradient)
+                                    .frame(width: 10, height: 10)
+
+                                Text(item.task.name)
+                                    .font(.caption)
+                                    .lineLimit(1)
+
+                                Spacer()
+
+                                Text(formatDuration(item.duration))
+                                    .font(.caption.monospacedDigit())
+                                    .foregroundStyle(.secondary)
+                            }
+                        }
+
+                        Divider()
+                            .padding(.vertical, 4)
+
+                        HStack {
+                            Text("Total")
+                                .font(.caption.bold())
+                            Spacer()
+                            Text(formatDuration(totalDuration))
+                                .font(.caption.bold().monospacedDigit())
+                        }
+                    }
+                    .frame(maxWidth: .infinity)
+                }
             }
         }
         .padding()

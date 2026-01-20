@@ -38,6 +38,15 @@ public struct InsightsView: View {
             .task(id: container.settingsRevision) {
                 // Load/reload data - existing data stays visible during load
                 await container.insightsViewModel.loadAll()
+                // Start live updates for tasks if active session exists
+                container.insightsViewModel.tasks.startLiveUpdates()
+            }
+            .onAppear {
+                // Restart timer when returning from detail view
+                container.insightsViewModel.tasks.startLiveUpdates()
+            }
+            .onDisappear {
+                container.insightsViewModel.tasks.stopLiveUpdates()
             }
         }
     }

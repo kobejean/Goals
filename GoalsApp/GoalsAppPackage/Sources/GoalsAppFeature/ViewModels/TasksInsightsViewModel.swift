@@ -23,6 +23,19 @@ public final class TasksInsightsViewModel: InsightsSectionViewModel {
     private let taskRepository: TaskRepositoryProtocol
     private let goalRepository: GoalRepositoryProtocol
 
+    // MARK: - Timer State
+
+    /// Reference date for computing active session durations
+    public private(set) var referenceDate: Date = Date()
+
+    /// Timer task for live updates
+    private var timerTask: Task<Void, Never>?
+
+    /// Whether there's currently an active session
+    public var hasActiveSession: Bool {
+        sessions.contains { $0.isActive }
+    }
+
     // MARK: - Initialization
 
     public init(
@@ -75,15 +88,27 @@ public final class TasksInsightsViewModel: InsightsSectionViewModel {
     public var summary: InsightSummary? {
         guard !sessions.isEmpty else { return nil }
 
-        // Limit to last 14 entries for duration range chart readability
-        let recentData = dailySummaries.suffix(14)
+        // Fixed 7-day date range for consistent X-axis
+        let dateRange = DateRange.lastDays(10)
+        let calendar = Calendar.current
+
+        // Filter data to the date range (comparing start of day)
+        let rangeStart = calendar.startOfDay(for: dateRange.start)
+        let rangeEnd = calendar.startOfDay(for: dateRange.end)
+
+        let recentData = dailySummaries.filter { summary in
+            let day = calendar.startOfDay(for: summary.date)
+            return day >= rangeStart && day <= rangeEnd
+        }
+
         let rangeDataPoints = recentData.map { summary in
-            summary.toDurationRangeDataPoint(tasks: tasks)
+            summary.toDurationRangeDataPoint(tasks: tasks, referenceDate: referenceDate)
         }
 
         let durationRangeData = InsightDurationRangeData(
             dataPoints: rangeDataPoints,
-            defaultColor: .orange
+            defaultColor: .orange,
+            dateRange: dateRange
         )
 
         return InsightSummary(
@@ -154,7 +179,7 @@ public final class TasksInsightsViewModel: InsightsSectionViewModel {
     public func filteredRangeData(for timeRange: TimeRange) -> [DurationRangeDataPoint] {
         let filtered = filteredDailySummaries(for: timeRange)
         let dataToShow = filtered.count > 30 ? Array(filtered.suffix(30)) : filtered
-        return dataToShow.map { $0.toDurationRangeDataPoint(tasks: tasks) }
+        return dataToShow.map { $0.toDurationRangeDataPoint(tasks: tasks, referenceDate: referenceDate) }
     }
 
     // MARK: - Data Loading
@@ -174,6 +199,9 @@ public final class TasksInsightsViewModel: InsightsSectionViewModel {
             tasks = try await tasksResult
             sessions = try await sessionsResult
             goals = try await goalsResult
+
+            // Update reference date after loading
+            referenceDate = Date()
         } catch {
             errorMessage = "Failed to load task data: \(error.localizedDescription)"
         }
@@ -199,6 +227,30 @@ public final class TasksInsightsViewModel: InsightsSectionViewModel {
 
     public func formatDuration(_ seconds: TimeInterval) -> String {
         formatHours(seconds / 3600.0)
+    }
+
+    // MARK: - Timer Management
+
+    /// Start timer for live updates when active session exists
+    public func startLiveUpdates() {
+        guard hasActiveSession else { return }
+        stopLiveUpdates()
+
+        timerTask = Task { [weak self] in
+            while !Task.isCancelled {
+                try? await Task.sleep(for: .seconds(60))
+                guard !Task.isCancelled else { break }
+                await MainActor.run {
+                    self?.referenceDate = Date()
+                }
+            }
+        }
+    }
+
+    /// Stop timer for live updates
+    public func stopLiveUpdates() {
+        timerTask?.cancel()
+        timerTask = nil
     }
 }
 
@@ -228,9 +280,15 @@ public struct TaskDailySummary: Identifiable, Sendable {
     }
 
     /// Convert to duration range data point for charting
-    public func toDurationRangeDataPoint(tasks: [TaskDefinition]) -> DurationRangeDataPoint {
+    /// - Parameter referenceDate: Date to use as end time for active sessions
+    public func toDurationRangeDataPoint(tasks: [TaskDefinition], referenceDate: Date = Date()) -> DurationRangeDataPoint {
         let segments = sessions.compactMap { session -> DurationSegment? in
-            guard let endDate = session.endDate else { return nil }
+            // Use referenceDate for active sessions, actual endDate for completed
+            let endDate = session.endDate ?? referenceDate
+
+            // Skip if session started after reference date
+            guard session.startDate <= referenceDate else { return nil }
+
             let task = tasks.first { $0.id == session.taskId }
             let color = task?.color.swiftUIColor ?? .orange
 
