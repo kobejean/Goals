@@ -1,6 +1,7 @@
 import SwiftUI
 import GoalsDomain
 import GoalsData
+import GoalsCore
 
 /// ViewModel for Sleep insights section
 @MainActor @Observable
@@ -17,6 +18,7 @@ public final class SleepInsightsViewModel: InsightsSectionViewModel {
     public private(set) var goals: [Goal] = []
     public private(set) var isAuthorized: Bool = false
     public private(set) var authorizationChecked: Bool = false
+    public private(set) var errorMessage: String?
     public var selectedMetric: SleepMetric = .duration
 
     // MARK: - Dependencies
@@ -61,16 +63,7 @@ public final class SleepInsightsViewModel: InsightsSectionViewModel {
 
     /// Sleep trend (percentage change from first half to second half of data)
     public var sleepTrend: Double? {
-        guard sleepData.count >= 4 else { return nil }
-        let midpoint = sleepData.count / 2
-        let firstHalf = sleepData.prefix(midpoint)
-        let secondHalf = sleepData.suffix(midpoint)
-
-        let firstAvg = firstHalf.reduce(0.0) { $0 + $1.totalSleepHours } / Double(firstHalf.count)
-        let secondAvg = secondHalf.reduce(0.0) { $0 + $1.totalSleepHours } / Double(secondHalf.count)
-
-        guard firstAvg > 0 else { return nil }
-        return ((secondAvg - firstAvg) / firstAvg) * 100
+        sleepData.halfTrendPercentage { $0.totalSleepHours }
     }
 
     /// Summary data for the overview card
@@ -122,6 +115,27 @@ public final class SleepInsightsViewModel: InsightsSectionViewModel {
         goals.targetValue(for: metric.metricKey)
     }
 
+    // MARK: - Chart Data Helpers
+
+    /// Filter sleep data by time range with performance limit
+    public func filteredSleepData(for timeRange: TimeRange) -> [SleepDailySummary] {
+        let cutoffDate = timeRange.startDate(from: Date())
+        let filtered = sleepData.filter { $0.date >= cutoffDate }
+
+        // For "all" time range, limit to most recent 90 entries for chart performance
+        if timeRange == .all && filtered.count > 90 {
+            return Array(filtered.suffix(90))
+        }
+        return filtered
+    }
+
+    /// Filter range data for sleep schedule chart (limited to 30 for readability)
+    public func filteredRangeData(for timeRange: TimeRange) -> [SleepRangeDataPoint] {
+        let filtered = filteredSleepData(for: timeRange)
+        let dataToShow = filtered.count > 30 ? Array(filtered.suffix(30)) : filtered
+        return dataToShow.map { SleepRangeDataPoint(from: $0) }
+    }
+
     // MARK: - Authorization
 
     public func requestAuthorization() async {
@@ -140,6 +154,7 @@ public final class SleepInsightsViewModel: InsightsSectionViewModel {
     // MARK: - Data Loading
 
     public func loadData() async {
+        errorMessage = nil
         let endDate = Date()
         let startDate = TimeRange.all.startDate(from: endDate)
 
@@ -166,7 +181,10 @@ public final class SleepInsightsViewModel: InsightsSectionViewModel {
         do {
             sleepData = try await dataSource.fetchSleepData(from: startDate, to: endDate)
         } catch {
-            // Keep cached data on error (already displayed above)
+            // Keep cached data on error
+            if sleepData.isEmpty {
+                errorMessage = "Failed to load sleep data: \(error.localizedDescription)"
+            }
         }
     }
 

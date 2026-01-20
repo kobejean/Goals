@@ -1,6 +1,7 @@
 import SwiftUI
 import GoalsDomain
 import GoalsData
+import GoalsCore
 
 /// ViewModel for AtCoder insights section
 @MainActor @Observable
@@ -80,11 +81,7 @@ public final class AtCoderInsightsViewModel: InsightsSectionViewModel {
 
     /// Calculate rating trend percentage
     private func calculateRatingTrend() -> Double? {
-        guard contestHistory.count >= 2 else { return nil }
-        let first = Double(contestHistory.first!.rating)
-        let last = Double(contestHistory.last!.rating)
-        guard first > 0 else { return nil }
-        return ((last - first) / first) * 100
+        contestHistory.trendPercentage { Double($0.rating) }
     }
 
     /// Activity data for GitHub-style contribution chart

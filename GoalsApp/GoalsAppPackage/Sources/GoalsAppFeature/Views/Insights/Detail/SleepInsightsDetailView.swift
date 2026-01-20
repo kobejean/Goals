@@ -10,7 +10,13 @@ struct SleepInsightsDetailView: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 16) {
-                if !viewModel.authorizationChecked {
+                if let error = viewModel.errorMessage {
+                    ContentUnavailableView {
+                        Label("Unable to Load", systemImage: "exclamationmark.triangle")
+                    } description: {
+                        Text(error)
+                    }
+                } else if !viewModel.authorizationChecked {
                     loadingView
                 } else if !viewModel.isAuthorized {
                     authorizationRequestView
@@ -46,20 +52,11 @@ struct SleepInsightsDetailView: View {
     // MARK: - Filtered Data
 
     private var filteredData: [SleepDailySummary] {
-        let cutoffDate = timeRange.startDate(from: Date())
-        let filtered = viewModel.sleepData.filter { $0.date >= cutoffDate }
-
-        // For "all" time range, limit to most recent 90 entries for chart performance
-        if timeRange == .all && filtered.count > 90 {
-            return Array(filtered.suffix(90))
-        }
-        return filtered
+        viewModel.filteredSleepData(for: timeRange)
     }
 
     private var filteredRangeData: [SleepRangeDataPoint] {
-        // For range chart, limit to most recent 30 entries for readability
-        let dataToShow = filteredData.count > 30 ? Array(filteredData.suffix(30)) : filteredData
-        return dataToShow.map { SleepRangeDataPoint(from: $0) }
+        viewModel.filteredRangeData(for: timeRange)
     }
 
     // MARK: - Subviews

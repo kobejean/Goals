@@ -49,7 +49,7 @@ public struct CreateGoalView: View {
                 // Step 2: Select Metric (shown after data source is selected)
                 if let dataSource = selectedDataSource {
                     Section {
-                        ForEach(metricsForDataSource(dataSource)) { metric in
+                        ForEach(container.availableMetrics(for: dataSource)) { metric in
                             Button {
                                 selectedMetric = metric
                             } label: {
@@ -133,10 +133,6 @@ public struct CreateGoalView: View {
 
     private var availableDataSources: [DataSourceType] {
         [.typeQuicker, .atCoder, .healthKitSleep]
-    }
-
-    private func metricsForDataSource(_ dataSource: DataSourceType) -> [MetricInfo] {
-        container.availableMetrics(for: dataSource)
     }
 
     private var isValid: Bool {

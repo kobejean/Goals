@@ -22,39 +22,12 @@ public actor CachedTypeQuickerDataSource: TypeQuickerDataSourceProtocol, Caching
     // MARK: - TypeQuickerDataSourceProtocol
 
     public func fetchStats(from startDate: Date, to endDate: Date) async throws -> [TypeQuickerStats] {
-        let calendar = Calendar.current
-
         // Get cached data to determine what's missing
         let cachedStats = try await fetchCached(TypeQuickerStats.self, from: startDate, to: endDate)
-        let cachedDates = Set(cachedStats.map { calendar.startOfDay(for: $0.date) })
+        let cachedDates = Set(cachedStats.map { Calendar.current.startOfDay(for: $0.date) })
 
-        // Determine which dates need to be fetched
-        var missingRanges: [(start: Date, end: Date)] = []
-        var currentStart: Date? = nil
-
-        var checkDate = calendar.startOfDay(for: startDate)
-        let endDay = calendar.startOfDay(for: endDate)
-
-        while checkDate <= endDay {
-            if !cachedDates.contains(checkDate) {
-                if currentStart == nil {
-                    currentStart = checkDate
-                }
-            } else {
-                if let start = currentStart {
-                    let previousDay = calendar.date(byAdding: .day, value: -1, to: checkDate) ?? checkDate
-                    missingRanges.append((start, previousDay))
-                    currentStart = nil
-                }
-            }
-            checkDate = calendar.date(byAdding: .day, value: 1, to: checkDate) ?? checkDate
-        }
-
-        if let start = currentStart {
-            missingRanges.append((start, endDay))
-        }
-
-        // Fetch missing data from remote and store in cache
+        // Calculate and fetch missing ranges
+        let missingRanges = calculateMissingDateRanges(from: startDate, to: endDate, cachedDates: cachedDates)
         for range in missingRanges {
             let remoteStats = try await remote.fetchStats(from: range.start, to: range.end)
             if !remoteStats.isEmpty {
