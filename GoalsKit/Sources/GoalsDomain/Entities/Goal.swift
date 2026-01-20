@@ -65,6 +65,20 @@ public struct Goal: Sendable, Equatable, UUIDIdentifiable {
     }
 }
 
+// MARK: - Goal Collection Helpers
+
+public extension Array where Element == Goal {
+    /// Find active (non-archived) goal for a metric key
+    func activeGoal(for metricKey: String) -> Goal? {
+        first { $0.metricKey == metricKey && !$0.isArchived }
+    }
+
+    /// Get target value for an active goal with the given metric key
+    func targetValue(for metricKey: String) -> Double? {
+        activeGoal(for: metricKey)?.targetValue
+    }
+}
+
 /// Available colors for goals
 public enum GoalColor: String, Codable, Sendable, CaseIterable {
     case blue

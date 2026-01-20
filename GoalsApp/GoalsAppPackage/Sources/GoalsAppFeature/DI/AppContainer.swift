@@ -35,6 +35,7 @@ public final class AppContainer {
         _insightsViewModel = vm
         return vm
     }
+
     // MARK: - Model Container
 
     public let modelContainer: ModelContainer
@@ -70,14 +71,22 @@ public final class AppContainer {
 
     // MARK: - Initialization
 
-    public init() throws {
+    public convenience init() throws {
+        try self.init(inMemory: false)
+    }
+
+    /// Creates an in-memory container for previews and testing
+    public static func preview() throws -> AppContainer {
+        try AppContainer(inMemory: true)
+    }
+
+    private init(inMemory: Bool) throws {
         // Create LOCAL-ONLY cache container FIRST for fast startup
-        // This allows cached data to load immediately
         let cacheSchema = Schema([CachedDataEntry.self])
         let cacheConfiguration = ModelConfiguration(
             "CacheStore",
             schema: cacheSchema,
-            isStoredInMemoryOnly: false,
+            isStoredInMemoryOnly: inMemory,
             cloudKitDatabase: .none  // Local only - fast initialization
         )
         let cacheContainer = try ModelContainer(
@@ -88,23 +97,23 @@ public final class AppContainer {
         // Initialize caching EARLY so data sources can use it
         self.dataCache = DataCache(modelContainer: cacheContainer)
 
-        // Configure SwiftData for CloudKit-synced data (Goals, Badges)
+        // Configure SwiftData for Goals and Badges
         // NOTE: CloudKit temporarily disabled to fix slow startup from migration
         // Re-enable with .automatic once migration completes
-        let cloudSchema = Schema([
+        let mainSchema = Schema([
             GoalModel.self,
             EarnedBadgeModel.self,
         ])
 
-        let cloudConfiguration = ModelConfiguration(
-            schema: cloudSchema,
-            isStoredInMemoryOnly: false,
+        let mainConfiguration = ModelConfiguration(
+            schema: mainSchema,
+            isStoredInMemoryOnly: inMemory,
             cloudKitDatabase: .none  // Temporarily disabled - was causing 30+ second startup
         )
 
         self.modelContainer = try ModelContainer(
-            for: cloudSchema,
-            configurations: [cloudConfiguration]
+            for: mainSchema,
+            configurations: [mainConfiguration]
         )
 
         // Initialize repositories
@@ -117,107 +126,20 @@ public final class AppContainer {
         self.httpClient = HTTPClient()
 
         // Initialize data sources with caching
-        let remoteTypeQuicker = TypeQuickerDataSource(httpClient: httpClient)
-        let remoteAtCoder = AtCoderDataSource(httpClient: httpClient)
-        let remoteHealthKitSleep = HealthKitSleepDataSource()
-
         self.typeQuickerDataSource = CachedTypeQuickerDataSource(
-            remote: remoteTypeQuicker,
+            remote: TypeQuickerDataSource(httpClient: httpClient),
             cache: dataCache
         )
         self.atCoderDataSource = CachedAtCoderDataSource(
-            remote: remoteAtCoder,
+            remote: AtCoderDataSource(httpClient: httpClient),
             cache: dataCache
         )
         self.healthKitSleepDataSource = CachedHealthKitSleepDataSource(
-            remote: remoteHealthKitSleep,
+            remote: HealthKitSleepDataSource(),
             cache: dataCache
         )
 
         // Initialize use cases
-        self.createGoalUseCase = CreateGoalUseCase(goalRepository: goalRepo)
-        self.syncDataSourcesUseCase = SyncDataSourcesUseCase(
-            goalRepository: goalRepo,
-            dataSources: [
-                .typeQuicker: typeQuickerDataSource,
-                .atCoder: atCoderDataSource,
-                .healthKitSleep: healthKitSleepDataSource
-            ]
-        )
-        self.badgeEvaluationUseCase = BadgeEvaluationUseCase(
-            goalRepository: goalRepo,
-            badgeRepository: badgeRepo
-        )
-
-        // Initialize managers
-        self.badgeNotificationManager = BadgeNotificationManager()
-    }
-
-    /// Creates an in-memory container for previews and testing
-    public static func preview() throws -> AppContainer {
-        try AppContainer(inMemory: true)
-    }
-
-    private init(inMemory: Bool) throws {
-        // Main container for Goals and Badges
-        let cloudSchema = Schema([
-            GoalModel.self,
-            EarnedBadgeModel.self,
-        ])
-
-        let modelConfiguration = ModelConfiguration(
-            schema: cloudSchema,
-            isStoredInMemoryOnly: inMemory,
-            cloudKitDatabase: .none
-        )
-
-        self.modelContainer = try ModelContainer(
-            for: cloudSchema,
-            configurations: [modelConfiguration]
-        )
-
-        // Separate container for cache
-        let cacheSchema = Schema([CachedDataEntry.self])
-        let cacheConfiguration = ModelConfiguration(
-            "CacheStore",
-            schema: cacheSchema,
-            isStoredInMemoryOnly: inMemory,
-            cloudKitDatabase: .none
-        )
-        let cacheContainer = try ModelContainer(
-            for: cacheSchema,
-            configurations: [cacheConfiguration]
-        )
-
-        let goalRepo = SwiftDataGoalRepository(modelContainer: modelContainer)
-        self.goalRepository = goalRepo
-        let badgeRepo = SwiftDataBadgeRepository(modelContainer: modelContainer)
-        self.badgeRepository = badgeRepo
-
-        // Initialize caching with separate container
-        self.dataCache = DataCache(modelContainer: cacheContainer)
-
-        // Initialize networking
-        self.httpClient = HTTPClient()
-
-        // Initialize data sources with caching
-        let remoteTypeQuicker = TypeQuickerDataSource(httpClient: httpClient)
-        let remoteAtCoder = AtCoderDataSource(httpClient: httpClient)
-        let remoteHealthKitSleep = HealthKitSleepDataSource()
-
-        self.typeQuickerDataSource = CachedTypeQuickerDataSource(
-            remote: remoteTypeQuicker,
-            cache: dataCache
-        )
-        self.atCoderDataSource = CachedAtCoderDataSource(
-            remote: remoteAtCoder,
-            cache: dataCache
-        )
-        self.healthKitSleepDataSource = CachedHealthKitSleepDataSource(
-            remote: remoteHealthKitSleep,
-            cache: dataCache
-        )
-
         self.createGoalUseCase = CreateGoalUseCase(goalRepository: goalRepo)
         self.syncDataSourcesUseCase = SyncDataSourcesUseCase(
             goalRepository: goalRepo,

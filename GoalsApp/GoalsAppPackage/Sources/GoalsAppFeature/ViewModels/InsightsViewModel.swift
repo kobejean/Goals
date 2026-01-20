@@ -39,31 +39,31 @@ public final class InsightsViewModel {
     /// All insight cards for display
     public var cards: [InsightCardConfig] {
         [
-            InsightCardConfig(
-                title: typeQuicker.title,
-                systemImage: typeQuicker.systemImage,
-                color: typeQuicker.color,
-                summary: typeQuicker.summary,
-                activityData: typeQuicker.activityData,
-                makeDetailView: { AnyView(TypeQuickerInsightsDetailView(viewModel: self.typeQuicker)) }
-            ),
-            InsightCardConfig(
-                title: atCoder.title,
-                systemImage: atCoder.systemImage,
-                color: atCoder.color,
-                summary: atCoder.summary,
-                activityData: atCoder.activityData,
-                makeDetailView: { AnyView(AtCoderInsightsDetailView(viewModel: self.atCoder)) }
-            ),
-            InsightCardConfig(
-                title: sleep.title,
-                systemImage: sleep.systemImage,
-                color: sleep.color,
-                summary: sleep.summary,
-                activityData: sleep.activityData,
-                makeDetailView: { AnyView(SleepInsightsDetailView(viewModel: self.sleep)) }
-            )
+            makeCardConfig(from: typeQuicker) {
+                AnyView(TypeQuickerInsightsDetailView(viewModel: self.typeQuicker))
+            },
+            makeCardConfig(from: atCoder) {
+                AnyView(AtCoderInsightsDetailView(viewModel: self.atCoder))
+            },
+            makeCardConfig(from: sleep) {
+                AnyView(SleepInsightsDetailView(viewModel: self.sleep))
+            }
         ]
+    }
+
+    /// Factory method to create card config from any InsightsSectionViewModel
+    private func makeCardConfig<VM: InsightsSectionViewModel>(
+        from viewModel: VM,
+        detailView: @escaping @MainActor () -> AnyView
+    ) -> InsightCardConfig {
+        InsightCardConfig(
+            title: viewModel.title,
+            systemImage: viewModel.systemImage,
+            color: viewModel.color,
+            summary: viewModel.summary,
+            activityData: viewModel.activityData,
+            makeDetailView: detailView
+        )
     }
 
     // MARK: - Data Loading

@@ -119,15 +119,7 @@ public final class SleepInsightsViewModel: InsightsSectionViewModel {
 
     /// Get the goal target for a specific metric
     public func goalTarget(for metric: SleepMetric) -> Double? {
-        let metricKey: String
-        switch metric {
-        case .duration: metricKey = "sleepDuration"
-        case .efficiency: metricKey = "sleepEfficiency"
-        case .stages: metricKey = "deepDuration"
-        case .bedtime: metricKey = "bedtime"
-        case .wakeTime: metricKey = "wakeTime"
-        }
-        return goals.first { $0.metricKey == metricKey && !$0.isArchived }?.targetValue
+        goals.targetValue(for: metric.metricKey)
     }
 
     // MARK: - Authorization

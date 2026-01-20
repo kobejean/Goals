@@ -38,10 +38,7 @@ public final class AtCoderInsightsViewModel: InsightsSectionViewModel {
 
     /// Rating goal target if set
     public var ratingGoalTarget: Int? {
-        guard let goal = goals.first(where: { $0.metricKey == "rating" && !$0.isArchived }) else {
-            return nil
-        }
-        return Int(goal.targetValue)
+        goals.targetValue(for: "rating").map { Int($0) }
     }
 
     /// Filter contest history by time range
@@ -116,7 +113,7 @@ public final class AtCoderInsightsViewModel: InsightsSectionViewModel {
         errorMessage = nil
 
         // Configure from saved settings if available
-        if let username = UserDefaults.standard.string(forKey: "atCoderUsername"), !username.isEmpty {
+        if let username = UserDefaults.standard.atCoderUsername, !username.isEmpty {
             let settings = DataSourceSettings(
                 dataSourceType: .atCoder,
                 credentials: ["username": username]
