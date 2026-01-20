@@ -230,9 +230,9 @@ private struct TaskScheduleChart: View {
         let calendar = Calendar.current
         let today = calendar.startOfDay(for: Date())
         let startDate = calendar.date(byAdding: .day, value: -6, to: today)!
-        // Add half a day padding on each side so bars are centered in their columns
+        // Add padding so bars don't collide with axis labels
         let paddedStart = calendar.date(byAdding: .hour, value: -12, to: startDate)!
-        let paddedEnd = calendar.date(byAdding: .hour, value: 12, to: today)!
+        let paddedEnd = calendar.date(byAdding: .hour, value: 18, to: today)!
         return paddedStart...paddedEnd
     }
 
@@ -252,7 +252,7 @@ private struct TaskScheduleChart: View {
                         x: .value("Date", segment.date, unit: .day),
                         yStart: .value("Start", segment.startHour),
                         yEnd: .value("End", segment.endHour),
-                        width: .ratio(0.7)
+                        width: .ratio(0.6)
                     )
                     .foregroundStyle(segment.color.gradient)
                     .clipShape(RoundedRectangle(cornerRadius: 3))
