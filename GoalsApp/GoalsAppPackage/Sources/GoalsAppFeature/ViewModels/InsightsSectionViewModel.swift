@@ -1,7 +1,7 @@
 import SwiftUI
 
 /// Protocol for insights section ViewModels
-/// Each ViewModel knows how to load its data and create its section view
+/// Defines common interface for insight data providers
 @MainActor
 public protocol InsightsSectionViewModel: AnyObject, Observable, Sendable {
     /// Static display title (available before loading)
@@ -21,7 +21,4 @@ public protocol InsightsSectionViewModel: AnyObject, Observable, Sendable {
 
     /// Load all data (always loads full range for overview)
     func loadData() async
-
-    /// Create the detail view for this ViewModel (full charts)
-    func makeDetailView() -> AnyView
 }

@@ -160,10 +160,4 @@ public final class AtCoderInsightsViewModel: InsightsSectionViewModel {
             }
         }
     }
-
-    // MARK: - InsightsSectionViewModel
-
-    public func makeDetailView() -> AnyView {
-        AnyView(AtCoderInsightsDetailView(viewModel: self))
-    }
 }

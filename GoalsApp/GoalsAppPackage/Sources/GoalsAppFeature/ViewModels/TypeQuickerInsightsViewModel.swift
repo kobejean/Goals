@@ -173,10 +173,4 @@ public final class TypeQuickerInsightsViewModel: InsightsSectionViewModel {
             // Keep cached data on error (already displayed above)
         }
     }
-
-    // MARK: - InsightsSectionViewModel
-
-    public func makeDetailView() -> AnyView {
-        AnyView(TypeQuickerInsightsDetailView(viewModel: self))
-    }
 }

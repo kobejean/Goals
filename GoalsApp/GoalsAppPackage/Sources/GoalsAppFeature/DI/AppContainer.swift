@@ -17,23 +17,23 @@ public final class AppContainer {
         settingsRevision += 1
     }
 
-    // MARK: - ViewModel Factories
+    // MARK: - ViewModels (lazily created, persist for app lifetime)
 
-    public func makeInsightsViewModels() -> [any InsightsSectionViewModel] {
-        [
-            TypeQuickerInsightsViewModel(
-                dataSource: typeQuickerDataSource,
-                goalRepository: goalRepository
-            ),
-            AtCoderInsightsViewModel(
-                dataSource: atCoderDataSource,
-                goalRepository: goalRepository
-            ),
-            SleepInsightsViewModel(
-                dataSource: healthKitSleepDataSource,
-                goalRepository: goalRepository
-            )
-        ]
+    private var _insightsViewModel: InsightsViewModel?
+
+    /// Shared InsightsViewModel - persists across navigation
+    public var insightsViewModel: InsightsViewModel {
+        if let existing = _insightsViewModel {
+            return existing
+        }
+        let vm = InsightsViewModel(
+            typeQuickerDataSource: typeQuickerDataSource,
+            atCoderDataSource: atCoderDataSource,
+            sleepDataSource: healthKitSleepDataSource,
+            goalRepository: goalRepository
+        )
+        _insightsViewModel = vm
+        return vm
     }
     // MARK: - Model Container
 
@@ -71,22 +71,40 @@ public final class AppContainer {
     // MARK: - Initialization
 
     public init() throws {
-        // Configure SwiftData
-        let schema = Schema([
+        // Create LOCAL-ONLY cache container FIRST for fast startup
+        // This allows cached data to load immediately
+        let cacheSchema = Schema([CachedDataEntry.self])
+        let cacheConfiguration = ModelConfiguration(
+            "CacheStore",
+            schema: cacheSchema,
+            isStoredInMemoryOnly: false,
+            cloudKitDatabase: .none  // Local only - fast initialization
+        )
+        let cacheContainer = try ModelContainer(
+            for: cacheSchema,
+            configurations: [cacheConfiguration]
+        )
+
+        // Initialize caching EARLY so data sources can use it
+        self.dataCache = DataCache(modelContainer: cacheContainer)
+
+        // Configure SwiftData for CloudKit-synced data (Goals, Badges)
+        // NOTE: CloudKit temporarily disabled to fix slow startup from migration
+        // Re-enable with .automatic once migration completes
+        let cloudSchema = Schema([
             GoalModel.self,
-            CachedDataEntry.self,
             EarnedBadgeModel.self,
         ])
 
-        let modelConfiguration = ModelConfiguration(
-            schema: schema,
+        let cloudConfiguration = ModelConfiguration(
+            schema: cloudSchema,
             isStoredInMemoryOnly: false,
-            cloudKitDatabase: .automatic
+            cloudKitDatabase: .none  // Temporarily disabled - was causing 30+ second startup
         )
 
         self.modelContainer = try ModelContainer(
-            for: schema,
-            configurations: [modelConfiguration]
+            for: cloudSchema,
+            configurations: [cloudConfiguration]
         )
 
         // Initialize repositories
@@ -94,9 +112,6 @@ public final class AppContainer {
         self.goalRepository = goalRepo
         let badgeRepo = SwiftDataBadgeRepository(modelContainer: modelContainer)
         self.badgeRepository = badgeRepo
-
-        // Initialize caching
-        self.dataCache = DataCache(modelContainer: modelContainer)
 
         // Initialize networking
         self.httpClient = HTTPClient()
@@ -144,21 +159,34 @@ public final class AppContainer {
     }
 
     private init(inMemory: Bool) throws {
-        let schema = Schema([
+        // Main container for Goals and Badges
+        let cloudSchema = Schema([
             GoalModel.self,
-            CachedDataEntry.self,
             EarnedBadgeModel.self,
         ])
 
         let modelConfiguration = ModelConfiguration(
-            schema: schema,
+            schema: cloudSchema,
             isStoredInMemoryOnly: inMemory,
             cloudKitDatabase: .none
         )
 
         self.modelContainer = try ModelContainer(
-            for: schema,
+            for: cloudSchema,
             configurations: [modelConfiguration]
+        )
+
+        // Separate container for cache
+        let cacheSchema = Schema([CachedDataEntry.self])
+        let cacheConfiguration = ModelConfiguration(
+            "CacheStore",
+            schema: cacheSchema,
+            isStoredInMemoryOnly: inMemory,
+            cloudKitDatabase: .none
+        )
+        let cacheContainer = try ModelContainer(
+            for: cacheSchema,
+            configurations: [cacheConfiguration]
         )
 
         let goalRepo = SwiftDataGoalRepository(modelContainer: modelContainer)
@@ -166,8 +194,8 @@ public final class AppContainer {
         let badgeRepo = SwiftDataBadgeRepository(modelContainer: modelContainer)
         self.badgeRepository = badgeRepo
 
-        // Initialize caching
-        self.dataCache = DataCache(modelContainer: modelContainer)
+        // Initialize caching with separate container
+        self.dataCache = DataCache(modelContainer: cacheContainer)
 
         // Initialize networking
         self.httpClient = HTTPClient()
