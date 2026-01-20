@@ -23,6 +23,7 @@ public final class AppContainer {
         case .typeQuicker: return typeQuickerDataSource.availableMetrics
         case .atCoder: return atCoderDataSource.availableMetrics
         case .healthKitSleep: return healthKitSleepDataSource.availableMetrics
+        case .tasks: return tasksDataSource.availableMetrics
         }
     }
 
@@ -53,6 +54,7 @@ public final class AppContainer {
     // MARK: - ViewModels (lazily created, persist for app lifetime)
 
     private var _insightsViewModel: InsightsViewModel?
+    private var _tasksViewModel: TasksViewModel?
 
     /// Shared InsightsViewModel - persists across navigation
     public var insightsViewModel: InsightsViewModel {
@@ -69,6 +71,16 @@ public final class AppContainer {
         return vm
     }
 
+    /// Shared TasksViewModel - persists across navigation
+    public var tasksViewModel: TasksViewModel {
+        if let existing = _tasksViewModel {
+            return existing
+        }
+        let vm = TasksViewModel(taskRepository: taskRepository)
+        _tasksViewModel = vm
+        return vm
+    }
+
     // MARK: - Model Container
 
     public let modelContainer: ModelContainer
@@ -77,6 +89,7 @@ public final class AppContainer {
 
     public let goalRepository: GoalRepositoryProtocol
     public let badgeRepository: BadgeRepositoryProtocol
+    public let taskRepository: TaskRepositoryProtocol
 
     // MARK: - Caching
 
@@ -91,6 +104,7 @@ public final class AppContainer {
     public let typeQuickerDataSource: CachedTypeQuickerDataSource
     public let atCoderDataSource: CachedAtCoderDataSource
     public let healthKitSleepDataSource: CachedHealthKitSleepDataSource
+    public let tasksDataSource: TasksDataSource
 
     // MARK: - Use Cases
 
@@ -130,12 +144,14 @@ public final class AppContainer {
         // Initialize caching EARLY so data sources can use it
         self.dataCache = DataCache(modelContainer: cacheContainer)
 
-        // Configure SwiftData for Goals and Badges
+        // Configure SwiftData for Goals, Badges, and Tasks
         // NOTE: CloudKit temporarily disabled to fix slow startup from migration
         // Re-enable with .automatic once migration completes
         let mainSchema = Schema([
             GoalModel.self,
             EarnedBadgeModel.self,
+            TaskDefinitionModel.self,
+            TaskSessionModel.self,
         ])
 
         let mainConfiguration = ModelConfiguration(
@@ -154,6 +170,8 @@ public final class AppContainer {
         self.goalRepository = goalRepo
         let badgeRepo = SwiftDataBadgeRepository(modelContainer: modelContainer)
         self.badgeRepository = badgeRepo
+        let taskRepo = SwiftDataTaskRepository(modelContainer: modelContainer)
+        self.taskRepository = taskRepo
 
         // Initialize networking
         self.httpClient = HTTPClient()
@@ -171,6 +189,7 @@ public final class AppContainer {
             remote: HealthKitSleepDataSource(),
             cache: dataCache
         )
+        self.tasksDataSource = TasksDataSource(taskRepository: taskRepo)
 
         // Initialize use cases
         self.createGoalUseCase = CreateGoalUseCase(goalRepository: goalRepo)
@@ -179,7 +198,8 @@ public final class AppContainer {
             dataSources: [
                 .typeQuicker: typeQuickerDataSource,
                 .atCoder: atCoderDataSource,
-                .healthKitSleep: healthKitSleepDataSource
+                .healthKitSleep: healthKitSleepDataSource,
+                .tasks: tasksDataSource
             ]
         )
         self.badgeEvaluationUseCase = BadgeEvaluationUseCase(
