@@ -26,6 +26,30 @@ public final class AppContainer {
         }
     }
 
+    /// Configure all data sources from stored settings
+    /// Call this before syncing to ensure data sources are ready
+    public func configureDataSources() async {
+        // Configure TypeQuicker
+        if let username = UserDefaults.standard.typeQuickerUsername, !username.isEmpty {
+            let settings = DataSourceSettings(
+                dataSourceType: .typeQuicker,
+                credentials: ["username": username]
+            )
+            try? await typeQuickerDataSource.configure(settings: settings)
+        }
+
+        // Configure AtCoder
+        if let username = UserDefaults.standard.atCoderUsername, !username.isEmpty {
+            let settings = DataSourceSettings(
+                dataSourceType: .atCoder,
+                credentials: ["username": username]
+            )
+            try? await atCoderDataSource.configure(settings: settings)
+        }
+
+        // HealthKit doesn't need configuration - it uses system authorization
+    }
+
     // MARK: - ViewModels (lazily created, persist for app lifetime)
 
     private var _insightsViewModel: InsightsViewModel?

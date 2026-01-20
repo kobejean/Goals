@@ -164,7 +164,8 @@ public struct CreateGoalView: View {
                 unit: metric.unit,
                 color: color
             )
-            // Sync to populate the initial value
+            // Configure data source and sync to populate the initial value
+            await container.configureDataSources()
             _ = try? await container.syncDataSourcesUseCase.sync(dataSource: dataSource)
             await onSave?()
             dismiss()
