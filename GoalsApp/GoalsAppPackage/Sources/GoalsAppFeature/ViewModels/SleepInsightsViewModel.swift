@@ -77,7 +77,9 @@ public final class SleepInsightsViewModel: InsightsSectionViewModel {
     public var summary: InsightSummary? {
         guard !sleepData.isEmpty else { return nil }
 
-        let dataPoints = sleepData.map {
+        // Limit to last 30 entries for sparkline chart performance
+        let recentData = sleepData.suffix(30)
+        let dataPoints = recentData.map {
             InsightDataPoint(date: $0.date, value: $0.totalSleepHours)
         }
         let current = sleepData.last?.totalSleepHours ?? 0
@@ -100,7 +102,9 @@ public final class SleepInsightsViewModel: InsightsSectionViewModel {
         // Use 8 hours as the "full" intensity reference
         let targetHours = goalTarget(for: .duration) ?? 8.0
 
-        let days = sleepData.map { summary in
+        // Limit to last 90 entries for activity chart performance
+        let recentData = sleepData.suffix(90)
+        let days = recentData.map { summary in
             let intensity = min(summary.totalSleepHours / targetHours, 1.0)
 
             return InsightActivityDay(
