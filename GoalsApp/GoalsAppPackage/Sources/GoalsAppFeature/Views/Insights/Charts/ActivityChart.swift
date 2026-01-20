@@ -96,11 +96,8 @@ struct ActivityChart: View {
             currentDate = calendar.date(byAdding: .day, value: 1, to: currentDate)!
         }
 
-        // Add remaining days of the last week (pad with nil for future days)
+        // Add remaining days of the current week (no padding for future days)
         if !currentWeek.isEmpty {
-            while currentWeek.count < 7 {
-                currentWeek.append(nil)
-            }
             grid.append(currentWeek)
         }
 
