@@ -148,9 +148,19 @@ public final class SleepInsightsViewModel: InsightsSectionViewModel {
     // MARK: - Data Loading
 
     public func loadData() async {
-        // Always request authorization first - this won't re-prompt if already responded
-        // HealthKit doesn't reveal read authorization status for privacy, so we must
-        // request first and then try to fetch data
+        let endDate = Date()
+        let startDate = TimeRange.all.startDate(from: endDate)
+
+        // Load cached data FIRST (doesn't require HealthKit authorization)
+        // This allows immediate display while authorization/fetch happens
+        if let cachedData = try? await dataSource.fetchCachedSleepData(from: startDate, to: endDate), !cachedData.isEmpty {
+            sleepData = cachedData
+        }
+
+        // Load goals (needed for goal lines on charts)
+        goals = (try? await goalRepository.fetch(dataSource: .healthKitSleep)) ?? []
+
+        // Now request authorization (may show system prompt)
         do {
             isAuthorized = try await dataSource.requestAuthorization()
         } catch {
@@ -160,18 +170,7 @@ public final class SleepInsightsViewModel: InsightsSectionViewModel {
 
         guard isAuthorized else { return }
 
-        let endDate = Date()
-        let startDate = TimeRange.all.startDate(from: endDate)
-
-        // Load goals first (needed for goal lines on charts)
-        goals = (try? await goalRepository.fetch(dataSource: .healthKitSleep)) ?? []
-
-        // Display cached data immediately
-        if let cachedData = try? await dataSource.fetchCachedSleepData(from: startDate, to: endDate), !cachedData.isEmpty {
-            sleepData = cachedData
-        }
-
-        // Fetch fresh data (updates cache internally), then update UI
+        // Fetch fresh data from HealthKit (updates cache internally)
         do {
             sleepData = try await dataSource.fetchSleepData(from: startDate, to: endDate)
         } catch {

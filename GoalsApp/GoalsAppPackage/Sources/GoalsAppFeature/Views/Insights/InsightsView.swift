@@ -54,22 +54,32 @@ public struct InsightsView: View {
             }
             .task {
                 viewModels = container.makeInsightsViewModels()
-                await loadAll()
+                // Refresh immediately to show cards, then load data
                 refreshTrigger.toggle()
+                await loadAllWithRefresh()
             }
             .task(id: container.settingsRevision) {
                 guard container.settingsRevision > 0 else { return }
                 viewModels = container.makeInsightsViewModels()
-                await loadAll()
                 refreshTrigger.toggle()
+                await loadAllWithRefresh()
             }
         }
     }
 
-    private func loadAll() async {
+    private func loadAllWithRefresh() async {
+        // Load all view models in parallel, refreshing as each completes
         await withTaskGroup(of: Void.self) { group in
             for vm in viewModels {
-                group.addTask { await vm.loadData() }
+                group.addTask {
+                    await vm.loadData()
+                }
+            }
+            // Refresh after each task completes to show cached data quickly
+            for await _ in group {
+                await MainActor.run {
+                    refreshTrigger.toggle()
+                }
             }
         }
     }
