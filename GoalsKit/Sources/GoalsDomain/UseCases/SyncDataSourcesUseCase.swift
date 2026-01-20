@@ -13,38 +13,45 @@ public struct SyncDataSourcesUseCase: Sendable {
         self.dataSources = dataSources
     }
 
-    /// Syncs data from all configured data sources
+    /// Syncs data from all configured data sources in parallel
     public func syncAll() async throws -> SyncResult {
-        var results: [DataSourceType: SyncSourceResult] = [:]
+        // Run all syncs in parallel for better performance
+        await withTaskGroup(of: (DataSourceType, SyncSourceResult).self) { group in
+            for (sourceType, repository) in dataSources {
+                group.addTask {
+                    guard await repository.isConfigured() else {
+                        return (sourceType, SyncSourceResult(
+                            dataSource: sourceType,
+                            success: false,
+                            goalsUpdated: 0,
+                            error: SyncError.notConfigured
+                        ))
+                    }
 
-        for (sourceType, repository) in dataSources {
-            guard await repository.isConfigured() else {
-                results[sourceType] = SyncSourceResult(
-                    dataSource: sourceType,
-                    success: false,
-                    goalsUpdated: 0,
-                    error: SyncError.notConfigured
-                )
-                continue
+                    do {
+                        let result = try await self.syncDataSource(sourceType, repository: repository)
+                        return (sourceType, result)
+                    } catch {
+                        return (sourceType, SyncSourceResult(
+                            dataSource: sourceType,
+                            success: false,
+                            goalsUpdated: 0,
+                            error: error
+                        ))
+                    }
+                }
             }
 
-            do {
-                let result = try await syncDataSource(sourceType, repository: repository)
+            var results: [DataSourceType: SyncSourceResult] = [:]
+            for await (sourceType, result) in group {
                 results[sourceType] = result
-            } catch {
-                results[sourceType] = SyncSourceResult(
-                    dataSource: sourceType,
-                    success: false,
-                    goalsUpdated: 0,
-                    error: error
-                )
             }
-        }
 
-        return SyncResult(
-            timestamp: Date(),
-            sourceResults: results
-        )
+            return SyncResult(
+                timestamp: Date(),
+                sourceResults: results
+            )
+        }
     }
 
     /// Syncs data from a specific data source

@@ -74,7 +74,11 @@ public struct GoalsListView: View {
                 }
             }
             .task {
-                // Sync data sources first, then load goals
+                // Load goals immediately for fast display
+                await loadGoals()
+
+                // Configure data sources, then sync and refresh goals
+                await container.configureDataSources()
                 _ = try? await container.syncDataSourcesUseCase.syncAll()
                 await loadGoals()
             }
