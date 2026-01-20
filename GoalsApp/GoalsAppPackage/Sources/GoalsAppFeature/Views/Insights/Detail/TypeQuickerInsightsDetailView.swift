@@ -29,6 +29,7 @@ struct TypeQuickerInsightsDetailView: View {
                     if viewModel.uniqueModes.count > 1 {
                         modeLegend
                     }
+                    wpmAccuracySection
                 }
             }
             .padding()
@@ -153,6 +154,62 @@ struct TypeQuickerInsightsDetailView: View {
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
+            }
+        }
+        .padding(.top, 4)
+    }
+
+    private var wpmAccuracySection: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Divider()
+                .padding(.vertical, 8)
+
+            Text("WPM vs Accuracy")
+                .font(.subheadline)
+                .fontWeight(.medium)
+
+            WPMAccuracyChart(
+                dataPoints: filteredStats,
+                wpmGoal: viewModel.goalTarget(for: .wpm),
+                accuracyGoal: viewModel.goalTarget(for: .accuracy),
+                colorForMode: colorForMode
+            )
+
+            // Legend with mode colors and old/new fade indicator
+            wpmAccuracyLegend
+        }
+    }
+
+    private var wpmAccuracyLegend: some View {
+        let uniqueModes = Array(Set(filteredStats.map(\.mode))).sorted()
+        return VStack(spacing: 6) {
+            // Mode colors
+            ForEach(uniqueModes, id: \.self) { mode in
+                HStack {
+                    Circle()
+                        .fill(colorForMode(mode))
+                        .frame(width: 8, height: 8)
+                    Text(mode.capitalized)
+                        .font(.caption)
+                    Spacer()
+                }
+            }
+
+            // Temporal fade indicator
+            HStack(spacing: 4) {
+                LinearGradient(
+                    colors: [Color.primary.opacity(0.2), Color.primary.opacity(1.0)],
+                    startPoint: .leading,
+                    endPoint: .trailing
+                )
+                .frame(width: 40, height: 8)
+                .clipShape(RoundedRectangle(cornerRadius: 2))
+
+                Text("Old → New")
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+
+                Spacer()
             }
         }
         .padding(.top, 4)
