@@ -48,7 +48,10 @@ public struct InsightSummary: Sendable {
     public let currentValueFormatted: String
     public let trend: Double?  // percentage change, nil if insufficient data
     public let goalValue: Double?  // optional goal target to show as line
+    public let chartType: InsightChartType
+    public let durationRangeData: InsightDurationRangeData?
 
+    /// Initialize with sparkline chart type (default, backward compatible)
     public init(
         title: String,
         systemImage: String,
@@ -65,5 +68,27 @@ public struct InsightSummary: Sendable {
         self.currentValueFormatted = currentValueFormatted
         self.trend = trend
         self.goalValue = goalValue
+        self.chartType = .sparkline
+        self.durationRangeData = nil
+    }
+
+    /// Initialize with duration range chart type
+    public init(
+        title: String,
+        systemImage: String,
+        color: Color,
+        durationRangeData: InsightDurationRangeData,
+        currentValueFormatted: String,
+        trend: Double?
+    ) {
+        self.title = title
+        self.systemImage = systemImage
+        self.color = color
+        self.dataPoints = []
+        self.currentValueFormatted = currentValueFormatted
+        self.trend = trend
+        self.goalValue = nil
+        self.chartType = .durationRange
+        self.durationRangeData = durationRangeData
     }
 }

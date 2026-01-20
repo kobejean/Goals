@@ -70,21 +70,25 @@ public final class SleepInsightsViewModel: InsightsSectionViewModel {
     public var summary: InsightSummary? {
         guard !sleepData.isEmpty else { return nil }
 
-        // Limit to last 30 entries for sparkline chart performance
-        let recentData = sleepData.suffix(30)
-        let dataPoints = recentData.map {
-            InsightDataPoint(date: $0.date, value: $0.totalSleepHours)
+        // Limit to last 14 entries for duration range chart readability
+        let recentData = sleepData.suffix(14)
+        let rangeDataPoints = recentData.compactMap { summary in
+            SleepRangeDataPoint(from: summary).toDurationRangeDataPoint(color: .indigo)
         }
         let current = sleepData.last?.totalSleepHours ?? 0
+
+        let durationRangeData = InsightDurationRangeData(
+            dataPoints: rangeDataPoints,
+            defaultColor: .indigo
+        )
 
         return InsightSummary(
             title: "Sleep",
             systemImage: "bed.double.fill",
             color: .indigo,
-            dataPoints: dataPoints,
+            durationRangeData: durationRangeData,
             currentValueFormatted: formatSleepHours(current),
-            trend: sleepTrend,
-            goalValue: goalTarget(for: .duration)
+            trend: sleepTrend
         )
     }
 

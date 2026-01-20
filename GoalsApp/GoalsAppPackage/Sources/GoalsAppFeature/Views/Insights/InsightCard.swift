@@ -72,12 +72,20 @@ public struct InsightCard: View {
                 switch mode {
                 case .chart:
                     if let summary {
-                        SparklineChart(
-                            dataPoints: summary.dataPoints,
-                            color: summary.color,
-                            goalValue: summary.goalValue
-                        )
-                        .frame(height: 40)
+                        switch summary.chartType {
+                        case .sparkline:
+                            SparklineChart(
+                                dataPoints: summary.dataPoints,
+                                color: summary.color,
+                                goalValue: summary.goalValue
+                            )
+                            .frame(height: 40)
+                        case .durationRange:
+                            if let rangeData = summary.durationRangeData {
+                                DurationRangeChart(data: rangeData)
+                                    .frame(height: 40)
+                            }
+                        }
                     } else {
                         // Empty placeholder when no data
                         RoundedRectangle(cornerRadius: 4)
