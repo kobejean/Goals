@@ -16,7 +16,7 @@ public struct SyncDataSourcesUseCase: Sendable {
     /// Syncs data from all configured data sources in parallel
     public func syncAll() async throws -> SyncResult {
         // Run all syncs in parallel for better performance
-        await withTaskGroup(of: (DataSourceType, SyncSourceResult).self) { group in
+        return await withTaskGroup(of: (DataSourceType, SyncSourceResult).self) { group in
             for (sourceType, repository) in dataSources {
                 group.addTask {
                     guard await repository.isConfigured() else {
