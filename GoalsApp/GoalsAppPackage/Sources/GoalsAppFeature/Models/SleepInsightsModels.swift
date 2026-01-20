@@ -162,3 +162,19 @@ extension SleepStageType {
         }
     }
 }
+
+// MARK: - Duration Range Conversion
+
+extension SleepRangeDataPoint {
+    /// Convert sleep range data to duration range format for insight cards
+    public func toDurationRangeDataPoint(color: Color = .indigo) -> DurationRangeDataPoint? {
+        guard let bedtime = bedtime, let wakeTime = wakeTime else { return nil }
+
+        let segment = DurationSegment(
+            startTime: bedtime,
+            endTime: wakeTime,
+            color: color
+        )
+        return DurationRangeDataPoint(date: date, segments: [segment])
+    }
+}
