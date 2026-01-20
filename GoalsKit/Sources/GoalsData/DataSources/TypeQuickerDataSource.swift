@@ -90,7 +90,8 @@ public actor TypeQuickerDataSource: TypeQuickerDataSourceProtocol {
 
     public func fetchLatestStats() async throws -> TypeQuickerStats? {
         let endDate = Date()
-        let startDate = Calendar.current.date(byAdding: .day, value: -7, to: endDate) ?? endDate
+        // Use 90 days lookback to find recent stats (user may not type every day)
+        let startDate = Calendar.current.date(byAdding: .day, value: -90, to: endDate) ?? endDate
         let stats = try await fetchStats(from: startDate, to: endDate)
         return stats.last
     }
@@ -107,8 +108,14 @@ public actor TypeQuickerDataSource: TypeQuickerDataSourceProtocol {
 
 /// API response structure from TypeQuicker
 /// Format: { "activity": { "2026-01-11": [{ "wpm": 45, ... }], ... } }
+/// Note: API may return {} or {"activity": null} for empty date ranges
 private struct TypeQuickerAPIResponse: Codable {
-    let activity: [String: [Session]]
+    let activity: [String: [Session]]?
+
+    // Handle empty responses gracefully
+    var safeActivity: [String: [Session]] {
+        activity ?? [:]
+    }
 
     struct Session: Codable {
         let wpm: Double
@@ -126,7 +133,7 @@ private struct TypeQuickerAPIResponse: Codable {
         let dateFormatter = DateFormatter()
         dateFormatter.dateFormat = "yyyy-MM-dd"
 
-        return activity.compactMap { (dateString, sessions) -> TypeQuickerStats? in
+        return safeActivity.compactMap { (dateString, sessions) -> TypeQuickerStats? in
             guard let date = dateFormatter.date(from: dateString), !sessions.isEmpty else {
                 return nil
             }
@@ -162,7 +169,7 @@ private struct TypeQuickerAPIResponse: Codable {
 
     /// Aggregate all sessions by mode across all dates
     func toStatsByMode() -> [TypeQuickerModeStats] {
-        let allSessions = activity.values.flatMap { $0 }
+        let allSessions = safeActivity.values.flatMap { $0 }
         return aggregateByMode(sessions: allSessions)
     }
 

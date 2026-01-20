@@ -28,10 +28,20 @@ public actor CachedTypeQuickerDataSource: TypeQuickerDataSourceProtocol, Caching
 
         // Calculate and fetch missing ranges
         let missingRanges = calculateMissingDateRanges(from: startDate, to: endDate, cachedDates: cachedDates)
+
         for range in missingRanges {
-            let remoteStats = try await remote.fetchStats(from: range.start, to: range.end)
-            if !remoteStats.isEmpty {
-                try await cache.store(remoteStats)
+            do {
+                let remoteStats = try await remote.fetchStats(from: range.start, to: range.end)
+                if !remoteStats.isEmpty {
+                    try await cache.store(remoteStats)
+                }
+            } catch {
+                // Don't fail if we already have cached data - use what we have
+                if !cachedStats.isEmpty {
+                    break
+                }
+                // Only throw if we have no cached data at all
+                throw error
             }
         }
 
@@ -41,7 +51,8 @@ public actor CachedTypeQuickerDataSource: TypeQuickerDataSourceProtocol, Caching
 
     public func fetchLatestStats() async throws -> TypeQuickerStats? {
         let endDate = Date()
-        let startDate = Calendar.current.date(byAdding: .day, value: -7, to: endDate) ?? endDate
+        // Use 90 days lookback to find recent stats (user may not type every day)
+        let startDate = Calendar.current.date(byAdding: .day, value: -90, to: endDate) ?? endDate
         let stats = try await fetchStats(from: startDate, to: endDate)
         return stats.last
     }
