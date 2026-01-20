@@ -11,6 +11,9 @@ public enum DataSourceType: String, Codable, Sendable, CaseIterable {
     /// HealthKit sleep data
     case healthKitSleep
 
+    /// Manual task time tracking
+    case tasks
+
     /// Display name for the data source
     public var displayName: String {
         switch self {
@@ -20,6 +23,8 @@ public enum DataSourceType: String, Codable, Sendable, CaseIterable {
             return "AtCoder"
         case .healthKitSleep:
             return "Sleep"
+        case .tasks:
+            return "Tasks"
         }
     }
 
@@ -32,6 +37,8 @@ public enum DataSourceType: String, Codable, Sendable, CaseIterable {
             return "chevron.left.forwardslash.chevron.right"
         case .healthKitSleep:
             return "bed.double.fill"
+        case .tasks:
+            return "timer"
         }
     }
 
@@ -44,6 +51,8 @@ public enum DataSourceType: String, Codable, Sendable, CaseIterable {
             return "Competitive programming rating, contests, and problems solved"
         case .healthKitSleep:
             return "Sleep duration, stages, and quality from HealthKit"
+        case .tasks:
+            return "Manual time tracking for tasks and activities"
         }
     }
 }

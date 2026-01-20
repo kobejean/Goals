@@ -12,6 +12,11 @@ public struct ContentView: View {
                 .tabItem { AppTab.insights.label }
                 .accessibilityIdentifier("tab-insights")
 
+            TasksView()
+                .tag(AppTab.tasks)
+                .tabItem { AppTab.tasks.label }
+                .accessibilityIdentifier("tab-tasks")
+
             GoalsListView()
                 .tag(AppTab.goals)
                 .tabItem { AppTab.goals.label }

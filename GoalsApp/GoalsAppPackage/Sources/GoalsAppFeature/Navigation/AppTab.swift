@@ -3,6 +3,7 @@ import SwiftUI
 /// Represents the main navigation tabs in the app
 public enum AppTab: String, CaseIterable, Identifiable {
     case insights
+    case tasks
     case goals
     case settings
 
@@ -14,6 +15,8 @@ public enum AppTab: String, CaseIterable, Identifiable {
             return "Goals"
         case .insights:
             return "Insights"
+        case .tasks:
+            return "Tasks"
         case .settings:
             return "Settings"
         }
@@ -25,6 +28,8 @@ public enum AppTab: String, CaseIterable, Identifiable {
             return "target"
         case .insights:
             return "chart.line.uptrend.xyaxis"
+        case .tasks:
+            return "timer"
         case .settings:
             return "gearshape"
         }
