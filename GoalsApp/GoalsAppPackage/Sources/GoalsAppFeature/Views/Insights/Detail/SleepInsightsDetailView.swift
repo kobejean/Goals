@@ -154,10 +154,6 @@ struct SleepInsightsDetailView: View {
                     .foregroundStyle(.indigo)
                 Text("Sleep Summary")
                     .font(.headline)
-                Spacer()
-                if let trend = viewModel.sleepTrend {
-                    TrendBadge(trend: trend)
-                }
             }
 
             LazyVGrid(columns: [
