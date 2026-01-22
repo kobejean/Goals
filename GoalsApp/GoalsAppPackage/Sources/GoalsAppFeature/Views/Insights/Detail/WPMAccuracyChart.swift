@@ -9,9 +9,39 @@ struct WPMAccuracyChart: View {
     let accuracyGoal: Double?
     let colorForMode: (String) -> Color
 
+    private let movingAverageWindow = 5
+    private let defaultSymbolSize: CGFloat = 6
+    private let lastSymbolSize: CGFloat = 10
+    private let lineWidth: CGFloat = 2.5
+    private let openCircleLineWidth: CGFloat = 2
+
     var body: some View {
         Chart {
-            // Goal lines only - curved lines drawn as overlay
+            // Scatter points with temporal alpha
+            ForEach(uniqueModes, id: \.self) { mode in
+                let points = sortedPoints(for: mode)
+                let color = colorForMode(mode)
+                ForEach(Array(points.enumerated()), id: \.element.id) { index, point in
+                    let isLast = index == points.count - 1
+                    let pointAlpha = alpha(for: index, total: points.count)
+                    PointMark(
+                        x: .value("WPM", point.wpm),
+                        y: .value("Accuracy", point.accuracy)
+                    )
+                    .symbol {
+                        if isLast {
+                            Circle()
+                                .strokeBorder(color, lineWidth: openCircleLineWidth)
+                                .frame(width: lastSymbolSize, height: lastSymbolSize)
+                        } else {
+                            Circle()
+                                .fill(color.opacity(pointAlpha))
+                                .frame(width: defaultSymbolSize, height: defaultSymbolSize)
+                        }
+                    }
+                }
+            }
+
             // WPM goal line (vertical)
             if let wpmGoal {
                 RuleMark(x: .value("WPM Goal", wpmGoal))
@@ -48,14 +78,21 @@ struct WPMAccuracyChart: View {
         .chartXAxisLabel("WPM")
         .chartYAxisLabel("Accuracy (%)")
         .chartLegend(.hidden)
-        .chartBackground { proxy in
-            // Draw curved gradient lines for each mode
-            ForEach(uniqueModes, id: \.self) { mode in
-                CurvedGradientLine(
-                    points: sortedPoints(for: mode),
-                    color: colorForMode(mode),
-                    proxy: proxy
-                )
+        .chartBackground { chart in
+            GeometryReader { geometry in
+                if let plotFrame = chart.plotFrame {
+                    let frame = geometry[plotFrame]
+
+                    ForEach(uniqueModes, id: \.self) { mode in
+                        MovingAverageLine(
+                            points: movingAverage(for: mode),
+                            color: colorForMode(mode),
+                            chart: chart,
+                            plotOrigin: frame.origin,
+                            lineWidth: lineWidth
+                        )
+                    }
+                }
             }
         }
     }
@@ -68,6 +105,28 @@ struct WPMAccuracyChart: View {
 
     private func sortedPoints(for mode: String) -> [TypeQuickerModeDataPoint] {
         dataPoints.filter { $0.mode == mode }.sorted { $0.date < $1.date }
+    }
+
+    private func alpha(for index: Int, total: Int) -> Double {
+        guard total > 1 else { return 1.0 }
+        return 0.20 + (0.8 * Double(index) / Double(total - 1))
+    }
+
+    private func movingAverage(for mode: String) -> [(wpm: Double, accuracy: Double)] {
+        let points = sortedPoints(for: mode)
+        guard points.count >= 2 else {
+            return points.map { (wpm: $0.wpm, accuracy: $0.accuracy) }
+        }
+
+        var result: [(wpm: Double, accuracy: Double)] = []
+        for i in 0..<points.count {
+            let windowStart = max(0, i - movingAverageWindow + 1)
+            let window = points[windowStart...i]
+            let avgWpm = window.reduce(0.0) { $0 + $1.wpm } / Double(window.count)
+            let avgAcc = window.reduce(0.0) { $0 + $1.accuracy } / Double(window.count)
+            result.append((wpm: avgWpm, accuracy: avgAcc))
+        }
+        return result
     }
 
     // MARK: - Axis Ranges
@@ -99,69 +158,58 @@ struct WPMAccuracyChart: View {
     }
 }
 
-// MARK: - Curved Gradient Line
+// MARK: - Moving Average Line
 
-private struct CurvedGradientLine: View {
-    let points: [TypeQuickerModeDataPoint]
+private struct MovingAverageLine: View {
+    let points: [(wpm: Double, accuracy: Double)]
     let color: Color
-    let proxy: ChartProxy
+    let chart: ChartProxy
+    let plotOrigin: CGPoint
+    let lineWidth: CGFloat
 
     var body: some View {
-        if points.count >= 2 {
-            CatmullRomPath(cgPoints: convertedPoints)
-                .stroke(
-                    LinearGradient(
-                        colors: [color.opacity(0.15), color.opacity(1.0)],
-                        startPoint: startPoint,
-                        endPoint: endPoint
-                    ),
-                    style: StrokeStyle(lineWidth: 2.5, lineCap: .round, lineJoin: .round)
-                )
-        }
-    }
+        Canvas { context, _ in
+            guard points.count >= 2 else { return }
 
-    private var convertedPoints: [CGPoint] {
-        points.compactMap { point in
-            guard let x = proxy.position(forX: point.wpm),
-                  let y = proxy.position(forY: point.accuracy) else {
-                return nil
+            let cgPoints = points.compactMap { point -> CGPoint? in
+                guard let x = chart.position(forX: point.wpm),
+                      let y = chart.position(forY: point.accuracy) else {
+                    return nil
+                }
+                // Offset by plot origin to align with chart coordinate system
+                return CGPoint(x: plotOrigin.x + x, y: plotOrigin.y + y)
             }
-            return CGPoint(x: x, y: y)
+
+            guard cgPoints.count >= 2 else { return }
+
+            let path = createCatmullRomPath(from: cgPoints)
+
+            // Create gradient from first to last point
+            let gradient = Gradient(colors: [color.opacity(0.15), color.opacity(1.0)])
+            let shading = GraphicsContext.Shading.linearGradient(
+                gradient,
+                startPoint: cgPoints.first!,
+                endPoint: cgPoints.last!
+            )
+
+            context.stroke(
+                path,
+                with: shading,
+                style: StrokeStyle(lineWidth: lineWidth, lineCap: .round, lineJoin: .round)
+            )
         }
     }
 
-    private var startPoint: UnitPoint {
-        guard let first = convertedPoints.first else { return .leading }
-        let plotArea = proxy.plotSize
-        return UnitPoint(x: first.x / plotArea.width, y: first.y / plotArea.height)
-    }
-
-    private var endPoint: UnitPoint {
-        guard let last = convertedPoints.last else { return .trailing }
-        let plotArea = proxy.plotSize
-        return UnitPoint(x: last.x / plotArea.width, y: last.y / plotArea.height)
-    }
-}
-
-// MARK: - Catmull-Rom Spline Path
-
-private struct CatmullRomPath: Shape {
-    let cgPoints: [CGPoint]
-
-    func path(in rect: CGRect) -> Path {
-        guard cgPoints.count >= 2 else { return Path() }
-
+    private func createCatmullRomPath(from cgPoints: [CGPoint]) -> Path {
         var path = Path()
 
         if cgPoints.count == 2 {
-            // Just draw a line for 2 points
             path.move(to: cgPoints[0])
             path.addLine(to: cgPoints[1])
             return path
         }
 
-        // For Catmull-Rom, we need to handle endpoints specially
-        // Add phantom points at start and end
+        // Add phantom points at start and end for Catmull-Rom
         let points = [cgPoints[0]] + cgPoints + [cgPoints[cgPoints.count - 1]]
 
         path.move(to: points[1])
@@ -172,7 +220,6 @@ private struct CatmullRomPath: Shape {
             let p2 = points[i + 1]
             let p3 = points[i + 2]
 
-            // Generate curve segments
             let segments = 20
             for t in 1...segments {
                 let t = CGFloat(t) / CGFloat(segments)
