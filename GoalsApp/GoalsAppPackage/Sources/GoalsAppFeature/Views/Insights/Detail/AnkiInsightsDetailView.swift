@@ -56,7 +56,7 @@ struct AnkiInsightsDetailView: View {
     private var headerSection: some View {
         HStack {
             Image(systemName: "rectangle.stack")
-                .foregroundStyle(.purple)
+                .foregroundStyle(.red)
             Text("Anki Learning")
                 .font(.headline)
         }
@@ -100,7 +100,7 @@ struct AnkiInsightsDetailView: View {
                     value: formatNumber(viewModel.totalReviews),
                     unit: "cards",
                     icon: "rectangle.stack.fill",
-                    color: .purple
+                    color: .red
                 )
                 statCard(
                     title: "Avg Retention",
@@ -159,7 +159,7 @@ struct AnkiInsightsDetailView: View {
                     x: .value("Date", point.date, unit: .day),
                     y: .value(viewModel.selectedMetric.displayName, point.value(for: viewModel.selectedMetric))
                 )
-                .foregroundStyle(.purple.opacity(0.4))
+                .foregroundStyle(.red.opacity(0.4))
                 .symbolSize(30)
             }
 
@@ -169,7 +169,7 @@ struct AnkiInsightsDetailView: View {
                     x: .value("Date", point.date, unit: .day),
                     y: .value("Moving Avg", point.value)
                 )
-                .foregroundStyle(.purple)
+                .foregroundStyle(.red)
                 .lineStyle(StrokeStyle(lineWidth: 2.5))
             }
 

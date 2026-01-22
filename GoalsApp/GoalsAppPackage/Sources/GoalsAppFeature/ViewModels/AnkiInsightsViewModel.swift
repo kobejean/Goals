@@ -11,7 +11,7 @@ public final class AnkiInsightsViewModel: InsightsSectionViewModel {
 
     public let title = "Anki"
     public let systemImage = "rectangle.stack"
-    public let color: Color = .purple
+    public let color: Color = .red
 
     // MARK: - Published State
 

@@ -43,7 +43,7 @@ public enum InsightType: String, CaseIterable, Codable, Sendable {
         case .atCoder: return Self.brandGreen
         case .sleep: return .indigo
         case .tasks: return .orange
-        case .anki: return .purple
+        case .anki: return .red
         }
     }
 
