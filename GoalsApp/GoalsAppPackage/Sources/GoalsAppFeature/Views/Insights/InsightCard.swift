@@ -1,8 +1,30 @@
 import SwiftUI
+import UniformTypeIdentifiers
+
+/// Identifies each type of insight card for ordering/persistence
+public enum InsightType: String, CaseIterable, Codable, Sendable {
+    case typeQuicker
+    case atCoder
+    case sleep
+    case tasks
+    case anki
+
+    /// Default order for insight cards
+    public static let defaultOrder: [InsightType] = [.typeQuicker, .atCoder, .sleep, .tasks, .anki]
+}
+
+// MARK: - Transferable for Drag & Drop
+
+extension InsightType: Transferable {
+    public static var transferRepresentation: some TransferRepresentation {
+        CodableRepresentation(contentType: .text)
+    }
+}
 
 /// Configuration for an insight card in the overview
 public struct InsightCardConfig: Identifiable {
-    public let id = UUID()
+    public var id: InsightType { type }
+    public let type: InsightType
     public let title: String
     public let systemImage: String
     public let color: Color
@@ -11,6 +33,7 @@ public struct InsightCardConfig: Identifiable {
     public let makeDetailView: @MainActor () -> AnyView
 
     public init(
+        type: InsightType,
         title: String,
         systemImage: String,
         color: Color,
@@ -18,6 +41,7 @@ public struct InsightCardConfig: Identifiable {
         activityData: InsightActivityData?,
         makeDetailView: @escaping @MainActor () -> AnyView
     ) {
+        self.type = type
         self.title = title
         self.systemImage = systemImage
         self.color = color

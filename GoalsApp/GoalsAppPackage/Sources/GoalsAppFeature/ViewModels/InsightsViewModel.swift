@@ -14,6 +14,15 @@ public final class InsightsViewModel {
     public let tasks: TasksInsightsViewModel
     public let anki: AnkiInsightsViewModel
 
+    // MARK: - Card Ordering
+
+    /// Current order of insight cards (persisted to UserDefaults)
+    public var cardOrder: [InsightType] {
+        didSet {
+            saveCardOrder()
+        }
+    }
+
     // MARK: - Initialization
 
     public init(
@@ -44,26 +53,36 @@ public final class InsightsViewModel {
             dataSource: ankiDataSource,
             goalRepository: goalRepository
         )
+
+        // Load persisted card order or use default
+        self.cardOrder = Self.loadCardOrder()
     }
 
     // MARK: - Card Data (computed from owned view models)
 
-    /// All insight cards for display
+    /// All insight cards for display, ordered by cardOrder
     public var cards: [InsightCardConfig] {
+        cardOrder.compactMap { type in
+            allCards[type]
+        }
+    }
+
+    /// Dictionary of all available cards by type
+    private var allCards: [InsightType: InsightCardConfig] {
         [
-            makeCardConfig(from: typeQuicker) {
+            .typeQuicker: makeCardConfig(type: .typeQuicker, from: typeQuicker) {
                 AnyView(TypeQuickerInsightsDetailView(viewModel: self.typeQuicker))
             },
-            makeCardConfig(from: atCoder) {
+            .atCoder: makeCardConfig(type: .atCoder, from: atCoder) {
                 AnyView(AtCoderInsightsDetailView(viewModel: self.atCoder))
             },
-            makeCardConfig(from: sleep) {
+            .sleep: makeCardConfig(type: .sleep, from: sleep) {
                 AnyView(SleepInsightsDetailView(viewModel: self.sleep))
             },
-            makeCardConfig(from: tasks) {
+            .tasks: makeCardConfig(type: .tasks, from: tasks) {
                 AnyView(TasksInsightsDetailView(viewModel: self.tasks))
             },
-            makeCardConfig(from: anki) {
+            .anki: makeCardConfig(type: .anki, from: anki) {
                 AnyView(AnkiInsightsDetailView(viewModel: self.anki))
             }
         ]
@@ -71,10 +90,12 @@ public final class InsightsViewModel {
 
     /// Factory method to create card config from any InsightsSectionViewModel
     private func makeCardConfig<VM: InsightsSectionViewModel>(
+        type: InsightType,
         from viewModel: VM,
         detailView: @escaping @MainActor () -> AnyView
     ) -> InsightCardConfig {
         InsightCardConfig(
+            type: type,
             title: viewModel.title,
             systemImage: viewModel.systemImage,
             color: viewModel.color,
@@ -82,6 +103,34 @@ public final class InsightsViewModel {
             activityData: viewModel.activityData,
             makeDetailView: detailView
         )
+    }
+
+    // MARK: - Card Reordering
+
+    /// Move a card from one position to another
+    public func moveCard(from source: IndexSet, to destination: Int) {
+        cardOrder.move(fromOffsets: source, toOffset: destination)
+    }
+
+    // MARK: - Persistence
+
+    private static func loadCardOrder() -> [InsightType] {
+        guard let data = UserDefaults.standard.data(forKey: UserDefaultsKeys.insightsCardOrder),
+              let order = try? JSONDecoder().decode([InsightType].self, from: data) else {
+            return InsightType.defaultOrder
+        }
+
+        // Ensure all types are present (handles new types added in updates)
+        var result = order.filter { InsightType.allCases.contains($0) }
+        for type in InsightType.allCases where !result.contains(type) {
+            result.append(type)
+        }
+        return result
+    }
+
+    private func saveCardOrder() {
+        guard let data = try? JSONEncoder().encode(cardOrder) else { return }
+        UserDefaults.standard.set(data, forKey: UserDefaultsKeys.insightsCardOrder)
     }
 
     // MARK: - Data Loading

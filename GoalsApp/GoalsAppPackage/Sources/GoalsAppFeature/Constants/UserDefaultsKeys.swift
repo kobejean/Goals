@@ -8,6 +8,9 @@ public enum UserDefaultsKeys {
     public static let ankiPort = "ankiPort"
     public static let ankiDecks = "ankiDecks"
 
+    // Insights card order
+    public static let insightsCardOrder = "insightsCardOrder"
+
     // Insights time range keys (per detail view)
     public static let typeQuickerInsightsTimeRange = "typeQuickerInsightsTimeRange"
     public static let sleepInsightsTimeRange = "sleepInsightsTimeRange"
