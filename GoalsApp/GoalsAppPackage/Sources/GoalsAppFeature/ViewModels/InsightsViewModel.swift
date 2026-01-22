@@ -105,6 +105,7 @@ public final class InsightsViewModel {
             color: viewModel.color,
             summary: viewModel.summary,
             activityData: viewModel.activityData,
+            fetchStatus: viewModel.fetchStatus,
             makeDetailView: detailView
         )
     }

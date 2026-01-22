@@ -20,6 +20,7 @@ public final class AtCoderInsightsViewModel: InsightsSectionViewModel {
     public private(set) var dailyEffort: [AtCoderDailyEffort] = []
     public private(set) var goals: [Goal] = []
     public private(set) var errorMessage: String?
+    public private(set) var fetchStatus: InsightFetchStatus = .idle
 
     // MARK: - Dependencies
 
@@ -69,6 +70,7 @@ public final class AtCoderInsightsViewModel: InsightsSectionViewModel {
 
     public func loadData() async {
         errorMessage = nil
+        fetchStatus = .loading
 
         // Configure from saved settings if available
         if let username = UserDefaults.standard.atCoderUsername, !username.isEmpty {
@@ -82,6 +84,7 @@ public final class AtCoderInsightsViewModel: InsightsSectionViewModel {
         // Check if configured
         guard await dataSource.isConfigured() else {
             errorMessage = "Configure your AtCoder username in Settings"
+            fetchStatus = .error
             return
         }
 
@@ -108,10 +111,15 @@ public final class AtCoderInsightsViewModel: InsightsSectionViewModel {
             stats = try await statsTask
             dailyEffort = try await effortTask
             contestHistory = try await historyTask
+            fetchStatus = .success
         } catch {
             // Keep cached data on error
             if contestHistory.isEmpty {
                 errorMessage = "Failed to load data: \(error.localizedDescription)"
+                fetchStatus = .error
+            } else {
+                // Have cached data, show success despite fetch error
+                fetchStatus = .success
             }
         }
     }

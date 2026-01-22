@@ -18,6 +18,7 @@ public final class AnkiInsightsViewModel: InsightsSectionViewModel {
     public private(set) var stats: [AnkiDailyStats] = []
     public private(set) var goals: [Goal] = []
     public private(set) var errorMessage: String?
+    public private(set) var fetchStatus: InsightFetchStatus = .idle
     public var selectedMetric: AnkiMetric = .reviews
 
     // MARK: - Dependencies
@@ -145,6 +146,7 @@ public final class AnkiInsightsViewModel: InsightsSectionViewModel {
 
     public func loadData() async {
         errorMessage = nil
+        fetchStatus = .loading
 
         // Configure from saved settings if available
         if let host = UserDefaults.standard.ankiHost, !host.isEmpty {
@@ -159,6 +161,7 @@ public final class AnkiInsightsViewModel: InsightsSectionViewModel {
 
         guard await dataSource.isConfigured() else {
             errorMessage = "Configure Anki connection in Settings"
+            fetchStatus = .error
             return
         }
 
@@ -176,10 +179,15 @@ public final class AnkiInsightsViewModel: InsightsSectionViewModel {
         // Fetch fresh stats (updates cache internally), then update UI
         do {
             stats = try await dataSource.fetchDailyStats(from: startDate, to: endDate)
+            fetchStatus = .success
         } catch {
             // Keep cached data on error (Anki might not be running)
             if stats.isEmpty {
                 errorMessage = "Unable to connect to Anki. Make sure Anki is running with AnkiConnect installed."
+                fetchStatus = .error
+            } else {
+                // Have cached data, show success despite fetch error
+                fetchStatus = .success
             }
         }
     }

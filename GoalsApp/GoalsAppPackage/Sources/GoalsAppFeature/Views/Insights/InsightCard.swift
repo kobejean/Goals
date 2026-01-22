@@ -13,6 +13,7 @@ public struct InsightCardConfig: Identifiable {
     public let color: Color
     public let summary: InsightSummary?
     public let activityData: InsightActivityData?
+    public let fetchStatus: InsightFetchStatus
     public let makeDetailView: @MainActor () -> AnyView
 
     public init(
@@ -22,6 +23,7 @@ public struct InsightCardConfig: Identifiable {
         color: Color,
         summary: InsightSummary?,
         activityData: InsightActivityData?,
+        fetchStatus: InsightFetchStatus,
         makeDetailView: @escaping @MainActor () -> AnyView
     ) {
         self.type = type
@@ -30,6 +32,7 @@ public struct InsightCardConfig: Identifiable {
         self.color = color
         self.summary = summary
         self.activityData = activityData
+        self.fetchStatus = fetchStatus
         self.makeDetailView = makeDetailView
     }
 }

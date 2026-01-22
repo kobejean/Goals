@@ -19,6 +19,7 @@ public final class TasksInsightsViewModel: InsightsSectionViewModel {
     public private(set) var sessions: [TaskSession] = []
     public private(set) var goals: [Goal] = []
     public private(set) var errorMessage: String?
+    public private(set) var fetchStatus: InsightFetchStatus = .idle
 
     // MARK: - Dependencies
 
@@ -192,6 +193,7 @@ public final class TasksInsightsViewModel: InsightsSectionViewModel {
 
     public func loadData() async {
         errorMessage = nil
+        fetchStatus = .loading
 
         let endDate = Date()
         let startDate = TimeRange.all.startDate(from: endDate)
@@ -211,8 +213,10 @@ public final class TasksInsightsViewModel: InsightsSectionViewModel {
 
             // Sync to cache for widget access
             try? await taskCachingService?.syncToCache(from: startDate, to: endDate)
+            fetchStatus = .success
         } catch {
             errorMessage = "Failed to load task data: \(error.localizedDescription)"
+            fetchStatus = .error
         }
     }
 
