@@ -12,5 +12,6 @@ import SwiftUI
 struct GoalsWidgetBundle: WidgetBundle {
     var body: some Widget {
         InsightWidget()
+        TaskControlPanelWidget()
     }
 }
