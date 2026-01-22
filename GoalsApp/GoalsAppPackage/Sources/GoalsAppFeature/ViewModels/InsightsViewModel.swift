@@ -15,6 +15,7 @@ public final class InsightsViewModel {
     public let sleep: SleepInsightsViewModel
     public let tasks: TasksInsightsViewModel
     public let anki: AnkiInsightsViewModel
+    public let zotero: ZoteroInsightsViewModel
 
     // MARK: - Card Ordering
 
@@ -34,6 +35,7 @@ public final class InsightsViewModel {
         taskRepository: TaskRepositoryProtocol,
         goalRepository: GoalRepositoryProtocol,
         ankiDataSource: CachedAnkiDataSource,
+        zoteroDataSource: CachedZoteroDataSource,
         taskCachingService: TaskCachingService? = nil
     ) {
         self.typeQuicker = TypeQuickerInsightsViewModel(
@@ -55,6 +57,10 @@ public final class InsightsViewModel {
         )
         self.anki = AnkiInsightsViewModel(
             dataSource: ankiDataSource,
+            goalRepository: goalRepository
+        )
+        self.zotero = ZoteroInsightsViewModel(
+            dataSource: zoteroDataSource,
             goalRepository: goalRepository
         )
 
@@ -88,6 +94,9 @@ public final class InsightsViewModel {
             },
             .anki: makeCardConfig(type: .anki, from: anki) {
                 AnyView(AnkiInsightsDetailView(viewModel: self.anki))
+            },
+            .zotero: makeCardConfig(type: .zotero, from: zotero) {
+                AnyView(ZoteroInsightsDetailView(viewModel: self.zotero))
             }
         ]
     }
@@ -150,6 +159,7 @@ public final class InsightsViewModel {
             group.addTask { await self.sleep.loadData() }
             group.addTask { await self.tasks.loadData() }
             group.addTask { await self.anki.loadData() }
+            group.addTask { await self.zotero.loadData() }
         }
 
         // Trigger widget refresh after all data is loaded

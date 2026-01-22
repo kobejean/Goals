@@ -11,9 +11,16 @@ public struct SettingsView: View {
     @State private var ankiPort = "8765"
     @State private var ankiDecks = ""
     @State private var ankiConnectionStatus: AnkiConnectionStatus = .unknown
+    @State private var zoteroAPIKey = ""
+    @State private var zoteroUserID = ""
+    @State private var zoteroToReadCollection = ""
+    @State private var zoteroInProgressCollection = ""
+    @State private var zoteroReadCollection = ""
+    @State private var zoteroConnectionStatus: ZoteroConnectionStatus = .unknown
     @State private var typeQuickerSaveState: SaveState = .idle
     @State private var atCoderSaveState: SaveState = .idle
     @State private var ankiSaveState: SaveState = .idle
+    @State private var zoteroSaveState: SaveState = .idle
 
     enum SaveState {
         case idle
@@ -28,130 +35,196 @@ public struct SettingsView: View {
         case disconnected
     }
 
+    enum ZoteroConnectionStatus {
+        case unknown
+        case testing
+        case connected
+        case disconnected
+        case unauthorized  // Invalid API key or permissions
+    }
+
     public var body: some View {
         NavigationStack {
             Form {
-                // Data Sources
-                Section {
-                    DataSourceRow(
-                        title: "TypeQuicker",
-                        icon: "keyboard",
-                        username: $typeQuickerUsername,
-                        placeholder: "Enter username"
-                    )
-
-                    DataSourceRow(
-                        title: "AtCoder",
-                        icon: "chevron.left.forwardslash.chevron.right",
-                        username: $atCoderUsername,
-                        placeholder: "Enter username"
-                    )
-                } header: {
-                    Text("Data Sources")
-                } footer: {
-                }
-
-                // Anki Settings
-                Section {
-                    HStack {
-                        Label("Host", systemImage: "network")
-                        Spacer()
-                        TextField("localhost", text: $ankiHost)
-                            .multilineTextAlignment(.trailing)
-                            .textInputAutocapitalization(.never)
-                            .autocorrectionDisabled()
-                            .foregroundStyle(.secondary)
-                    }
-
-                    HStack {
-                        Label("Port", systemImage: "number")
-                        Spacer()
-                        TextField("8765", text: $ankiPort)
-                            .multilineTextAlignment(.trailing)
-                            .keyboardType(.numberPad)
-                            .foregroundStyle(.secondary)
-                    }
-
-                    HStack {
-                        Label("Decks", systemImage: "rectangle.stack")
-                        Spacer()
-                        TextField("All decks", text: $ankiDecks)
-                            .multilineTextAlignment(.trailing)
-                            .textInputAutocapitalization(.never)
-                            .autocorrectionDisabled()
-                            .foregroundStyle(.secondary)
-                    }
-
-                    HStack {
-                        Text("Status")
-                        Spacer()
-                        ankiStatusView
-                    }
-
-                    Button {
-                        Task {
-                            await testAnkiConnection()
-                        }
-                    } label: {
-                        HStack {
-                            Spacer()
-                            Text("Test Connection")
-                            Spacer()
-                        }
-                    }
-                    .disabled(ankiHost.isEmpty)
-                } header: {
-                    Text("Anki")
-                } footer: {
-                    Text("Enter comma-separated deck names to track specific decks, or leave empty for all decks. Anki must be running with AnkiConnect installed.")
-                }
-
-                // About
-                Section("About") {
-                    HStack {
-                        Text("Version")
-                        Spacer()
-                        Text("1.0.0")
-                            .foregroundStyle(.secondary)
-                    }
-
-                    Link(destination: URL(string: "https://github.com/kobejean/Goals")!) {
-                        HStack {
-                            Text("Source Code")
-                            Spacer()
-                            Image(systemName: "arrow.up.right")
-                                .foregroundStyle(.secondary)
-                        }
-                    }
-                }
+                dataSourcesSection
+                ankiSection
+                zoteroSection
+                aboutSection
             }
             .navigationTitle("Settings")
             .task {
                 await loadSettings()
             }
             .onChange(of: typeQuickerUsername) { _, newValue in
-                Task {
-                    await saveTypeQuickerSettings(username: newValue)
-                }
+                Task { await saveTypeQuickerSettings(username: newValue) }
             }
             .onChange(of: atCoderUsername) { _, newValue in
-                Task {
-                    await saveAtCoderSettings(username: newValue)
+                Task { await saveAtCoderSettings(username: newValue) }
+            }
+            .onChange(of: ankiHost) { _, _ in Task { await saveAnkiSettings() } }
+            .onChange(of: ankiPort) { _, _ in Task { await saveAnkiSettings() } }
+            .onChange(of: ankiDecks) { _, _ in Task { await saveAnkiSettings() } }
+            .onChange(of: zoteroAPIKey) { _, _ in Task { await saveZoteroSettings() } }
+            .onChange(of: zoteroUserID) { _, _ in Task { await saveZoteroSettings() } }
+            .onChange(of: zoteroToReadCollection) { _, _ in Task { await saveZoteroSettings() } }
+            .onChange(of: zoteroInProgressCollection) { _, _ in Task { await saveZoteroSettings() } }
+            .onChange(of: zoteroReadCollection) { _, _ in Task { await saveZoteroSettings() } }
+        }
+    }
+
+    // MARK: - Section Views
+
+    private var dataSourcesSection: some View {
+        Section {
+            DataSourceRow(
+                title: "TypeQuicker",
+                icon: "keyboard",
+                username: $typeQuickerUsername,
+                placeholder: "Enter username"
+            )
+            DataSourceRow(
+                title: "AtCoder",
+                icon: "chevron.left.forwardslash.chevron.right",
+                username: $atCoderUsername,
+                placeholder: "Enter username"
+            )
+        } header: {
+            Text("Data Sources")
+        }
+    }
+
+    private var ankiSection: some View {
+        Section {
+            HStack {
+                Label("Host", systemImage: "network")
+                Spacer()
+                TextField("localhost", text: $ankiHost)
+                    .multilineTextAlignment(.trailing)
+                    .textInputAutocapitalization(.never)
+                    .autocorrectionDisabled()
+                    .foregroundStyle(.secondary)
+            }
+            HStack {
+                Label("Port", systemImage: "number")
+                Spacer()
+                TextField("8765", text: $ankiPort)
+                    .multilineTextAlignment(.trailing)
+                    .keyboardType(.numberPad)
+                    .foregroundStyle(.secondary)
+            }
+            HStack {
+                Label("Decks", systemImage: "rectangle.stack")
+                Spacer()
+                TextField("All decks", text: $ankiDecks)
+                    .multilineTextAlignment(.trailing)
+                    .textInputAutocapitalization(.never)
+                    .autocorrectionDisabled()
+                    .foregroundStyle(.secondary)
+            }
+            HStack {
+                Text("Status")
+                Spacer()
+                ankiStatusView
+            }
+            Button {
+                Task { await testAnkiConnection() }
+            } label: {
+                HStack {
+                    Spacer()
+                    Text("Test Connection")
+                    Spacer()
                 }
             }
-            .onChange(of: ankiHost) { _, _ in
-                Task {
-                    await saveAnkiSettings()
+            .disabled(ankiHost.isEmpty)
+        } header: {
+            Text("Anki")
+        } footer: {
+            Text("Enter comma-separated deck names to track specific decks, or leave empty for all decks. Anki must be running with AnkiConnect installed.")
+        }
+    }
+
+    private var zoteroSection: some View {
+        Section {
+            HStack {
+                Label("API Key", systemImage: "key")
+                Spacer()
+                SecureField("Enter API key", text: $zoteroAPIKey)
+                    .multilineTextAlignment(.trailing)
+                    .textInputAutocapitalization(.never)
+                    .autocorrectionDisabled()
+                    .foregroundStyle(.secondary)
+            }
+            HStack {
+                Label("User ID", systemImage: "person")
+                Spacer()
+                TextField("Enter user ID", text: $zoteroUserID)
+                    .multilineTextAlignment(.trailing)
+                    .keyboardType(.numberPad)
+                    .foregroundStyle(.secondary)
+            }
+            HStack {
+                Label("To Read", systemImage: "book.closed")
+                Spacer()
+                TextField("Collection key", text: $zoteroToReadCollection)
+                    .multilineTextAlignment(.trailing)
+                    .textInputAutocapitalization(.never)
+                    .autocorrectionDisabled()
+                    .foregroundStyle(.secondary)
+            }
+            HStack {
+                Label("In Progress", systemImage: "book")
+                Spacer()
+                TextField("Collection key", text: $zoteroInProgressCollection)
+                    .multilineTextAlignment(.trailing)
+                    .textInputAutocapitalization(.never)
+                    .autocorrectionDisabled()
+                    .foregroundStyle(.secondary)
+            }
+            HStack {
+                Label("Read", systemImage: "checkmark.circle")
+                Spacer()
+                TextField("Collection key", text: $zoteroReadCollection)
+                    .multilineTextAlignment(.trailing)
+                    .textInputAutocapitalization(.never)
+                    .autocorrectionDisabled()
+                    .foregroundStyle(.secondary)
+            }
+            HStack {
+                Text("Status")
+                Spacer()
+                zoteroStatusView
+            }
+            Button {
+                Task { await testZoteroConnection() }
+            } label: {
+                HStack {
+                    Spacer()
+                    Text("Test Connection")
+                    Spacer()
                 }
             }
-            .onChange(of: ankiPort) { _, _ in
-                Task {
-                    await saveAnkiSettings()
-                }
+            .disabled(zoteroAPIKey.isEmpty || zoteroUserID.isEmpty)
+        } header: {
+            Text("Zotero")
+        } footer: {
+            Text("Get your API key at zotero.org/settings/keys. Collection keys are found in collection URLs (e.g., zotero.org/users/123/collections/ABC).")
+        }
+    }
+
+    private var aboutSection: some View {
+        Section("About") {
+            HStack {
+                Text("Version")
+                Spacer()
+                Text("1.0.0")
+                    .foregroundStyle(.secondary)
             }
-            .onChange(of: ankiDecks) { _, _ in
-                Task {
-                    await saveAnkiSettings()
+            Link(destination: URL(string: "https://github.com/kobejean/Goals")!) {
+                HStack {
+                    Text("Source Code")
+                    Spacer()
+                    Image(systemName: "arrow.up.right")
+                        .foregroundStyle(.secondary)
                 }
             }
         }
@@ -187,12 +260,54 @@ public struct SettingsView: View {
         }
     }
 
+    @ViewBuilder
+    private var zoteroStatusView: some View {
+        switch zoteroConnectionStatus {
+        case .unknown:
+            Text("Not tested")
+                .foregroundStyle(.secondary)
+        case .testing:
+            HStack(spacing: 4) {
+                ProgressView()
+                    .scaleEffect(0.8)
+                Text("Testing...")
+                    .foregroundStyle(.secondary)
+            }
+        case .connected:
+            HStack(spacing: 4) {
+                Image(systemName: "checkmark.circle.fill")
+                    .foregroundStyle(.green)
+                Text("Connected")
+                    .foregroundStyle(.green)
+            }
+        case .disconnected:
+            HStack(spacing: 4) {
+                Image(systemName: "xmark.circle.fill")
+                    .foregroundStyle(.red)
+                Text("Disconnected")
+                    .foregroundStyle(.red)
+            }
+        case .unauthorized:
+            HStack(spacing: 4) {
+                Image(systemName: "exclamationmark.triangle.fill")
+                    .foregroundStyle(.orange)
+                Text("Invalid credentials")
+                    .foregroundStyle(.orange)
+            }
+        }
+    }
+
     private func loadSettings() async {
         typeQuickerUsername = UserDefaults.standard.typeQuickerUsername ?? ""
         atCoderUsername = UserDefaults.standard.atCoderUsername ?? ""
         ankiHost = UserDefaults.standard.ankiHost ?? ""
         ankiPort = UserDefaults.standard.ankiPort ?? "8765"
         ankiDecks = UserDefaults.standard.ankiDecks ?? ""
+        zoteroAPIKey = UserDefaults.standard.zoteroAPIKey ?? ""
+        zoteroUserID = UserDefaults.standard.zoteroUserID ?? ""
+        zoteroToReadCollection = UserDefaults.standard.zoteroToReadCollection ?? ""
+        zoteroInProgressCollection = UserDefaults.standard.zoteroInProgressCollection ?? ""
+        zoteroReadCollection = UserDefaults.standard.zoteroReadCollection ?? ""
     }
 
     private func saveTypeQuickerSettings(username: String) async {
@@ -269,6 +384,61 @@ public struct SettingsView: View {
             ankiConnectionStatus = connected ? .connected : .disconnected
         } catch {
             ankiConnectionStatus = .disconnected
+        }
+    }
+
+    private func saveZoteroSettings() async {
+        zoteroSaveState = .saving
+        UserDefaults.standard.zoteroAPIKey = zoteroAPIKey
+        UserDefaults.standard.zoteroUserID = zoteroUserID
+        UserDefaults.standard.zoteroToReadCollection = zoteroToReadCollection
+        UserDefaults.standard.zoteroInProgressCollection = zoteroInProgressCollection
+        UserDefaults.standard.zoteroReadCollection = zoteroReadCollection
+
+        if !zoteroAPIKey.isEmpty && !zoteroUserID.isEmpty {
+            let settings = DataSourceSettings(
+                dataSourceType: .zotero,
+                credentials: ["apiKey": zoteroAPIKey, "userID": zoteroUserID],
+                options: [
+                    "toReadCollection": zoteroToReadCollection,
+                    "inProgressCollection": zoteroInProgressCollection,
+                    "readCollection": zoteroReadCollection
+                ]
+            )
+            try? await container.zoteroDataSource.configure(settings: settings)
+        }
+
+        container.notifySettingsChanged()
+        zoteroSaveState = .saved
+        try? await Task.sleep(for: .seconds(1.5))
+        zoteroSaveState = .idle
+    }
+
+    private func testZoteroConnection() async {
+        zoteroConnectionStatus = .testing
+
+        // Configure first if not already
+        if !zoteroAPIKey.isEmpty && !zoteroUserID.isEmpty {
+            let settings = DataSourceSettings(
+                dataSourceType: .zotero,
+                credentials: ["apiKey": zoteroAPIKey, "userID": zoteroUserID],
+                options: [
+                    "toReadCollection": zoteroToReadCollection,
+                    "inProgressCollection": zoteroInProgressCollection,
+                    "readCollection": zoteroReadCollection
+                ]
+            )
+            try? await container.zoteroDataSource.configure(settings: settings)
+        }
+
+        // Test connection
+        do {
+            let connected = try await container.zoteroDataSource.testConnection()
+            zoteroConnectionStatus = connected ? .connected : .disconnected
+        } catch DataSourceError.unauthorized {
+            zoteroConnectionStatus = .unauthorized
+        } catch {
+            zoteroConnectionStatus = .disconnected
         }
     }
 

@@ -202,3 +202,41 @@ public extension AnkiDataSourceProtocol {
         false
     }
 }
+
+/// Protocol for Zotero data source
+public protocol ZoteroDataSourceProtocol: DataSourceRepositoryProtocol {
+    /// Fetches daily annotation/note statistics for a date range
+    func fetchDailyStats(from startDate: Date, to endDate: Date) async throws -> [ZoteroDailyStats]
+
+    /// Fetches the current reading status (counts in each collection)
+    func fetchReadingStatus() async throws -> ZoteroReadingStatus?
+
+    /// Tests the connection to Zotero API
+    func testConnection() async throws -> Bool
+
+    // MARK: - Cache Methods (optional, for stale-while-revalidate pattern)
+
+    /// Returns cached stats without fetching from remote (for instant display)
+    func fetchCachedDailyStats(from startDate: Date, to endDate: Date) async throws -> [ZoteroDailyStats]
+
+    /// Returns cached reading status without fetching from remote
+    func fetchCachedReadingStatus() async throws -> ZoteroReadingStatus?
+
+    /// Returns true if there's any cached data available
+    func hasCachedData() async throws -> Bool
+}
+
+// Default implementations for non-cached Zotero data sources
+public extension ZoteroDataSourceProtocol {
+    func fetchCachedDailyStats(from startDate: Date, to endDate: Date) async throws -> [ZoteroDailyStats] {
+        []
+    }
+
+    func fetchCachedReadingStatus() async throws -> ZoteroReadingStatus? {
+        nil
+    }
+
+    func hasCachedData() async throws -> Bool {
+        false
+    }
+}

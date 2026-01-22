@@ -9,9 +9,10 @@ public enum InsightType: String, CaseIterable, Codable, Sendable {
     case sleep
     case tasks
     case anki
+    case zotero
 
     /// Default order for insight cards
-    public static let defaultOrder: [InsightType] = [.typeQuicker, .atCoder, .sleep, .tasks, .anki]
+    public static let defaultOrder: [InsightType] = [.typeQuicker, .atCoder, .sleep, .tasks, .anki, .zotero]
 
     /// Display title for the insight type
     public var displayTitle: String {
@@ -21,6 +22,7 @@ public enum InsightType: String, CaseIterable, Codable, Sendable {
         case .sleep: return "Sleep"
         case .tasks: return "Tasks"
         case .anki: return "Anki"
+        case .zotero: return "Zotero"
         }
     }
 
@@ -32,6 +34,7 @@ public enum InsightType: String, CaseIterable, Codable, Sendable {
         case .sleep: return "bed.double.fill"
         case .tasks: return "timer"
         case .anki: return "rectangle.stack"
+        case .zotero: return "books.vertical"
         }
     }
 
@@ -44,6 +47,7 @@ public enum InsightType: String, CaseIterable, Codable, Sendable {
         case .sleep: return .indigo
         case .tasks: return .orange
         case .anki: return .red
+        case .zotero: return .purple
         }
     }
 
@@ -73,7 +77,8 @@ extension InsightType: AppEnum {
             .atCoder: DisplayRepresentation(title: "AtCoder"),
             .sleep: DisplayRepresentation(title: "Sleep"),
             .tasks: DisplayRepresentation(title: "Tasks"),
-            .anki: DisplayRepresentation(title: "Anki")
+            .anki: DisplayRepresentation(title: "Anki"),
+            .zotero: DisplayRepresentation(title: "Zotero")
         ]
     }
 }
