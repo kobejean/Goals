@@ -7,6 +7,13 @@ public enum UserDefaultsKeys {
     public static let ankiHost = "ankiHost"
     public static let ankiPort = "ankiPort"
     public static let ankiDecks = "ankiDecks"
+
+    // Insights time range keys (per detail view)
+    public static let typeQuickerInsightsTimeRange = "typeQuickerInsightsTimeRange"
+    public static let sleepInsightsTimeRange = "sleepInsightsTimeRange"
+    public static let tasksInsightsTimeRange = "tasksInsightsTimeRange"
+    public static let ankiInsightsTimeRange = "ankiInsightsTimeRange"
+    public static let atCoderInsightsTimeRange = "atCoderInsightsTimeRange"
 }
 
 // MARK: - UserDefaults Convenience Extensions

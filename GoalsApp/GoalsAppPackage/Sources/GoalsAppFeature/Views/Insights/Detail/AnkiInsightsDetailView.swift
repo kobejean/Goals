@@ -5,7 +5,7 @@ import GoalsDomain
 /// Anki insights detail view with full charts
 struct AnkiInsightsDetailView: View {
     @Bindable var viewModel: AnkiInsightsViewModel
-    @State private var timeRange: TimeRange = .all
+    @AppStorage(UserDefaultsKeys.ankiInsightsTimeRange) private var timeRange: TimeRange = .month
 
     var body: some View {
         ScrollView {
