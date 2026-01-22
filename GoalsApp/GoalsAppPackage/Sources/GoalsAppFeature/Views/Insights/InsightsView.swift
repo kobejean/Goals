@@ -86,7 +86,8 @@ public struct InsightsView: View {
                 color: card.color,
                 summary: card.summary,
                 activityData: card.activityData,
-                mode: mode
+                mode: mode,
+                fetchStatus: card.fetchStatus
             )
             .overlay(alignment: .topTrailing) {
                 Image(systemName: "line.3.horizontal")
@@ -107,7 +108,8 @@ public struct InsightsView: View {
                     color: card.color,
                     summary: card.summary,
                     activityData: card.activityData,
-                    mode: mode
+                    mode: mode,
+                    fetchStatus: card.fetchStatus
                 )
                 .frame(width: 300)
                 .opacity(0.8)

@@ -18,6 +18,7 @@ public final class TypeQuickerInsightsViewModel: InsightsSectionViewModel {
     public private(set) var stats: [TypeQuickerStats] = []
     public private(set) var goals: [Goal] = []
     public private(set) var errorMessage: String?
+    public private(set) var fetchStatus: InsightFetchStatus = .idle
     public var selectedMetric: TypeQuickerMetric = .wpm
 
     // MARK: - Dependencies
@@ -139,6 +140,7 @@ public final class TypeQuickerInsightsViewModel: InsightsSectionViewModel {
 
     public func loadData() async {
         errorMessage = nil
+        fetchStatus = .loading
 
         // Configure from saved settings if available
         if let username = UserDefaults.standard.typeQuickerUsername, !username.isEmpty {
@@ -151,6 +153,7 @@ public final class TypeQuickerInsightsViewModel: InsightsSectionViewModel {
 
         guard await dataSource.isConfigured() else {
             errorMessage = "Configure your TypeQuicker username in Settings"
+            fetchStatus = .error
             return
         }
 
@@ -168,10 +171,15 @@ public final class TypeQuickerInsightsViewModel: InsightsSectionViewModel {
         // Fetch fresh stats (updates cache internally), then update UI
         do {
             stats = try await dataSource.fetchStats(from: startDate, to: endDate)
+            fetchStatus = .success
         } catch {
             // Keep cached data on error
             if stats.isEmpty {
                 errorMessage = "Failed to load data: \(error.localizedDescription)"
+                fetchStatus = .error
+            } else {
+                // Have cached data, show success despite fetch error
+                fetchStatus = .success
             }
         }
     }

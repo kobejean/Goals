@@ -17,6 +17,7 @@ public struct InsightCard: View {
     public let activityData: InsightActivityData?
     public let mode: InsightDisplayMode
     public let style: InsightCardStyle
+    public let fetchStatus: InsightFetchStatus?
 
     public init(
         title: String,
@@ -25,7 +26,8 @@ public struct InsightCard: View {
         summary: InsightSummary?,
         activityData: InsightActivityData?,
         mode: InsightDisplayMode,
-        style: InsightCardStyle = .card
+        style: InsightCardStyle = .card,
+        fetchStatus: InsightFetchStatus? = nil
     ) {
         self.title = title
         self.systemImage = systemImage
@@ -34,17 +36,22 @@ public struct InsightCard: View {
         self.activityData = activityData
         self.mode = mode
         self.style = style
+        self.fetchStatus = fetchStatus
     }
 
     public var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            // Header: icon + title + trend (trend only in chart mode)
+            // Header: icon + title + status indicator
             HStack {
                 Image(systemName: systemImage)
                     .foregroundStyle(summary?.color ?? color)
                 Text(title)
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
+                Spacer()
+                if let fetchStatus {
+                    StatusIndicatorView(status: fetchStatus)
+                }
             }
 
             // Fixed height content area for consistent card size

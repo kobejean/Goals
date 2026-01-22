@@ -20,6 +20,7 @@ public final class SleepInsightsViewModel: InsightsSectionViewModel {
     public private(set) var isAuthorized: Bool = false
     public private(set) var authorizationChecked: Bool = false
     public private(set) var errorMessage: String?
+    public private(set) var fetchStatus: InsightFetchStatus = .idle
     public var selectedMetric: SleepMetric = .duration
 
     // MARK: - Dependencies
@@ -122,6 +123,7 @@ public final class SleepInsightsViewModel: InsightsSectionViewModel {
 
     public func loadData() async {
         errorMessage = nil
+        fetchStatus = .loading
         let endDate = Date()
         let startDate = TimeRange.all.startDate(from: endDate)
 
@@ -142,15 +144,23 @@ public final class SleepInsightsViewModel: InsightsSectionViewModel {
         }
         authorizationChecked = true
 
-        guard isAuthorized else { return }
+        guard isAuthorized else {
+            fetchStatus = sleepData.isEmpty ? .error : .success
+            return
+        }
 
         // Fetch fresh data from HealthKit (updates cache internally)
         do {
             sleepData = try await dataSource.fetchSleepData(from: startDate, to: endDate)
+            fetchStatus = .success
         } catch {
             // Keep cached data on error
             if sleepData.isEmpty {
                 errorMessage = "Failed to load sleep data: \(error.localizedDescription)"
+                fetchStatus = .error
+            } else {
+                // Have cached data, show success despite fetch error
+                fetchStatus = .success
             }
         }
     }
