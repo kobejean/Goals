@@ -41,7 +41,7 @@ public struct InsightCard: View {
             // Header: icon + title + trend (trend only in chart mode)
             HStack {
                 Image(systemName: systemImage)
-                    .foregroundStyle(color)
+                    .foregroundStyle(summary?.color ?? color)
                 Text(title)
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
