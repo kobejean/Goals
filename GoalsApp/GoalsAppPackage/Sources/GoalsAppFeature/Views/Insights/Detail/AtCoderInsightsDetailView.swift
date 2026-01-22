@@ -6,7 +6,7 @@ import GoalsData
 /// AtCoder insights detail view with Rating and Daily Effort charts
 public struct AtCoderInsightsDetailView: View {
     @Bindable var viewModel: AtCoderInsightsViewModel
-    @State private var timeRange: TimeRange = .all
+    @AppStorage(UserDefaultsKeys.atCoderInsightsTimeRange) private var timeRange: TimeRange = .month
 
     public var body: some View {
         ScrollView {

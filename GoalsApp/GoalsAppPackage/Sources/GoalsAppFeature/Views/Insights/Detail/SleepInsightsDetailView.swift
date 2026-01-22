@@ -5,7 +5,7 @@ import GoalsDomain
 /// Sleep insights detail view with full charts and stage breakdown
 struct SleepInsightsDetailView: View {
     @Bindable var viewModel: SleepInsightsViewModel
-    @State private var timeRange: TimeRange = .month
+    @AppStorage(UserDefaultsKeys.sleepInsightsTimeRange) private var timeRange: TimeRange = .month
 
     var body: some View {
         ScrollView {

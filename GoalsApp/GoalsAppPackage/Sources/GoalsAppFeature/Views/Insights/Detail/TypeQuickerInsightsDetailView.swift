@@ -5,7 +5,7 @@ import GoalsDomain
 /// TypeQuicker insights detail view with full charts
 struct TypeQuickerInsightsDetailView: View {
     @Bindable var viewModel: TypeQuickerInsightsViewModel
-    @State private var timeRange: TimeRange = .all
+    @AppStorage(UserDefaultsKeys.typeQuickerInsightsTimeRange) private var timeRange: TimeRange = .month
 
     var body: some View {
         ScrollView {
