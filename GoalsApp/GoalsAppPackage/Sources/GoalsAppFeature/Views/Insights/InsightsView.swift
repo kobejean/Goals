@@ -5,7 +5,7 @@ import GoalsData
 /// Insights view showing minimalistic overview cards with sparkline charts
 public struct InsightsView: View {
     @Environment(AppContainer.self) private var container
-    @State private var displayMode: InsightDisplayMode = .chart
+    @State private var displayMode: InsightDisplayMode = .both
     @State private var isEditing = false
     @State private var draggedType: InsightType?
     @State private var dropTargetType: InsightType?

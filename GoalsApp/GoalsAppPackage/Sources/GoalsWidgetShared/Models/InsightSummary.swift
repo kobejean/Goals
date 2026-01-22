@@ -51,6 +51,7 @@ public struct InsightSummary: Sendable {
     public let goalValue: Double?  // optional goal target to show as line
     public let chartType: InsightChartType
     public let durationRangeData: InsightDurationRangeData?
+    public let wpmAccuracyData: InsightWPMAccuracyData?  // For WPM vs Accuracy charts
 
     /// Initialize with sparkline chart type (default, backward compatible)
     public init(
@@ -72,6 +73,7 @@ public struct InsightSummary: Sendable {
         self.goalValue = goalValue
         self.chartType = .sparkline
         self.durationRangeData = nil
+        self.wpmAccuracyData = nil
     }
 
     /// Initialize with duration range chart type
@@ -93,6 +95,7 @@ public struct InsightSummary: Sendable {
         self.goalValue = nil
         self.chartType = .durationRange
         self.durationRangeData = durationRangeData
+        self.wpmAccuracyData = nil
     }
 
     /// Initialize with scatter + moving average chart type
@@ -116,5 +119,28 @@ public struct InsightSummary: Sendable {
         self.goalValue = goalValue
         self.chartType = .scatterWithMovingAverage
         self.durationRangeData = nil
+        self.wpmAccuracyData = nil
+    }
+
+    /// Initialize with WPM vs Accuracy chart type
+    public init(
+        title: String,
+        systemImage: String,
+        color: Color,
+        wpmAccuracyData: InsightWPMAccuracyData,
+        currentValueFormatted: String,
+        trend: Double?
+    ) {
+        self.title = title
+        self.systemImage = systemImage
+        self.color = color
+        self.dataPoints = []
+        self.movingAveragePoints = nil
+        self.currentValueFormatted = currentValueFormatted
+        self.trend = trend
+        self.goalValue = nil
+        self.chartType = .wpmAccuracy
+        self.durationRangeData = nil
+        self.wpmAccuracyData = wpmAccuracyData
     }
 }

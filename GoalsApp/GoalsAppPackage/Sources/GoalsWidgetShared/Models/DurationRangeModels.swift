@@ -30,6 +30,7 @@ public enum InsightChartType: String, Sendable {
     case sparkline              // Line chart for continuous values
     case durationRange          // Vertical bars showing time ranges
     case scatterWithMovingAverage  // Scatter plot with moving average line
+    case wpmAccuracy            // 2D scatter: WPM (x) vs Accuracy (y) with mode colors
 }
 
 /// A single time segment within a day (e.g., sleep period, focus session)
@@ -120,5 +121,54 @@ public struct InsightDurationRangeData: Sendable {
         self.defaultColor = defaultColor
         self.dateRange = dateRange
         self.useSimpleHours = useSimpleHours
+    }
+}
+
+// MARK: - WPM vs Accuracy Chart Models
+
+/// A single data point for WPM vs Accuracy chart
+public struct InsightWPMAccuracyPoint: Identifiable, Sendable {
+    public let id: UUID
+    public let date: Date
+    public let mode: String
+    public let wpm: Double
+    public let accuracy: Double
+
+    public init(id: UUID = UUID(), date: Date, mode: String, wpm: Double, accuracy: Double) {
+        self.id = id
+        self.date = date
+        self.mode = mode
+        self.wpm = wpm
+        self.accuracy = accuracy
+    }
+}
+
+/// Container for WPM vs Accuracy chart data
+public struct InsightWPMAccuracyData: Sendable {
+    public let dataPoints: [InsightWPMAccuracyPoint]
+    public let wpmGoal: Double?
+    public let accuracyGoal: Double?
+    public let modeColors: [String: Color]
+
+    public init(
+        dataPoints: [InsightWPMAccuracyPoint],
+        wpmGoal: Double? = nil,
+        accuracyGoal: Double? = nil,
+        modeColors: [String: Color] = [:]
+    ) {
+        self.dataPoints = dataPoints
+        self.wpmGoal = wpmGoal
+        self.accuracyGoal = accuracyGoal
+        self.modeColors = modeColors
+    }
+
+    /// Get unique modes from data points
+    public var uniqueModes: [String] {
+        Array(Set(dataPoints.map(\.mode))).sorted()
+    }
+
+    /// Get color for a mode (falls back to accent color)
+    public func color(for mode: String) -> Color {
+        modeColors[mode] ?? .accentColor
     }
 }

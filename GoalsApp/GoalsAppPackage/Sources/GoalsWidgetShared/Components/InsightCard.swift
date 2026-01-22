@@ -41,65 +41,105 @@ public struct InsightCard: View {
             // Header: icon + title + trend (trend only in chart mode)
             HStack {
                 Image(systemName: systemImage)
-                    .foregroundStyle(color)
+                    .foregroundStyle(summary?.color ?? color)
                 Text(title)
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
             }
 
             // Fixed height content area for consistent card size
-            VStack(alignment: .leading, spacing: 8) {
-                switch mode {
-                case .chart:
-                    if let summary {
-                        switch summary.chartType {
-                        case .sparkline:
-                            SparklineChart(
-                                dataPoints: summary.dataPoints,
-                                color: summary.color,
-                                goalValue: summary.goalValue
-                            )
-                            .frame(height: 40)
-                        case .durationRange:
-                            if let rangeData = summary.durationRangeData {
-                                DurationRangeChart(data: rangeData)
-                                    .frame(height: 40)
-                            }
-                        case .scatterWithMovingAverage:
-                            ScatterMovingAverageChart(
-                                scatterPoints: summary.dataPoints,
-                                movingAveragePoints: summary.movingAveragePoints ?? [],
-                                color: summary.color,
-                                goalValue: summary.goalValue
-                            )
-                            .frame(height: 40)
-                        }
-                    } else {
-                        // Empty placeholder when no data
-                        RoundedRectangle(cornerRadius: 4)
-                            .fill(.quaternary)
-                            .frame(height: 40)
-                    }
-
-                    // Show "--" when no data, actual value when available
-                    Text(summary?.currentValueFormatted ?? "--")
-                        .font(.title2.bold())
-
-                case .activity:
-                    if let activityData {
-                        ActivityChart(activityData: activityData)
-                    } else {
-                        // Empty placeholder when no data
-                        RoundedRectangle(cornerRadius: 4)
-                            .fill(.quaternary)
-                            .frame(height: 76)
-                    }
-                }
-            }
-            .frame(height: 76, alignment: .topLeading)
+            contentView
+                .frame(height: contentHeight, alignment: .topLeading)
         }
         .padding()
         .modifier(CardStyleModifier(style: style))
+    }
+
+    /// Content height
+    private let contentHeight: CGFloat = 76
+
+    /// Main content view that switches based on display mode
+    @ViewBuilder
+    private var contentView: some View {
+        switch mode {
+        case .chart:
+            chartContent(height: 56, showValue: true, valueFont: .title2.bold())
+
+        case .activity:
+            activityContent
+
+        case .both:
+            HStack(alignment: .top, spacing: 12) {
+                // Left: Chart with current value
+                chartContent(height: 56, showValue: true, valueFont: .headline)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+
+                // Right: Activity grid
+                activityContent
+                    .frame(maxWidth: .infinity, alignment: .trailing)
+            }
+        }
+    }
+
+    /// Reusable chart content view
+    @ViewBuilder
+    private func chartContent(height: CGFloat, showValue: Bool, valueFont: Font) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            if let summary {
+                chartView(for: summary)
+                    .frame(height: height)
+            } else {
+                // Empty placeholder when no data
+                RoundedRectangle(cornerRadius: 4)
+                    .fill(.quaternary)
+                    .frame(height: height)
+            }
+
+            if showValue {
+                Text(summary?.currentValueFormatted ?? "--")
+                    .font(valueFont)
+            }
+        }
+    }
+
+    /// Renders the appropriate chart based on chart type
+    @ViewBuilder
+    private func chartView(for summary: InsightSummary) -> some View {
+        switch summary.chartType {
+        case .sparkline:
+            SparklineChart(
+                dataPoints: summary.dataPoints,
+                color: summary.color,
+                goalValue: summary.goalValue
+            )
+        case .durationRange:
+            if let rangeData = summary.durationRangeData {
+                DurationRangeChart(data: rangeData)
+            }
+        case .scatterWithMovingAverage:
+            ScatterMovingAverageChart(
+                scatterPoints: summary.dataPoints,
+                movingAveragePoints: summary.movingAveragePoints ?? [],
+                color: summary.color,
+                goalValue: summary.goalValue
+            )
+        case .wpmAccuracy:
+            if let wpmAccuracyData = summary.wpmAccuracyData {
+                WPMAccuracyChart(data: wpmAccuracyData, style: .compact)
+            }
+        }
+    }
+
+    /// Reusable activity grid content view
+    @ViewBuilder
+    private var activityContent: some View {
+        if let activityData {
+            ActivityChart(activityData: activityData)
+        } else {
+            // Empty placeholder when no data
+            RoundedRectangle(cornerRadius: 4)
+                .fill(.quaternary)
+        }
     }
 }
 
