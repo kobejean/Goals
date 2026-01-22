@@ -36,15 +36,20 @@ public enum InsightType: String, CaseIterable, Codable, Sendable {
     }
 
     /// Color for the insight type (matches app ViewModels)
+    /// Note: Uses explicit color instead of .accentColor for widget compatibility
     public var color: Color {
         switch self {
-        case .typeQuicker: return .accentColor
-        case .atCoder: return .accentColor
+        case .typeQuicker: return Self.brandGreen
+        case .atCoder: return Self.brandGreen
         case .sleep: return .indigo
         case .tasks: return .orange
         case .anki: return .purple
         }
     }
+
+    /// Brand green color - matches AccentColor in asset catalog
+    /// SwiftUI .accentColor doesn't resolve correctly in widgets, so we define it explicitly
+    private static let brandGreen = Color(red: 0.4745, green: 0.7020, blue: 0.2078)
 }
 
 // MARK: - Transferable for Drag & Drop
