@@ -66,6 +66,7 @@
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
 			membershipExceptions = (
 				Debug.xcconfig,
+				Info.plist,
 				Release.xcconfig,
 				Shared.xcconfig,
 				Tests.xcconfig,

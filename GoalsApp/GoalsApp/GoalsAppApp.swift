@@ -4,6 +4,7 @@ import GoalsAppFeature
 
 @main
 struct GoalsAppApp: App {
+    @UIApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
     @State private var container: AppContainer?
     @State private var initError: Error?
 
@@ -57,6 +58,8 @@ struct GoalsAppApp: App {
     private func initializeApp() async {
         do {
             container = try AppContainer()
+            // Schedule background refresh for widget data
+            AppDelegate.scheduleBackgroundRefresh()
         } catch {
             initError = error
             print("Failed to initialize AppContainer: \(error)")

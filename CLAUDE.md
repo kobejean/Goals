@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-Goals is an iOS app for tracking personal goals linked to external data sources (TypeQuicker for typing metrics, AtCoder for competitive programming stats). Built with Swift 6.1+, SwiftUI, and SwiftData. Targets iOS 18.0+.
+Goals is an iOS app for tracking personal goals linked to external data sources (TypeQuicker for typing metrics, AtCoder for competitive programming stats, Anki for spaced repetition, Tasks for time tracking, Sleep for health). Built with Swift 6.1+, SwiftUI, and SwiftData. Targets iOS 18.0+. Includes home screen widgets.
 
 ## Build & Test Commands
 
@@ -29,7 +29,7 @@ When XcodeBuildMCP tools are available, prefer using `session-set-defaults` then
 
 ## Architecture
 
-### Two-Package Structure
+### Project Structure
 ```
 Goals/
 ├── GoalsKit/                    # Shared business logic (reusable across platforms)
@@ -39,7 +39,10 @@ Goals/
 │
 └── GoalsApp/                    # iOS app
     ├── GoalsApp/               # App entry point only (@main)
-    ├── GoalsAppPackage/        # Feature code (Views, ViewModels, DI)
+    ├── GoalsAppPackage/        # Feature code
+    │   ├── GoalsAppFeature/    # Views, ViewModels, DI
+    │   └── GoalsWidgetShared/  # Shared code between app and widget
+    ├── GoalsWidget/            # Widget extension target
     └── Config/                 # XCConfig files and entitlements
 ```
 
@@ -47,6 +50,19 @@ Goals/
 - **GoalsCore**: No dependencies, shared utilities
 - **GoalsDomain**: Depends on GoalsCore. Pure business logic—entities, repository protocols, use cases. No SwiftData/networking.
 - **GoalsData**: Depends on GoalsDomain + GoalsCore. Repository implementations with SwiftData, HTTP networking, caching wrappers.
+
+### GoalsAppPackage Modules
+- **GoalsWidgetShared**: Shared code between app and widget. Contains `InsightBuilders` (single source of truth for building insight summaries), shared models (`InsightSummary`, `InsightType`), reusable chart components, and `InsightCard` UI component.
+- **GoalsAppFeature**: Main app features. Depends on GoalsWidgetShared. Contains Views, ViewModels, and DI container.
+
+### Widget Architecture
+The widget extension (`GoalsWidget/`) imports `GoalsWidgetShared` to share:
+- **InsightBuilders**: Converts raw data (stats, history) into `InsightSummary` for display
+- **InsightType**: Enum defining all insight types with colors, icons, titles
+- **Chart components**: `SparklineChart`, `ActivityChart`, `DurationRangeChart`, etc.
+- **InsightCard**: Reusable card component used by both app and widget
+
+Data flow: `WidgetDataProvider` fetches cached data → `InsightBuilders.build*()` → `InsightSummary` → Widget views
 
 ### Dependency Injection
 `AppContainer` (in GoalsAppFeature) manages all dependencies:
@@ -56,11 +72,12 @@ Goals/
 - Use `AppContainer.preview()` for tests and SwiftUI previews
 
 ### Data Sources
-Two external data sources with transparent caching:
+External data sources with transparent caching:
 - `TypeQuickerDataSource` → `CachedTypeQuickerDataSource`
 - `AtCoderDataSource` → `CachedAtCoderDataSource`
+- `AnkiDataSource` → `CachedAnkiDataSource`
 
-Both use `DataCache` backed by SwiftData's `CachedDataEntry` model.
+All use `DataCache` backed by SwiftData's `CachedDataEntry` model.
 
 ## Key Patterns
 
@@ -93,6 +110,11 @@ Both use `DataCache` backed by SwiftData's `CachedDataEntry` model.
 | Data sources | `GoalsKit/Sources/GoalsData/DataSources/` |
 | Build config | `GoalsApp/Config/*.xcconfig` |
 | Entitlements | `GoalsApp/Config/GoalsApp.entitlements` |
+| Widget extension | `GoalsApp/GoalsWidget/` |
+| Shared widget code | `GoalsApp/GoalsAppPackage/Sources/GoalsWidgetShared/` |
+| Insight builders | `GoalsApp/GoalsAppPackage/Sources/GoalsWidgetShared/Data/InsightBuilders.swift` |
+| Insight types | `GoalsApp/GoalsAppPackage/Sources/GoalsWidgetShared/Models/InsightType.swift` |
+| Shared charts | `GoalsApp/GoalsAppPackage/Sources/GoalsWidgetShared/Charts/` |
 
 ## Adding Features
 
@@ -100,6 +122,11 @@ Both use `DataCache` backed by SwiftData's `CachedDataEntry` model.
 2. **New data source**: Create in `GoalsKit/Sources/GoalsData/DataSources/`, add caching wrapper, register in `AppContainer`
 3. **New view**: Add to `GoalsAppPackage/Sources/GoalsAppFeature/Views/`, mark `public` for app shell access
 4. **New capability**: Edit `GoalsApp/Config/GoalsApp.entitlements` XML directly
+5. **New insight type**:
+   - Add case to `InsightType` enum in `GoalsWidgetShared/Models/InsightType.swift`
+   - Add builder method in `InsightBuilders.swift` (e.g., `buildNewInsight(from:goals:)`)
+   - Update `WidgetDataProvider` to fetch and build the new insight
+   - Create ViewModel in `GoalsAppFeature/ViewModels/` if needed for detail view
 
 ## Code Style
 

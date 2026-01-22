@@ -45,10 +45,6 @@ public struct InsightCard: View {
                 Text(title)
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
-                Spacer()
-                if mode == .chart, let trend = summary?.trend {
-                    TrendBadge(trend: trend)
-                }
             }
 
             // Fixed height content area for consistent card size
