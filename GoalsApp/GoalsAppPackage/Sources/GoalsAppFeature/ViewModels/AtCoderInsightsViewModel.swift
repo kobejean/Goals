@@ -2,6 +2,7 @@ import SwiftUI
 import GoalsDomain
 import GoalsData
 import GoalsCore
+import GoalsWidgetShared
 
 /// ViewModel for AtCoder insights section
 @MainActor @Observable
@@ -54,54 +55,14 @@ public final class AtCoderInsightsViewModel: InsightsSectionViewModel {
         return dailyEffort.filter { $0.date >= cutoffDate }
     }
 
-    /// Summary data for the overview card
+    /// Summary data for the overview card (uses shared InsightBuilders for consistency with widgets)
     public var summary: InsightSummary? {
-        guard !contestHistory.isEmpty else { return nil }
-
-        let dataPoints = contestHistory.map {
-            InsightDataPoint(
-                date: $0.date,
-                value: Double($0.rating),
-                color: $0.rankColor.swiftUIColor
-            )
-        }
-        let current = stats?.rating ?? contestHistory.last?.rating ?? 0
-        let trend = calculateRatingTrend()
-
-        return InsightSummary(
-            title: "AtCoder",
-            systemImage: "chevron.left.forwardslash.chevron.right",
-            color: stats?.rankColor.swiftUIColor ?? .gray,
-            dataPoints: dataPoints,
-            currentValueFormatted: "\(current)",
-            trend: trend,
-            goalValue: ratingGoalTarget.map { Double($0) }
-        )
+        InsightBuilders.buildAtCoderInsight(from: contestHistory, dailyEffort: dailyEffort, goals: goals).summary
     }
 
-    /// Calculate rating trend percentage
-    private func calculateRatingTrend() -> Double? {
-        contestHistory.trendPercentage { Double($0.rating) }
-    }
-
-    /// Activity data for GitHub-style contribution chart
+    /// Activity data for GitHub-style contribution chart (uses shared InsightBuilders for consistency with widgets)
     public var activityData: InsightActivityData? {
-        guard !dailyEffort.isEmpty else { return nil }
-
-        let days = dailyEffort.map { effort in
-            // Find hardest difficulty solved that day
-            let hardest = effort.submissionsByDifficulty.keys
-                .sorted { $0.sortOrder > $1.sortOrder }
-                .first ?? .gray
-
-            return InsightActivityDay(
-                date: effort.date,
-                color: hardest.swiftUIColor,
-                intensity: min(1.0, Double(effort.totalSubmissions) / 10.0)
-            )
-        }
-
-        return InsightActivityData(days: days, emptyColor: .gray.opacity(0.2))
+        InsightBuilders.buildAtCoderInsight(from: contestHistory, dailyEffort: dailyEffort, goals: goals).activityData
     }
 
     // MARK: - Data Loading

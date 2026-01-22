@@ -2,6 +2,7 @@ import SwiftUI
 import GoalsDomain
 import GoalsData
 import GoalsCore
+import GoalsWidgetShared
 
 /// ViewModel for Anki insights section
 @MainActor @Observable
@@ -77,98 +78,14 @@ public final class AnkiInsightsViewModel: InsightsSectionViewModel {
         }
     }
 
-    /// Summary data for the overview card
+    /// Summary data for the overview card (uses shared InsightBuilders for consistency with widgets)
     public var summary: InsightSummary? {
-        guard !stats.isEmpty else { return nil }
-
-        // Filter to last 30 days for the card
-        let cutoffDate = Calendar.current.date(byAdding: .day, value: -30, to: Date()) ?? Date()
-        let last30DaysStats = stats.filter { $0.date >= cutoffDate }
-
-        // Raw scatter points (last 30 days)
-        let scatterPoints = last30DaysStats.map {
-            InsightDataPoint(date: $0.date, value: Double($0.reviewCount))
-        }
-
-        // Calculate 30-day moving average for all stats, then filter to last 30 days
-        let allMovingAverage = calculateMovingAverage(for: stats.map { (date: $0.date, value: Double($0.reviewCount)) }, window: 30)
-        let movingAveragePoints = allMovingAverage.filter { $0.date >= cutoffDate }.map {
-            InsightDataPoint(date: $0.date, value: $0.value)
-        }
-
-        return InsightSummary(
-            title: "Anki",
-            systemImage: "rectangle.stack",
-            color: .purple,
-            scatterPoints: scatterPoints,
-            movingAveragePoints: movingAveragePoints,
-            currentValueFormatted: "\(currentStreak) day streak",
-            trend: metricTrend,
-            goalValue: goalTarget(for: .reviews)
-        )
+        InsightBuilders.buildAnkiInsight(from: stats, goals: goals).summary
     }
 
-    /// Calculate moving average for a series of data points
-    /// Days with no data are treated as 0
-    private func calculateMovingAverage(for data: [(date: Date, value: Double)], window: Int) -> [(date: Date, value: Double)] {
-        guard !data.isEmpty else { return [] }
-
-        let calendar = Calendar.current
-        let sorted = data.sorted { $0.date < $1.date }
-
-        // Create a lookup dictionary for values by date
-        var valuesByDate: [Date: Double] = [:]
-        for point in sorted {
-            let day = calendar.startOfDay(for: point.date)
-            valuesByDate[day] = point.value
-        }
-
-        // Get the date range
-        guard let firstDate = sorted.first?.date,
-              let lastDate = sorted.last?.date else { return [] }
-
-        let startDay = calendar.startOfDay(for: firstDate)
-        let endDay = calendar.startOfDay(for: lastDate)
-
-        // Build continuous series with zeros for missing days
-        var continuousSeries: [(date: Date, value: Double)] = []
-        var currentDay = startDay
-        while currentDay <= endDay {
-            let value = valuesByDate[currentDay] ?? 0.0
-            continuousSeries.append((date: currentDay, value: value))
-            currentDay = calendar.date(byAdding: .day, value: 1, to: currentDay) ?? currentDay
-        }
-
-        // Calculate moving average
-        var result: [(date: Date, value: Double)] = []
-        for i in 0..<continuousSeries.count {
-            let windowStart = Swift.max(0, i - window + 1)
-            let windowData = continuousSeries[windowStart...i]
-            let average = windowData.reduce(0.0) { $0 + $1.value } / Double(windowData.count)
-            result.append((date: continuousSeries[i].date, value: average))
-        }
-
-        return result
-    }
-
-    /// Activity data for GitHub-style contribution chart
+    /// Activity data for GitHub-style contribution chart (uses shared InsightBuilders for consistency with widgets)
     public var activityData: InsightActivityData? {
-        guard !stats.isEmpty else { return nil }
-
-        // Find max reviews for normalization
-        let maxReviews = stats.map(\.reviewCount).max() ?? 1
-
-        let days = stats.map { stat in
-            let intensity = Double(stat.reviewCount) / Double(Swift.max(maxReviews, 1))
-
-            return InsightActivityDay(
-                date: stat.date,
-                color: .purple,
-                intensity: intensity
-            )
-        }
-
-        return InsightActivityData(days: days, emptyColor: .gray.opacity(0.2))
+        InsightBuilders.buildAnkiInsight(from: stats, goals: goals).activityData
     }
 
     /// Get the goal target for a specific metric
@@ -200,7 +117,7 @@ public final class AnkiInsightsViewModel: InsightsSectionViewModel {
     /// Calculate 30-day moving average for filtered chart data
     public func movingAverageData(for filteredData: [AnkiChartDataPoint], metric: AnkiMetric) -> [(date: Date, value: Double)] {
         let data = filteredData.map { (date: $0.date, value: $0.value(for: metric)) }
-        return calculateMovingAverage(for: data, window: 30)
+        return InsightBuilders.calculateMovingAverage(for: data, window: 30)
     }
 
     /// Calculate Y-axis range for chart, including goal line if present

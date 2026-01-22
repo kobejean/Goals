@@ -2,6 +2,7 @@ import SwiftUI
 import GoalsDomain
 import GoalsData
 import GoalsCore
+import GoalsWidgetShared
 
 /// ViewModel for Sleep insights section
 @MainActor @Observable
@@ -66,52 +67,14 @@ public final class SleepInsightsViewModel: InsightsSectionViewModel {
         sleepData.halfTrendPercentage { $0.totalSleepHours }
     }
 
-    /// Summary data for the overview card
+    /// Summary data for the overview card (uses shared InsightBuilders for consistency with widgets)
     public var summary: InsightSummary? {
-        guard !sleepData.isEmpty else { return nil }
-
-        // Limit to last 14 entries for duration range chart readability
-        let recentData = sleepData.suffix(14)
-        let rangeDataPoints = recentData.compactMap { summary in
-            SleepRangeDataPoint(from: summary).toDurationRangeDataPoint(color: .indigo)
-        }
-        let current = sleepData.last?.totalSleepHours ?? 0
-
-        let durationRangeData = InsightDurationRangeData(
-            dataPoints: rangeDataPoints,
-            defaultColor: .indigo
-        )
-
-        return InsightSummary(
-            title: "Sleep",
-            systemImage: "bed.double.fill",
-            color: .indigo,
-            durationRangeData: durationRangeData,
-            currentValueFormatted: formatSleepHours(current),
-            trend: sleepTrend
-        )
+        InsightBuilders.buildSleepInsight(from: sleepData, goals: goals).summary
     }
 
-    /// Activity data for GitHub-style contribution chart
+    /// Activity data for GitHub-style contribution chart (uses shared InsightBuilders for consistency with widgets)
     public var activityData: InsightActivityData? {
-        guard !sleepData.isEmpty else { return nil }
-
-        // Use 8 hours as the "full" intensity reference
-        let targetHours = goalTarget(for: .duration) ?? 8.0
-
-        // Limit to last 90 entries for activity chart performance
-        let recentData = sleepData.suffix(90)
-        let days = recentData.map { summary in
-            let intensity = min(summary.totalSleepHours / targetHours, 1.0)
-
-            return InsightActivityDay(
-                date: summary.date,
-                color: .indigo,
-                intensity: intensity
-            )
-        }
-
-        return InsightActivityData(days: days, emptyColor: .gray.opacity(0.2))
+        InsightBuilders.buildSleepInsight(from: sleepData, goals: goals).activityData
     }
 
     /// Get the goal target for a specific metric

@@ -2,6 +2,7 @@ import SwiftUI
 import GoalsDomain
 import GoalsData
 import GoalsCore
+import GoalsWidgetShared
 
 /// ViewModel for TypeQuicker insights section
 @MainActor @Observable
@@ -80,44 +81,14 @@ public final class TypeQuickerInsightsViewModel: InsightsSectionViewModel {
         }
     }
 
-    /// Summary data for the overview card
+    /// Summary data for the overview card (uses shared InsightBuilders for consistency with widgets)
     public var summary: InsightSummary? {
-        guard !stats.isEmpty else { return nil }
-
-        let dataPoints = stats.map {
-            InsightDataPoint(date: $0.date, value: $0.wordsPerMinute)
-        }
-        let current = stats.last?.wordsPerMinute ?? 0
-
-        return InsightSummary(
-            title: "Typing",
-            systemImage: "keyboard",
-            color: Color.accentColor,
-            dataPoints: dataPoints,
-            currentValueFormatted: String(format: "%.0f WPM", current),
-            trend: metricTrend,
-            goalValue: goalTarget(for: .wpm)
-        )
+        InsightBuilders.buildTypeQuickerInsight(from: stats, goals: goals).summary
     }
 
-    /// Activity data for GitHub-style contribution chart
+    /// Activity data for GitHub-style contribution chart (uses shared InsightBuilders for consistency with widgets)
     public var activityData: InsightActivityData? {
-        guard !stats.isEmpty else { return nil }
-
-        // Find max practice time for normalization
-        let maxTime = stats.map(\.practiceTimeMinutes).max() ?? 1
-
-        let days = stats.map { stat in
-            let intensity = Double(stat.practiceTimeMinutes) / Double(max(maxTime, 1))
-
-            return InsightActivityDay(
-                date: stat.date,
-                color: Color.accentColor,
-                intensity: intensity
-            )
-        }
-
-        return InsightActivityData(days: days, emptyColor: .gray.opacity(0.2))
+        InsightBuilders.buildTypeQuickerInsight(from: stats, goals: goals).activityData
     }
 
     /// Get the goal target for a specific metric
