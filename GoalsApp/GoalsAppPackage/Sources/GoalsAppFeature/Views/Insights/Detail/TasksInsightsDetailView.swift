@@ -5,7 +5,7 @@ import GoalsDomain
 /// Tasks insights detail view with charts and breakdown
 struct TasksInsightsDetailView: View {
     @Bindable var viewModel: TasksInsightsViewModel
-    @State private var timeRange: TimeRange = .month
+    @AppStorage(UserDefaultsKeys.tasksInsightsTimeRange) private var timeRange: TimeRange = .month
 
     var body: some View {
         ScrollView {
