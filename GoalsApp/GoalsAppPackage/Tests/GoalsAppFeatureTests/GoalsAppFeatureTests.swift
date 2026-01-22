@@ -8,17 +8,17 @@ struct GoalsAppFeatureTests {
 
     @Test("AppTab has correct titles")
     func appTabTitles() {
-        #expect(AppTab.dashboard.title == "Dashboard")
-        #expect(AppTab.goals.title == "Goals")
         #expect(AppTab.insights.title == "Insights")
+        #expect(AppTab.tasks.title == "Tasks")
+        #expect(AppTab.goals.title == "Goals")
         #expect(AppTab.settings.title == "Settings")
     }
 
     @Test("AppTab has correct icons")
     func appTabIcons() {
-        #expect(AppTab.dashboard.iconName == "square.grid.2x2")
-        #expect(AppTab.goals.iconName == "target")
         #expect(AppTab.insights.iconName == "chart.line.uptrend.xyaxis")
+        #expect(AppTab.tasks.iconName == "timer")
+        #expect(AppTab.goals.iconName == "target")
         #expect(AppTab.settings.iconName == "gearshape")
     }
 

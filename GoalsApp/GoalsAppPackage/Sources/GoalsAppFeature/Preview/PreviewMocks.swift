@@ -35,3 +35,19 @@ actor PreviewGoalRepository: GoalRepositoryProtocol {
     func unarchive(id: UUID) async throws {}
     func updateProgress(goalId: UUID, currentValue: Double) async throws {}
 }
+
+/// Mock task repository for previews
+actor PreviewTaskRepository: TaskRepositoryProtocol {
+    func fetchAllTasks() async throws -> [TaskDefinition] { [] }
+    func fetchActiveTasks() async throws -> [TaskDefinition] { [] }
+    func fetchTask(id: UUID) async throws -> TaskDefinition? { nil }
+    func createTask(_ task: TaskDefinition) async throws -> TaskDefinition { task }
+    func updateTask(_ task: TaskDefinition) async throws -> TaskDefinition { task }
+    func deleteTask(id: UUID) async throws {}
+    func fetchActiveSession() async throws -> TaskSession? { nil }
+    func startSession(taskId: UUID) async throws -> TaskSession { TaskSession(taskId: taskId) }
+    func stopSession(id: UUID) async throws -> TaskSession { TaskSession(taskId: UUID()) }
+    func fetchSessions(from: Date, to: Date) async throws -> [TaskSession] { [] }
+    func fetchSessions(taskId: UUID) async throws -> [TaskSession] { [] }
+    func deleteSession(id: UUID) async throws {}
+}
