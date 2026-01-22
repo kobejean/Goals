@@ -318,7 +318,7 @@ public enum InsightBuilders {
             color: type.color,
             scatterPoints: scatterPoints,
             movingAveragePoints: movingAveragePoints,
-            currentValueFormatted: "\(currentStreak) day streak",
+            currentValueFormatted: "\(currentStreak) Day Streak",
             trend: trend,
             goalValue: goalValue
         )

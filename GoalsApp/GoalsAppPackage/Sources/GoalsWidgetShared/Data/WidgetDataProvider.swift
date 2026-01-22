@@ -14,7 +14,7 @@ public actor WidgetDataProvider {
     public func fetchInsightData(for type: InsightType) async -> (summary: InsightSummary?, activityData: InsightActivityData?) {
         let endDate = Date()
         let calendar = Calendar.current
-        guard let startDate = calendar.date(byAdding: .day, value: -30, to: endDate) else {
+        guard let startDate = calendar.date(byAdding: .day, value: -90, to: endDate) else {
             return (nil, nil)
         }
 
