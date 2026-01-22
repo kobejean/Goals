@@ -9,6 +9,13 @@ public enum UserDefaultsKeys {
     public static let ankiPort = "ankiPort"
     public static let ankiDecks = "ankiDecks"
 
+    // Zotero settings
+    public static let zoteroAPIKey = "zoteroAPIKey"
+    public static let zoteroUserID = "zoteroUserID"
+    public static let zoteroToReadCollection = "zoteroToReadCollection"
+    public static let zoteroInProgressCollection = "zoteroInProgressCollection"
+    public static let zoteroReadCollection = "zoteroReadCollection"
+
     // Insights card order
     public static let insightsCardOrder = "insightsCardOrder"
 
@@ -18,6 +25,7 @@ public enum UserDefaultsKeys {
     public static let tasksInsightsTimeRange = "tasksInsightsTimeRange"
     public static let ankiInsightsTimeRange = "ankiInsightsTimeRange"
     public static let atCoderInsightsTimeRange = "atCoderInsightsTimeRange"
+    public static let zoteroInsightsTimeRange = "zoteroInsightsTimeRange"
 
     /// Returns the shared UserDefaults if available, otherwise standard
     public static var shared: UserDefaults {
@@ -71,6 +79,46 @@ public extension UserDefaults {
         set {
             set(newValue, forKey: UserDefaultsKeys.ankiDecks)
             UserDefaults.shared.set(newValue, forKey: UserDefaultsKeys.ankiDecks)
+        }
+    }
+
+    var zoteroAPIKey: String? {
+        get { string(forKey: UserDefaultsKeys.zoteroAPIKey) }
+        set {
+            set(newValue, forKey: UserDefaultsKeys.zoteroAPIKey)
+            UserDefaults.shared.set(newValue, forKey: UserDefaultsKeys.zoteroAPIKey)
+        }
+    }
+
+    var zoteroUserID: String? {
+        get { string(forKey: UserDefaultsKeys.zoteroUserID) }
+        set {
+            set(newValue, forKey: UserDefaultsKeys.zoteroUserID)
+            UserDefaults.shared.set(newValue, forKey: UserDefaultsKeys.zoteroUserID)
+        }
+    }
+
+    var zoteroToReadCollection: String? {
+        get { string(forKey: UserDefaultsKeys.zoteroToReadCollection) }
+        set {
+            set(newValue, forKey: UserDefaultsKeys.zoteroToReadCollection)
+            UserDefaults.shared.set(newValue, forKey: UserDefaultsKeys.zoteroToReadCollection)
+        }
+    }
+
+    var zoteroInProgressCollection: String? {
+        get { string(forKey: UserDefaultsKeys.zoteroInProgressCollection) }
+        set {
+            set(newValue, forKey: UserDefaultsKeys.zoteroInProgressCollection)
+            UserDefaults.shared.set(newValue, forKey: UserDefaultsKeys.zoteroInProgressCollection)
+        }
+    }
+
+    var zoteroReadCollection: String? {
+        get { string(forKey: UserDefaultsKeys.zoteroReadCollection) }
+        set {
+            set(newValue, forKey: UserDefaultsKeys.zoteroReadCollection)
+            UserDefaults.shared.set(newValue, forKey: UserDefaultsKeys.zoteroReadCollection)
         }
     }
 }

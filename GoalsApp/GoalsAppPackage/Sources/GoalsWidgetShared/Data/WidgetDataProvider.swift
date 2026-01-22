@@ -40,6 +40,13 @@ public actor WidgetDataProvider {
         case .anki:
             let stats = (try? await cache.fetch(AnkiDailyStats.self, from: startDate, to: endDate)) ?? []
             return InsightBuilders.buildAnkiInsight(from: stats)
+
+        case .zotero:
+            let stats = (try? await cache.fetch(ZoteroDailyStats.self, from: startDate, to: endDate)) ?? []
+            // Get the most recent reading status from cache
+            let readingStatuses = (try? await cache.fetch(ZoteroReadingStatus.self)) ?? []
+            let readingStatus = readingStatuses.max { $0.date < $1.date }
+            return InsightBuilders.buildZoteroInsight(from: stats, readingStatus: readingStatus)
         }
     }
 }

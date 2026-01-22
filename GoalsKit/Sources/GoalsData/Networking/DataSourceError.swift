@@ -10,4 +10,5 @@ public enum DataSourceError: Error, Sendable {
     case httpError(statusCode: Int)
     case parseError(String)
     case connectionFailed(String)
+    case unauthorized  // 401/403 - invalid API key or permissions
 }

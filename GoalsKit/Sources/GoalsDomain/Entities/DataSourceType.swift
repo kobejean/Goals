@@ -17,6 +17,9 @@ public enum DataSourceType: String, Codable, Sendable, CaseIterable {
     /// Anki spaced repetition learning statistics
     case anki
 
+    /// Zotero reference management and reading progress
+    case zotero
+
     /// Display name for the data source
     public var displayName: String {
         switch self {
@@ -30,6 +33,8 @@ public enum DataSourceType: String, Codable, Sendable, CaseIterable {
             return "Tasks"
         case .anki:
             return "Anki"
+        case .zotero:
+            return "Zotero"
         }
     }
 
@@ -46,6 +51,8 @@ public enum DataSourceType: String, Codable, Sendable, CaseIterable {
             return "timer"
         case .anki:
             return "rectangle.stack"
+        case .zotero:
+            return "books.vertical"
         }
     }
 
@@ -62,6 +69,8 @@ public enum DataSourceType: String, Codable, Sendable, CaseIterable {
             return "Manual time tracking for tasks and activities"
         case .anki:
             return "Reviews, study time, retention, and streak from Anki"
+        case .zotero:
+            return "Reading progress and annotations from Zotero"
         }
     }
 }

@@ -364,6 +364,72 @@ public enum InsightBuilders {
         return (summary, activityData)
     }
 
+    // MARK: - Zotero
+
+    /// Build Zotero insight from daily stats and optional reading status
+    /// Uses scatter + moving average chart with streak or reading progress display
+    /// - Parameters:
+    ///   - stats: Array of Zotero daily stats (annotations/notes)
+    ///   - readingStatus: Optional reading status for collection counts
+    ///   - goals: Optional array of goals for goal line display
+    /// - Returns: Tuple of optional summary and activity data
+    public static func buildZoteroInsight(
+        from stats: [ZoteroDailyStats],
+        readingStatus: ZoteroReadingStatus? = nil,
+        goals: [Goal] = []
+    ) -> (summary: InsightSummary?, activityData: InsightActivityData?) {
+        guard !stats.isEmpty else { return (nil, nil) }
+
+        let type = InsightType.zotero
+
+        // Filter to last 30 days for the card
+        let cutoffDate = Calendar.current.date(byAdding: .day, value: -30, to: Date()) ?? Date()
+        let last30DaysStats = stats.filter { $0.date >= cutoffDate }
+
+        // Raw scatter points (last 30 days) showing total activity
+        let scatterPoints = last30DaysStats.map { stat in
+            InsightDataPoint(date: stat.date, value: Double(stat.totalActivity))
+        }
+
+        // Calculate 30-day moving average for all stats, then filter to last 30 days
+        let allMovingAverage = calculateMovingAverage(
+            for: stats.map { (date: $0.date, value: Double($0.totalActivity)) },
+            window: 30
+        )
+        let movingAveragePoints = allMovingAverage.filter { $0.date >= cutoffDate }.map {
+            InsightDataPoint(date: $0.date, value: $0.value)
+        }
+
+        // Determine display value: reading progress or streak
+        let currentValueFormatted: String
+        if let status = readingStatus, status.totalItems > 0 {
+            currentValueFormatted = "\(status.readCount)/\(status.totalItems) Read"
+        } else {
+            let currentStreak = stats.currentStreak()
+            currentValueFormatted = "\(currentStreak) Day Streak"
+        }
+
+        let trend = calculateTrend(for: stats.map { Double($0.totalActivity) })
+        let goalValue = goals.targetValue(for: "dailyAnnotations")
+
+        let summary = InsightSummary(
+            title: type.displayTitle,
+            systemImage: type.systemImage,
+            color: type.color,
+            scatterPoints: scatterPoints,
+            movingAveragePoints: movingAveragePoints,
+            currentValueFormatted: currentValueFormatted,
+            trend: trend,
+            goalValue: goalValue
+        )
+
+        // Build activity data (annotations + notes as intensity)
+        let activityDays = buildActivityDays(from: stats, color: type.color) { Double($0.totalActivity) }
+        let activityData = InsightActivityData(days: activityDays, emptyColor: .gray.opacity(0.2))
+
+        return (summary, activityData)
+    }
+
     // MARK: - Shared Helpers
 
     /// Calculate trend percentage comparing recent values to previous values

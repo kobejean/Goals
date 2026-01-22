@@ -27,6 +27,7 @@ public final class AppContainer {
         case .healthKitSleep: return healthKitSleepDataSource.availableMetrics
         case .tasks: return tasksDataSource.availableMetrics
         case .anki: return ankiDataSource.availableMetrics
+        case .zotero: return zoteroDataSource.availableMetrics
         }
     }
 
@@ -62,6 +63,24 @@ public final class AppContainer {
             try? await ankiDataSource.configure(settings: settings)
         }
 
+        // Configure Zotero
+        if let apiKey = UserDefaults.standard.zoteroAPIKey, !apiKey.isEmpty,
+           let userID = UserDefaults.standard.zoteroUserID, !userID.isEmpty {
+            let toReadCollection = UserDefaults.standard.zoteroToReadCollection ?? ""
+            let inProgressCollection = UserDefaults.standard.zoteroInProgressCollection ?? ""
+            let readCollection = UserDefaults.standard.zoteroReadCollection ?? ""
+            let settings = DataSourceSettings(
+                dataSourceType: .zotero,
+                credentials: ["apiKey": apiKey, "userID": userID],
+                options: [
+                    "toReadCollection": toReadCollection,
+                    "inProgressCollection": inProgressCollection,
+                    "readCollection": readCollection
+                ]
+            )
+            try? await zoteroDataSource.configure(settings: settings)
+        }
+
         // HealthKit doesn't need configuration - it uses system authorization
     }
 
@@ -82,6 +101,7 @@ public final class AppContainer {
             taskRepository: taskRepository,
             goalRepository: goalRepository,
             ankiDataSource: ankiDataSource,
+            zoteroDataSource: zoteroDataSource,
             taskCachingService: taskCachingService
         )
         _insightsViewModel = vm
@@ -126,6 +146,7 @@ public final class AppContainer {
     public let healthKitSleepDataSource: CachedHealthKitSleepDataSource
     public let tasksDataSource: TasksDataSource
     public let ankiDataSource: CachedAnkiDataSource
+    public let zoteroDataSource: CachedZoteroDataSource
 
     // MARK: - Caching Services
 
@@ -247,6 +268,10 @@ public final class AppContainer {
             remote: AnkiDataSource(),
             cache: dataCache
         )
+        self.zoteroDataSource = CachedZoteroDataSource(
+            remote: ZoteroDataSource(),
+            cache: dataCache
+        )
 
         // Initialize caching services
         self.taskCachingService = TaskCachingService(
@@ -263,7 +288,8 @@ public final class AppContainer {
                 .atCoder: atCoderDataSource,
                 .healthKitSleep: healthKitSleepDataSource,
                 .tasks: tasksDataSource,
-                .anki: ankiDataSource
+                .anki: ankiDataSource,
+                .zotero: zoteroDataSource
             ]
         )
         self.badgeEvaluationUseCase = BadgeEvaluationUseCase(
