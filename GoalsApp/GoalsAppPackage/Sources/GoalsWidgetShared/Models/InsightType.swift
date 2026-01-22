@@ -49,7 +49,7 @@ public enum InsightType: String, CaseIterable, Codable, Sendable {
 
     /// Brand green color - matches AccentColor in asset catalog
     /// SwiftUI .accentColor doesn't resolve correctly in widgets, so we define it explicitly
-    private static let brandGreen = Color(red: 0.4745, green: 0.7020, blue: 0.2078)
+    public static let brandGreen = Color(red: 0.4745, green: 0.7020, blue: 0.2078)
 }
 
 // MARK: - Transferable for Drag & Drop

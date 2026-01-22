@@ -9,6 +9,7 @@ public enum InsightBuilders {
     // MARK: - TypeQuicker
 
     /// Build TypeQuicker insight from stats
+    /// Uses WPM vs Accuracy chart showing both primary modes
     /// - Parameters:
     ///   - stats: Array of TypeQuicker stats
     ///   - goals: Optional array of goals for goal line display
@@ -21,23 +22,56 @@ public enum InsightBuilders {
 
         let type = InsightType.typeQuicker
 
-        // Build data points (WPM by default)
-        let dataPoints = stats.map { stat in
-            InsightDataPoint(date: stat.date, value: stat.wordsPerMinute)
+        // Build WPM vs Accuracy data points from mode stats
+        var wpmAccuracyPoints: [InsightWPMAccuracyPoint] = []
+
+        for stat in stats {
+            if let byMode = stat.byMode {
+                // Use per-mode stats when available
+                for modeStat in byMode {
+                    wpmAccuracyPoints.append(InsightWPMAccuracyPoint(
+                        date: stat.date,
+                        mode: modeStat.mode,
+                        wpm: modeStat.wordsPerMinute,
+                        accuracy: modeStat.accuracy
+                    ))
+                }
+            } else {
+                // Fallback to overall stats
+                wpmAccuracyPoints.append(InsightWPMAccuracyPoint(
+                    date: stat.date,
+                    mode: "overall",
+                    wpm: stat.wordsPerMinute,
+                    accuracy: stat.accuracy
+                ))
+            }
         }
 
+        // Define mode colors
+        let modeColors: [String: Color] = [
+            "text": .gray,
+            "code": InsightType.brandGreen,
+            "overall": type.color
+        ]
+
+        let wpmAccuracyData = InsightWPMAccuracyData(
+            dataPoints: wpmAccuracyPoints,
+            wpmGoal: goals.targetValue(for: "wpm"),
+            accuracyGoal: goals.targetValue(for: "accuracy"),
+            modeColors: modeColors
+        )
+
         let latestWPM = Int(stats.last?.wordsPerMinute ?? 0)
+        let latestAccuracy = Int(stats.last?.accuracy ?? 0)
         let trend = calculateTrend(for: stats.map { $0.wordsPerMinute })
-        let goalValue = goals.targetValue(for: "wpm")
 
         let summary = InsightSummary(
             title: type.displayTitle,
             systemImage: type.systemImage,
             color: type.color,
-            dataPoints: dataPoints,
-            currentValueFormatted: "\(latestWPM) WPM",
-            trend: trend,
-            goalValue: goalValue
+            wpmAccuracyData: wpmAccuracyData,
+            currentValueFormatted: "\(latestWPM) WPM · \(latestAccuracy)%",
+            trend: trend
         )
 
         // Build activity data (practice time intensity)

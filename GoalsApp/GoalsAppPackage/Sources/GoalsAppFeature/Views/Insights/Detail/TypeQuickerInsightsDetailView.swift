@@ -1,6 +1,7 @@
 import SwiftUI
 import Charts
 import GoalsDomain
+import GoalsWidgetShared
 
 /// TypeQuicker insights detail view with full charts
 struct TypeQuickerInsightsDetailView: View {
@@ -148,16 +149,36 @@ struct TypeQuickerInsightsDetailView: View {
                 .font(.subheadline)
                 .fontWeight(.medium)
 
-            WPMAccuracyChart(
-                dataPoints: filteredStats,
-                wpmGoal: viewModel.goalTarget(for: .wpm),
-                accuracyGoal: viewModel.goalTarget(for: .accuracy),
-                colorForMode: colorForMode
-            )
+            WPMAccuracyChart(data: wpmAccuracyData, style: .full)
+                .frame(height: 200)
 
             // Legend with mode colors and old/new fade indicator
             wpmAccuracyLegend
         }
+    }
+
+    /// Convert filtered stats to WPM Accuracy chart data
+    private var wpmAccuracyData: InsightWPMAccuracyData {
+        let points = filteredStats.map { point in
+            InsightWPMAccuracyPoint(
+                date: point.date,
+                mode: point.mode,
+                wpm: point.wpm,
+                accuracy: point.accuracy
+            )
+        }
+
+        let modeColors: [String: Color] = [
+            "text": .gray,
+            "code": InsightType.brandGreen
+        ]
+
+        return InsightWPMAccuracyData(
+            dataPoints: points,
+            wpmGoal: viewModel.goalTarget(for: .wpm),
+            accuracyGoal: viewModel.goalTarget(for: .accuracy),
+            modeColors: modeColors
+        )
     }
 
     private var wpmAccuracyLegend: some View {
@@ -211,8 +232,8 @@ struct TypeQuickerInsightsDetailView: View {
     private func colorForMode(_ mode: String) -> Color {
         switch mode.lowercased() {
         case "text": return .gray
-        case "code": return Color.accentColor
-        default: return Color.accentColor
+        case "code": return InsightType.brandGreen
+        default: return InsightType.brandGreen
         }
     }
 }

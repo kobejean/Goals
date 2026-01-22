@@ -1,26 +1,56 @@
 import SwiftUI
 import Charts
 
+/// Style for WPMAccuracyChart display
+public enum WPMAccuracyChartStyle {
+    /// Full size with axes, labels, and annotations (for detail views)
+    case full
+    /// Compact size without axes or annotations (for insight cards)
+    case compact
+}
+
 /// A 2D scatter/line chart plotting WPM (x-axis) vs Accuracy (y-axis)
 /// with temporal fading and goal lines
-struct WPMAccuracyChart: View {
-    let dataPoints: [TypeQuickerModeDataPoint]
-    let wpmGoal: Double?
-    let accuracyGoal: Double?
-    let colorForMode: (String) -> Color
+public struct WPMAccuracyChart: View {
+    let data: InsightWPMAccuracyData
+    let style: WPMAccuracyChartStyle
 
     private let movingAverageWindow = 5
-    private let defaultSymbolSize: CGFloat = 6
-    private let lastSymbolSize: CGFloat = 10
-    private let lineWidth: CGFloat = 2.5
-    private let openCircleLineWidth: CGFloat = 2
 
-    var body: some View {
+    // Style-dependent sizes
+    private var defaultSymbolSize: CGFloat {
+        style == .compact ? 4 : 6
+    }
+    private var lastSymbolSize: CGFloat {
+        style == .compact ? 7 : 10
+    }
+    private var lineWidth: CGFloat {
+        style == .compact ? 2 : 2.5
+    }
+    private var openCircleLineWidth: CGFloat {
+        style == .compact ? 1.5 : 2
+    }
+    private var goalLineWidth: CGFloat {
+        style == .compact ? 1 : 2
+    }
+    private var goalLineDash: [CGFloat] {
+        style == .compact ? [3, 3] : [5, 5]
+    }
+    private var goalLineOpacity: Double {
+        style == .compact ? 0.6 : 0.8
+    }
+
+    public init(data: InsightWPMAccuracyData, style: WPMAccuracyChartStyle = .full) {
+        self.data = data
+        self.style = style
+    }
+
+    public var body: some View {
         Chart {
             // Scatter points with temporal alpha
-            ForEach(uniqueModes, id: \.self) { mode in
+            ForEach(data.uniqueModes, id: \.self) { mode in
                 let points = sortedPoints(for: mode)
-                let color = colorForMode(mode)
+                let color = data.color(for: mode)
                 ForEach(Array(points.enumerated()), id: \.element.id) { index, point in
                     let isLast = index == points.count - 1
                     let pointAlpha = alpha(for: index, total: points.count)
@@ -43,50 +73,58 @@ struct WPMAccuracyChart: View {
             }
 
             // WPM goal line (vertical)
-            if let wpmGoal {
-                RuleMark(x: .value("WPM Goal", wpmGoal))
-                    .foregroundStyle(.red.opacity(0.8))
-                    .lineStyle(StrokeStyle(lineWidth: 2, dash: [5, 5]))
-                    .annotation(position: .top, alignment: .trailing) {
-                        Text("WPM Goal")
-                            .font(.caption2)
-                            .foregroundStyle(.red)
-                            .padding(.horizontal, 4)
-                            .background(.regularMaterial)
-                            .clipShape(RoundedRectangle(cornerRadius: 4))
-                    }
+            if let wpmGoal = data.wpmGoal {
+                if style == .compact {
+                    RuleMark(x: .value("WPM Goal", wpmGoal))
+                        .foregroundStyle(.red.opacity(goalLineOpacity))
+                        .lineStyle(StrokeStyle(lineWidth: goalLineWidth, dash: goalLineDash))
+                } else {
+                    RuleMark(x: .value("WPM Goal", wpmGoal))
+                        .foregroundStyle(.red.opacity(goalLineOpacity))
+                        .lineStyle(StrokeStyle(lineWidth: goalLineWidth, dash: goalLineDash))
+                        .annotation(position: .top, alignment: .trailing) {
+                            Text("WPM Goal")
+                                .font(.caption2)
+                                .foregroundStyle(.red)
+                                .padding(.horizontal, 4)
+                                .background(.regularMaterial)
+                                .clipShape(RoundedRectangle(cornerRadius: 4))
+                        }
+                }
             }
 
             // Accuracy goal line (horizontal)
-            if let accuracyGoal {
-                RuleMark(y: .value("Accuracy Goal", accuracyGoal))
-                    .foregroundStyle(.orange.opacity(0.8))
-                    .lineStyle(StrokeStyle(lineWidth: 2, dash: [5, 5]))
-                    .annotation(position: .trailing, alignment: .top) {
-                        Text("Accuracy Goal")
-                            .font(.caption2)
-                            .foregroundStyle(.orange)
-                            .padding(.horizontal, 4)
-                            .background(.regularMaterial)
-                            .clipShape(RoundedRectangle(cornerRadius: 4))
-                    }
+            if let accuracyGoal = data.accuracyGoal {
+                if style == .compact {
+                    RuleMark(y: .value("Accuracy Goal", accuracyGoal))
+                        .foregroundStyle(.orange.opacity(goalLineOpacity))
+                        .lineStyle(StrokeStyle(lineWidth: goalLineWidth, dash: goalLineDash))
+                } else {
+                    RuleMark(y: .value("Accuracy Goal", accuracyGoal))
+                        .foregroundStyle(.orange.opacity(goalLineOpacity))
+                        .lineStyle(StrokeStyle(lineWidth: goalLineWidth, dash: goalLineDash))
+                        .annotation(position: .trailing, alignment: .top) {
+                            Text("Accuracy Goal")
+                                .font(.caption2)
+                                .foregroundStyle(.orange)
+                                .padding(.horizontal, 4)
+                                .background(.regularMaterial)
+                                .clipShape(RoundedRectangle(cornerRadius: 4))
+                        }
+                }
             }
         }
-        .frame(height: 200)
-        .chartXScale(domain: xAxisRange)
-        .chartYScale(domain: yAxisRange)
-        .chartXAxisLabel("WPM")
-        .chartYAxisLabel("Accuracy (%)")
+        .modifier(ChartStyleModifier(style: style, xAxisRange: xAxisRange, yAxisRange: yAxisRange))
         .chartLegend(.hidden)
         .chartBackground { chart in
             GeometryReader { geometry in
                 if let plotFrame = chart.plotFrame {
                     let frame = geometry[plotFrame]
 
-                    ForEach(uniqueModes, id: \.self) { mode in
+                    ForEach(data.uniqueModes, id: \.self) { mode in
                         MovingAverageLine(
                             points: movingAverage(for: mode),
-                            color: colorForMode(mode),
+                            color: data.color(for: mode),
                             chart: chart,
                             plotOrigin: frame.origin,
                             lineWidth: lineWidth
@@ -99,12 +137,8 @@ struct WPMAccuracyChart: View {
 
     // MARK: - Data Helpers
 
-    private var uniqueModes: [String] {
-        Array(Set(dataPoints.map(\.mode))).sorted()
-    }
-
-    private func sortedPoints(for mode: String) -> [TypeQuickerModeDataPoint] {
-        dataPoints.filter { $0.mode == mode }.sorted { $0.date < $1.date }
+    private func sortedPoints(for mode: String) -> [InsightWPMAccuracyPoint] {
+        data.dataPoints.filter { $0.mode == mode }.sorted { $0.date < $1.date }
     }
 
     private func alpha(for index: Int, total: Int) -> Double {
@@ -132,8 +166,8 @@ struct WPMAccuracyChart: View {
     // MARK: - Axis Ranges
 
     private var xAxisRange: ClosedRange<Double> {
-        var values = dataPoints.map(\.wpm)
-        if let wpmGoal { values.append(wpmGoal) }
+        var values = data.dataPoints.map(\.wpm)
+        if let wpmGoal = data.wpmGoal { values.append(wpmGoal) }
 
         guard let minVal = values.min(), let maxVal = values.max() else {
             return 0...100
@@ -145,8 +179,8 @@ struct WPMAccuracyChart: View {
     }
 
     private var yAxisRange: ClosedRange<Double> {
-        var values = dataPoints.map(\.accuracy)
-        if let accuracyGoal { values.append(accuracyGoal) }
+        var values = data.dataPoints.map(\.accuracy)
+        if let accuracyGoal = data.accuracyGoal { values.append(accuracyGoal) }
 
         guard let minVal = values.min(), let maxVal = values.max() else {
             return 0...100
@@ -155,6 +189,32 @@ struct WPMAccuracyChart: View {
         let range = maxVal - minVal
         let padding = max(range * 0.15, 1)
         return max(0, minVal - padding)...min(100, maxVal + padding)
+    }
+}
+
+// MARK: - Chart Style Modifier
+
+private struct ChartStyleModifier: ViewModifier {
+    let style: WPMAccuracyChartStyle
+    let xAxisRange: ClosedRange<Double>
+    let yAxisRange: ClosedRange<Double>
+
+    func body(content: Content) -> some View {
+        switch style {
+        case .full:
+            content
+                .frame(height: 200)
+                .chartXScale(domain: xAxisRange)
+                .chartYScale(domain: yAxisRange)
+                .chartXAxisLabel("WPM")
+                .chartYAxisLabel("Accuracy (%)")
+        case .compact:
+            content
+                .chartXAxis(.hidden)
+                .chartYAxis(.hidden)
+                .chartXScale(domain: xAxisRange)
+                .chartYScale(domain: yAxisRange)
+        }
     }
 }
 
@@ -247,33 +307,4 @@ private struct MovingAverageLine: View {
 
         return CGPoint(x: x, y: y)
     }
-}
-
-// MARK: - Preview
-
-#Preview {
-    let sampleData = [
-        TypeQuickerModeDataPoint(date: Date().addingTimeInterval(-86400 * 7), mode: "code", wpm: 45, accuracy: 92, timeMinutes: 15),
-        TypeQuickerModeDataPoint(date: Date().addingTimeInterval(-86400 * 6), mode: "code", wpm: 48, accuracy: 93, timeMinutes: 20),
-        TypeQuickerModeDataPoint(date: Date().addingTimeInterval(-86400 * 5), mode: "code", wpm: 50, accuracy: 91, timeMinutes: 18),
-        TypeQuickerModeDataPoint(date: Date().addingTimeInterval(-86400 * 4), mode: "code", wpm: 52, accuracy: 94, timeMinutes: 25),
-        TypeQuickerModeDataPoint(date: Date().addingTimeInterval(-86400 * 3), mode: "text", wpm: 60, accuracy: 95, timeMinutes: 10),
-        TypeQuickerModeDataPoint(date: Date().addingTimeInterval(-86400 * 2), mode: "text", wpm: 62, accuracy: 96, timeMinutes: 12),
-        TypeQuickerModeDataPoint(date: Date().addingTimeInterval(-86400 * 1), mode: "code", wpm: 55, accuracy: 95, timeMinutes: 22),
-        TypeQuickerModeDataPoint(date: Date(), mode: "text", wpm: 65, accuracy: 97, timeMinutes: 15),
-    ]
-
-    return WPMAccuracyChart(
-        dataPoints: sampleData,
-        wpmGoal: 60,
-        accuracyGoal: 95,
-        colorForMode: { mode in
-            switch mode.lowercased() {
-            case "text": return .gray
-            case "code": return .accentColor
-            default: return .accentColor
-            }
-        }
-    )
-    .padding()
 }

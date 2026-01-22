@@ -123,6 +123,10 @@ public struct InsightCard: View {
                 color: summary.color,
                 goalValue: summary.goalValue
             )
+        case .wpmAccuracy:
+            if let wpmAccuracyData = summary.wpmAccuracyData {
+                WPMAccuracyChart(data: wpmAccuracyData, style: .compact)
+            }
         }
     }
 
