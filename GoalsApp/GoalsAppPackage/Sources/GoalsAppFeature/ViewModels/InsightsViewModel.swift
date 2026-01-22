@@ -33,7 +33,8 @@ public final class InsightsViewModel {
         sleepDataSource: CachedHealthKitSleepDataSource,
         taskRepository: TaskRepositoryProtocol,
         goalRepository: GoalRepositoryProtocol,
-        ankiDataSource: CachedAnkiDataSource
+        ankiDataSource: CachedAnkiDataSource,
+        taskCachingService: TaskCachingService? = nil
     ) {
         self.typeQuicker = TypeQuickerInsightsViewModel(
             dataSource: typeQuickerDataSource,
@@ -49,7 +50,8 @@ public final class InsightsViewModel {
         )
         self.tasks = TasksInsightsViewModel(
             taskRepository: taskRepository,
-            goalRepository: goalRepository
+            goalRepository: goalRepository,
+            taskCachingService: taskCachingService
         )
         self.anki = AnkiInsightsViewModel(
             dataSource: ankiDataSource,

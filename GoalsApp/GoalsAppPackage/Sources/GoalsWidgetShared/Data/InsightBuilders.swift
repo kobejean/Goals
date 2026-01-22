@@ -180,14 +180,98 @@ public enum InsightBuilders {
 
     // MARK: - Tasks
 
-    /// Build Tasks insight
-    /// Note: Tasks don't use CacheableRecord, so widgets can't access task data.
-    /// This always returns nil for widget use. App ViewModels should build directly.
-    /// - Returns: (nil, nil) - Tasks not supported in widgets
-    public static func buildTasksInsight() -> (summary: InsightSummary?, activityData: InsightActivityData?) {
-        // Tasks don't use CacheableRecord, so we can't access them from the shared cache
-        // The main app's TasksInsightsViewModel handles this directly with TaskRepository
-        return (nil, nil)
+    /// Build Tasks insight from cached daily summaries
+    /// - Parameters:
+    ///   - dailySummaries: Array of task daily summaries
+    ///   - goals: Optional array of goals for target display
+    /// - Returns: Tuple of optional summary and activity data
+    public static func buildTasksInsight(
+        from dailySummaries: [TaskDailySummary],
+        goals: [Goal] = []
+    ) -> (summary: InsightSummary?, activityData: InsightActivityData?) {
+        guard !dailySummaries.isEmpty else { return (nil, nil) }
+
+        let type = InsightType.tasks
+
+        // Fixed 10-day date range for consistent X-axis
+        let dateRange = DateRange.lastDays(10)
+        let calendar = Calendar.current
+
+        // Filter data to the date range (comparing start of day)
+        let rangeStart = calendar.startOfDay(for: dateRange.start)
+        let rangeEnd = calendar.startOfDay(for: dateRange.end)
+
+        let recentData = dailySummaries.filter { summary in
+            let day = calendar.startOfDay(for: summary.date)
+            return day >= rangeStart && day <= rangeEnd
+        }
+
+        let rangeDataPoints = recentData.map { summary in
+            summary.toDurationRangeDataPoint()
+        }
+
+        let durationRangeData = InsightDurationRangeData(
+            dataPoints: rangeDataPoints,
+            defaultColor: type.color,
+            dateRange: dateRange,
+            useSimpleHours: true
+        )
+
+        // Calculate today's hours
+        let today = calendar.startOfDay(for: Date())
+        let todayTotalHours = dailySummaries
+            .filter { calendar.startOfDay(for: $0.date) == today }
+            .reduce(0.0) { $0 + $1.totalDuration / 3600.0 }
+
+        // Calculate trend
+        let trend = calculateTrend(for: dailySummaries.map { $0.totalDuration / 3600.0 })
+
+        let summary = InsightSummary(
+            title: type.displayTitle,
+            systemImage: type.systemImage,
+            color: type.color,
+            durationRangeData: durationRangeData,
+            currentValueFormatted: formatTaskHours(todayTotalHours),
+            trend: trend
+        )
+
+        // Build activity data (daily hours as intensity)
+        // Use goal target or 4 hours as default "full" intensity reference
+        let targetHours = goals.targetValue(for: "dailyDuration").map { $0 / 60.0 } ?? 4.0
+
+        let activityDays = dailySummaries.map { summary in
+            let hours = summary.totalDuration / 3600.0
+            let intensity = min(hours / targetHours, 1.0)
+
+            return InsightActivityDay(
+                date: summary.date,
+                color: type.color,
+                intensity: intensity
+            )
+        }
+
+        let activityData = InsightActivityData(days: activityDays, emptyColor: .gray.opacity(0.2))
+
+        return (summary, activityData)
+    }
+
+    /// Format task hours for display
+    /// - Parameter hours: Duration in hours
+    /// - Returns: Formatted string like "2h" or "1h 30m"
+    public static func formatTaskHours(_ hours: Double) -> String {
+        let totalMinutes = Int(hours * 60)
+        let h = totalMinutes / 60
+        let m = totalMinutes % 60
+        if h == 0 && m == 0 {
+            return "0m"
+        }
+        if h == 0 {
+            return "\(m)m"
+        }
+        if m == 0 {
+            return "\(h)h"
+        }
+        return "\(h)h \(m)m"
     }
 
     // MARK: - Anki

@@ -81,7 +81,8 @@ public final class AppContainer {
             sleepDataSource: healthKitSleepDataSource,
             taskRepository: taskRepository,
             goalRepository: goalRepository,
-            ankiDataSource: ankiDataSource
+            ankiDataSource: ankiDataSource,
+            taskCachingService: taskCachingService
         )
         _insightsViewModel = vm
         return vm
@@ -92,7 +93,10 @@ public final class AppContainer {
         if let existing = _tasksViewModel {
             return existing
         }
-        let vm = TasksViewModel(taskRepository: taskRepository)
+        let vm = TasksViewModel(
+            taskRepository: taskRepository,
+            taskCachingService: taskCachingService
+        )
         _tasksViewModel = vm
         return vm
     }
@@ -122,6 +126,10 @@ public final class AppContainer {
     public let healthKitSleepDataSource: CachedHealthKitSleepDataSource
     public let tasksDataSource: TasksDataSource
     public let ankiDataSource: CachedAnkiDataSource
+
+    // MARK: - Caching Services
+
+    public let taskCachingService: TaskCachingService
 
     // MARK: - Use Cases
 
@@ -237,6 +245,12 @@ public final class AppContainer {
         self.tasksDataSource = TasksDataSource(taskRepository: taskRepo)
         self.ankiDataSource = CachedAnkiDataSource(
             remote: AnkiDataSource(),
+            cache: dataCache
+        )
+
+        // Initialize caching services
+        self.taskCachingService = TaskCachingService(
+            taskRepository: taskRepo,
             cache: dataCache
         )
 

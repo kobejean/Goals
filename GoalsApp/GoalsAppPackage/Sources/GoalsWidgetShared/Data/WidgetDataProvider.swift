@@ -34,7 +34,8 @@ public actor WidgetDataProvider {
             return InsightBuilders.buildSleepInsight(from: sleepData)
 
         case .tasks:
-            return InsightBuilders.buildTasksInsight()
+            let summaries = (try? await cache.fetch(TaskDailySummary.self, from: startDate, to: endDate)) ?? []
+            return InsightBuilders.buildTasksInsight(from: summaries)
 
         case .anki:
             let stats = (try? await cache.fetch(AnkiDailyStats.self, from: startDate, to: endDate)) ?? []

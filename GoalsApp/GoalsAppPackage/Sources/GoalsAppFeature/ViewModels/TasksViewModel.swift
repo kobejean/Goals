@@ -1,5 +1,7 @@
 import SwiftUI
+import WidgetKit
 import GoalsDomain
+import GoalsData
 
 /// ViewModel for the Tasks tab, managing task tracking state
 @MainActor
@@ -28,6 +30,7 @@ public final class TasksViewModel: Sendable {
     // MARK: - Dependencies
 
     private let taskRepository: TaskRepositoryProtocol
+    private let taskCachingService: TaskCachingService?
 
     // MARK: - Timer
 
@@ -35,8 +38,12 @@ public final class TasksViewModel: Sendable {
 
     // MARK: - Initialization
 
-    public init(taskRepository: TaskRepositoryProtocol) {
+    public init(
+        taskRepository: TaskRepositoryProtocol,
+        taskCachingService: TaskCachingService? = nil
+    ) {
         self.taskRepository = taskRepository
+        self.taskCachingService = taskCachingService
     }
 
     // MARK: - Public Methods
@@ -83,6 +90,10 @@ public final class TasksViewModel: Sendable {
 
             // Refresh today's sessions
             todaySessionsByTask = try await fetchTodaySessions()
+
+            // Sync to cache for widget access
+            try? await taskCachingService?.syncTodayToCache()
+            WidgetCenter.shared.reloadAllTimelines()
         } catch {
             errorMessage = error.localizedDescription
         }

@@ -1,6 +1,8 @@
 import SwiftUI
 import GoalsDomain
 import GoalsCore
+import GoalsData
+import GoalsWidgetShared
 
 /// ViewModel for Tasks insights section
 @MainActor @Observable
@@ -22,6 +24,7 @@ public final class TasksInsightsViewModel: InsightsSectionViewModel {
 
     private let taskRepository: TaskRepositoryProtocol
     private let goalRepository: GoalRepositoryProtocol
+    private let taskCachingService: TaskCachingService?
 
     // MARK: - Timer State
 
@@ -40,10 +43,12 @@ public final class TasksInsightsViewModel: InsightsSectionViewModel {
 
     public init(
         taskRepository: TaskRepositoryProtocol,
-        goalRepository: GoalRepositoryProtocol
+        goalRepository: GoalRepositoryProtocol,
+        taskCachingService: TaskCachingService? = nil
     ) {
         self.taskRepository = taskRepository
         self.goalRepository = goalRepository
+        self.taskCachingService = taskCachingService
     }
 
     // MARK: - Computed Properties
@@ -102,7 +107,7 @@ public final class TasksInsightsViewModel: InsightsSectionViewModel {
         }
 
         let rangeDataPoints = recentData.map { summary in
-            summary.toDurationRangeDataPoint(tasks: tasks, referenceDate: referenceDate)
+            summary.toDurationRangeDataPoint(referenceDate: referenceDate)
         }
 
         let durationRangeData = InsightDurationRangeData(
@@ -180,7 +185,7 @@ public final class TasksInsightsViewModel: InsightsSectionViewModel {
     public func filteredRangeData(for timeRange: TimeRange) -> [DurationRangeDataPoint] {
         let filtered = filteredDailySummaries(for: timeRange)
         let dataToShow = filtered.count > 30 ? Array(filtered.suffix(30)) : filtered
-        return dataToShow.map { $0.toDurationRangeDataPoint(tasks: tasks, referenceDate: referenceDate) }
+        return dataToShow.map { $0.toDurationRangeDataPoint(referenceDate: referenceDate) }
     }
 
     // MARK: - Data Loading
@@ -203,6 +208,9 @@ public final class TasksInsightsViewModel: InsightsSectionViewModel {
 
             // Update reference date after loading
             referenceDate = Date()
+
+            // Sync to cache for widget access
+            try? await taskCachingService?.syncToCache(from: startDate, to: endDate)
         } catch {
             errorMessage = "Failed to load task data: \(error.localizedDescription)"
         }
@@ -252,56 +260,6 @@ public final class TasksInsightsViewModel: InsightsSectionViewModel {
     public func stopLiveUpdates() {
         timerTask?.cancel()
         timerTask = nil
-    }
-}
-
-// MARK: - Supporting Types
-
-/// Daily summary of task sessions
-public struct TaskDailySummary: Identifiable, Sendable {
-    public var id: Date { date }
-    public let date: Date
-    public let sessions: [TaskSession]
-    public let tasks: [TaskDefinition]
-
-    public init(date: Date, sessions: [TaskSession], tasks: [TaskDefinition]) {
-        self.date = date
-        self.sessions = sessions
-        self.tasks = tasks
-    }
-
-    /// Total tracked duration for the day in seconds
-    public var totalDuration: TimeInterval {
-        sessions.totalDuration
-    }
-
-    /// Sessions grouped by task ID
-    public var sessionsByTask: [UUID: [TaskSession]] {
-        Dictionary(grouping: sessions) { $0.taskId }
-    }
-
-    /// Convert to duration range data point for charting
-    /// - Parameter referenceDate: Date to use as end time for active sessions
-    public func toDurationRangeDataPoint(tasks: [TaskDefinition], referenceDate: Date = Date()) -> DurationRangeDataPoint {
-        let segments = sessions.compactMap { session -> DurationSegment? in
-            // Use referenceDate for active sessions, actual endDate for completed
-            let endDate = session.endDate ?? referenceDate
-
-            // Skip if session started after reference date
-            guard session.startDate <= referenceDate else { return nil }
-
-            let task = tasks.first { $0.id == session.taskId }
-            let color = task?.color.swiftUIColor ?? .orange
-
-            return DurationSegment(
-                startTime: session.startDate,
-                endTime: endDate,
-                color: color,
-                label: task?.name
-            )
-        }
-
-        return DurationRangeDataPoint(date: date, segments: segments)
     }
 }
 
