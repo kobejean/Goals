@@ -1,6 +1,8 @@
 import SwiftUI
+import WidgetKit
 import GoalsDomain
 import GoalsData
+import GoalsWidgetShared
 
 /// Main ViewModel for the Insights view
 /// Owns all section view models and provides observable card data
@@ -131,6 +133,8 @@ public final class InsightsViewModel {
     private func saveCardOrder() {
         guard let data = try? JSONEncoder().encode(cardOrder) else { return }
         UserDefaults.standard.set(data, forKey: UserDefaultsKeys.insightsCardOrder)
+        // Also save to shared defaults for widget access
+        UserDefaults.shared.set(data, forKey: UserDefaultsKeys.insightsCardOrder)
     }
 
     // MARK: - Data Loading
@@ -144,5 +148,8 @@ public final class InsightsViewModel {
             group.addTask { await self.tasks.loadData() }
             group.addTask { await self.anki.loadData() }
         }
+
+        // Trigger widget refresh after all data is loaded
+        WidgetCenter.shared.reloadAllTimelines()
     }
 }

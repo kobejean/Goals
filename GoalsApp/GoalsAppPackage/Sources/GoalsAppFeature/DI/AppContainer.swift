@@ -1,7 +1,9 @@
 import Foundation
 import SwiftData
+import WidgetKit
 import GoalsDomain
 import GoalsData
+import GoalsWidgetShared
 
 /// Dependency injection container for the app
 @MainActor
@@ -144,13 +146,41 @@ public final class AppContainer {
 
     private init(inMemory: Bool) throws {
         // Create LOCAL-ONLY cache container FIRST for fast startup
+        // Use shared App Group container so widgets can read the cache
         let cacheSchema = Schema([CachedDataEntry.self])
-        let cacheConfiguration = ModelConfiguration(
-            "CacheStore",
-            schema: cacheSchema,
-            isStoredInMemoryOnly: inMemory,
-            cloudKitDatabase: .none  // Local only - fast initialization
-        )
+        let cacheConfiguration: ModelConfiguration
+
+        if inMemory {
+            cacheConfiguration = ModelConfiguration(
+                "CacheStore",
+                schema: cacheSchema,
+                isStoredInMemoryOnly: true,
+                cloudKitDatabase: .none
+            )
+        } else if let containerURL = SharedStorage.sharedContainerURL {
+            // Use shared container for widget access
+            let storeURL = containerURL.appendingPathComponent("Library/Application Support/CacheStore.sqlite")
+            // Ensure directory exists
+            try? FileManager.default.createDirectory(
+                at: containerURL.appendingPathComponent("Library/Application Support"),
+                withIntermediateDirectories: true
+            )
+            cacheConfiguration = ModelConfiguration(
+                "CacheStore",
+                schema: cacheSchema,
+                url: storeURL,
+                cloudKitDatabase: .none
+            )
+        } else {
+            // Fallback to default location
+            cacheConfiguration = ModelConfiguration(
+                "CacheStore",
+                schema: cacheSchema,
+                isStoredInMemoryOnly: false,
+                cloudKitDatabase: .none
+            )
+        }
+
         let cacheContainer = try ModelContainer(
             for: cacheSchema,
             configurations: [cacheConfiguration]

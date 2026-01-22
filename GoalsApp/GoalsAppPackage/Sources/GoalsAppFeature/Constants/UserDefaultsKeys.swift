@@ -1,4 +1,5 @@
 import Foundation
+import GoalsWidgetShared
 
 /// Centralized UserDefaults keys to avoid magic strings
 public enum UserDefaultsKeys {
@@ -17,33 +18,59 @@ public enum UserDefaultsKeys {
     public static let tasksInsightsTimeRange = "tasksInsightsTimeRange"
     public static let ankiInsightsTimeRange = "ankiInsightsTimeRange"
     public static let atCoderInsightsTimeRange = "atCoderInsightsTimeRange"
+
+    /// Returns the shared UserDefaults if available, otherwise standard
+    public static var shared: UserDefaults {
+        SharedStorage.sharedDefaults ?? .standard
+    }
 }
 
 // MARK: - UserDefaults Convenience Extensions
 
 public extension UserDefaults {
+    /// Access the shared UserDefaults suite for app group
+    static var shared: UserDefaults {
+        SharedStorage.sharedDefaults ?? .standard
+    }
+
     var typeQuickerUsername: String? {
         get { string(forKey: UserDefaultsKeys.typeQuickerUsername) }
-        set { set(newValue, forKey: UserDefaultsKeys.typeQuickerUsername) }
+        set {
+            set(newValue, forKey: UserDefaultsKeys.typeQuickerUsername)
+            // Also write to shared defaults for widget access
+            UserDefaults.shared.set(newValue, forKey: UserDefaultsKeys.typeQuickerUsername)
+        }
     }
 
     var atCoderUsername: String? {
         get { string(forKey: UserDefaultsKeys.atCoderUsername) }
-        set { set(newValue, forKey: UserDefaultsKeys.atCoderUsername) }
+        set {
+            set(newValue, forKey: UserDefaultsKeys.atCoderUsername)
+            UserDefaults.shared.set(newValue, forKey: UserDefaultsKeys.atCoderUsername)
+        }
     }
 
     var ankiHost: String? {
         get { string(forKey: UserDefaultsKeys.ankiHost) }
-        set { set(newValue, forKey: UserDefaultsKeys.ankiHost) }
+        set {
+            set(newValue, forKey: UserDefaultsKeys.ankiHost)
+            UserDefaults.shared.set(newValue, forKey: UserDefaultsKeys.ankiHost)
+        }
     }
 
     var ankiPort: String? {
         get { string(forKey: UserDefaultsKeys.ankiPort) }
-        set { set(newValue, forKey: UserDefaultsKeys.ankiPort) }
+        set {
+            set(newValue, forKey: UserDefaultsKeys.ankiPort)
+            UserDefaults.shared.set(newValue, forKey: UserDefaultsKeys.ankiPort)
+        }
     }
 
     var ankiDecks: String? {
         get { string(forKey: UserDefaultsKeys.ankiDecks) }
-        set { set(newValue, forKey: UserDefaultsKeys.ankiDecks) }
+        set {
+            set(newValue, forKey: UserDefaultsKeys.ankiDecks)
+            UserDefaults.shared.set(newValue, forKey: UserDefaultsKeys.ankiDecks)
+        }
     }
 }

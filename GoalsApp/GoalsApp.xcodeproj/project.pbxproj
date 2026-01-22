@@ -7,11 +7,22 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		3DF039862F21ECFD00EFB56A /* WidgetKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 3DF039852F21ECFD00EFB56A /* WidgetKit.framework */; };
+		3DF039882F21ECFD00EFB56A /* SwiftUI.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 3DF039872F21ECFD00EFB56A /* SwiftUI.framework */; };
+		3DF039992F21ECFE00EFB56A /* GoalsWidgetExtension.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 3DF039842F21ECFD00EFB56A /* GoalsWidgetExtension.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		3DF039AF2F21EEB800EFB56A /* GoalsWidgetShared in Frameworks */ = {isa = PBXBuildFile; productRef = 3DF039AE2F21EEB800EFB56A /* GoalsWidgetShared */; };
 		8B41F6832DEDD23B001A66F9 /* GoalsAppFeature in Frameworks */ = {isa = PBXBuildFile; productRef = 8B41F6822DEDD23B001A66F9 /* GoalsAppFeature */; };
 		8B41F6852DEDD25C001A66F9 /* GoalsAppFeature in Frameworks */ = {isa = PBXBuildFile; productRef = 8B41F6842DEDD25C001A66F9 /* GoalsAppFeature */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
+		3DF039972F21ECFE00EFB56A /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 8B41F63D2DEDD0D5001A66F9 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 3DF039832F21ECFD00EFB56A;
+			remoteInfo = GoalsWidgetExtension;
+		};
 		8B41F65D2DEDD0D6001A66F9 /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
 			containerPortal = 8B41F63D2DEDD0D5001A66F9 /* Project object */;
@@ -21,12 +32,36 @@
 		};
 /* End PBXContainerItemProxy section */
 
+/* Begin PBXCopyFilesBuildPhase section */
+		3DF0399E2F21ECFE00EFB56A /* Embed Foundation Extensions */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 13;
+			files = (
+				3DF039992F21ECFE00EFB56A /* GoalsWidgetExtension.appex in Embed Foundation Extensions */,
+			);
+			name = "Embed Foundation Extensions";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXCopyFilesBuildPhase section */
+
 /* Begin PBXFileReference section */
+		3DF039842F21ECFD00EFB56A /* GoalsWidgetExtension.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = GoalsWidgetExtension.appex; sourceTree = BUILT_PRODUCTS_DIR; };
+		3DF039852F21ECFD00EFB56A /* WidgetKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = WidgetKit.framework; path = System/Library/Frameworks/WidgetKit.framework; sourceTree = SDKROOT; };
+		3DF039872F21ECFD00EFB56A /* SwiftUI.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = SwiftUI.framework; path = System/Library/Frameworks/SwiftUI.framework; sourceTree = SDKROOT; };
 		8B41F6452DEDD0D5001A66F9 /* GoalsApp.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = GoalsApp.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		8B41F65C2DEDD0D6001A66F9 /* GoalsApp.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = GoalsApp.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
+		3DF0399D2F21ECFE00EFB56A /* Exceptions for "GoalsWidget" folder in "GoalsWidgetExtension" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Info.plist,
+			);
+			target = 3DF039832F21ECFD00EFB56A /* GoalsWidgetExtension */;
+		};
 		8BD71C0A2DEE41E000CEDD92 /* Exceptions for "Config" folder in "GoalsApp" target */ = {
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
 			membershipExceptions = (
@@ -40,6 +75,14 @@
 /* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
+		3DF039892F21ECFD00EFB56A /* GoalsWidget */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				3DF0399D2F21ECFE00EFB56A /* Exceptions for "GoalsWidget" folder in "GoalsWidgetExtension" target */,
+			);
+			path = GoalsWidget;
+			sourceTree = "<group>";
+		};
 		8B41F6472DEDD0D5001A66F9 /* GoalsApp */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
 			path = GoalsApp;
@@ -61,6 +104,16 @@
 /* End PBXFileSystemSynchronizedRootGroup section */
 
 /* Begin PBXFrameworksBuildPhase section */
+		3DF039812F21ECFD00EFB56A /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				3DF039882F21ECFD00EFB56A /* SwiftUI.framework in Frameworks */,
+				3DF039AF2F21EEB800EFB56A /* GoalsWidgetShared in Frameworks */,
+				3DF039862F21ECFD00EFB56A /* WidgetKit.framework in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		8B41F6422DEDD0D5001A66F9 /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
@@ -86,6 +139,7 @@
 				8BD71C052DEE41D800CEDD92 /* Config */,
 				8B41F6472DEDD0D5001A66F9 /* GoalsApp */,
 				8B41F65F2DEDD0D6001A66F9 /* GoalsAppUITests */,
+				3DF039892F21ECFD00EFB56A /* GoalsWidget */,
 				8B41F6812DEDD23B001A66F9 /* Frameworks */,
 				8B41F6462DEDD0D5001A66F9 /* Products */,
 			);
@@ -96,6 +150,7 @@
 			children = (
 				8B41F6452DEDD0D5001A66F9 /* GoalsApp.app */,
 				8B41F65C2DEDD0D6001A66F9 /* GoalsApp.xctest */,
+				3DF039842F21ECFD00EFB56A /* GoalsWidgetExtension.appex */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -103,6 +158,8 @@
 		8B41F6812DEDD23B001A66F9 /* Frameworks */ = {
 			isa = PBXGroup;
 			children = (
+				3DF039852F21ECFD00EFB56A /* WidgetKit.framework */,
+				3DF039872F21ECFD00EFB56A /* SwiftUI.framework */,
 			);
 			name = Frameworks;
 			sourceTree = "<group>";
@@ -110,6 +167,29 @@
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
+		3DF039832F21ECFD00EFB56A /* GoalsWidgetExtension */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 3DF0399A2F21ECFE00EFB56A /* Build configuration list for PBXNativeTarget "GoalsWidgetExtension" */;
+			buildPhases = (
+				3DF039802F21ECFD00EFB56A /* Sources */,
+				3DF039812F21ECFD00EFB56A /* Frameworks */,
+				3DF039822F21ECFD00EFB56A /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			fileSystemSynchronizedGroups = (
+				3DF039892F21ECFD00EFB56A /* GoalsWidget */,
+			);
+			name = GoalsWidgetExtension;
+			packageProductDependencies = (
+				3DF039AE2F21EEB800EFB56A /* GoalsWidgetShared */,
+			);
+			productName = GoalsWidgetExtension;
+			productReference = 3DF039842F21ECFD00EFB56A /* GoalsWidgetExtension.appex */;
+			productType = "com.apple.product-type.app-extension";
+		};
 		8B41F6442DEDD0D5001A66F9 /* GoalsApp */ = {
 			isa = PBXNativeTarget;
 			buildConfigurationList = 8B41F6662DEDD0D6001A66F9 /* Build configuration list for PBXNativeTarget "GoalsApp" */;
@@ -117,10 +197,12 @@
 				8B41F6412DEDD0D5001A66F9 /* Sources */,
 				8B41F6422DEDD0D5001A66F9 /* Frameworks */,
 				8B41F6432DEDD0D5001A66F9 /* Resources */,
+				3DF0399E2F21ECFE00EFB56A /* Embed Foundation Extensions */,
 			);
 			buildRules = (
 			);
 			dependencies = (
+				3DF039982F21ECFE00EFB56A /* PBXTargetDependency */,
 			);
 			fileSystemSynchronizedGroups = (
 				8B41F6472DEDD0D5001A66F9 /* GoalsApp */,
@@ -165,9 +247,12 @@
 			isa = PBXProject;
 			attributes = {
 				BuildIndependentTargetsInParallel = 1;
-				LastSwiftUpdateCheck = 1630;
+				LastSwiftUpdateCheck = 2620;
 				LastUpgradeCheck = 1630;
 				TargetAttributes = {
+					3DF039832F21ECFD00EFB56A = {
+						CreatedOnToolsVersion = 26.2;
+					};
 					8B41F6442DEDD0D5001A66F9 = {
 						CreatedOnToolsVersion = 16.3;
 					};
@@ -196,11 +281,19 @@
 			targets = (
 				8B41F6442DEDD0D5001A66F9 /* GoalsApp */,
 				8B41F65B2DEDD0D6001A66F9 /* GoalsAppUITests */,
+				3DF039832F21ECFD00EFB56A /* GoalsWidgetExtension */,
 			);
 		};
 /* End PBXProject section */
 
 /* Begin PBXResourcesBuildPhase section */
+		3DF039822F21ECFD00EFB56A /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		8B41F6432DEDD0D5001A66F9 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
@@ -218,6 +311,13 @@
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
+		3DF039802F21ECFD00EFB56A /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		8B41F6412DEDD0D5001A66F9 /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
@@ -235,6 +335,11 @@
 /* End PBXSourcesBuildPhase section */
 
 /* Begin PBXTargetDependency section */
+		3DF039982F21ECFE00EFB56A /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 3DF039832F21ECFD00EFB56A /* GoalsWidgetExtension */;
+			targetProxy = 3DF039972F21ECFE00EFB56A /* PBXContainerItemProxy */;
+		};
 		8B41F65E2DEDD0D6001A66F9 /* PBXTargetDependency */ = {
 			isa = PBXTargetDependency;
 			target = 8B41F6442DEDD0D5001A66F9 /* GoalsApp */;
@@ -243,6 +348,70 @@
 /* End PBXTargetDependency section */
 
 /* Begin XCBuildConfiguration section */
+		3DF0399B2F21ECFE00EFB56A /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				ASSETCATALOG_COMPILER_WIDGET_BACKGROUND_COLOR_NAME = WidgetBackground;
+				CODE_SIGN_ENTITLEMENTS = "$(SRCROOT)/Config/GoalsWidget.entitlements";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = Q74A2VY23K;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = GoalsWidget/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = GoalsWidget;
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				IPHONEOS_DEPLOYMENT_TARGET = 26.2;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.kobejean.goals.GoalsWidget;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		3DF0399C2F21ECFE00EFB56A /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				ASSETCATALOG_COMPILER_WIDGET_BACKGROUND_COLOR_NAME = WidgetBackground;
+				CODE_SIGN_ENTITLEMENTS = "$(SRCROOT)/Config/GoalsWidget.entitlements";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = Q74A2VY23K;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = GoalsWidget/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = GoalsWidget;
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				IPHONEOS_DEPLOYMENT_TARGET = 26.2;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.kobejean.goals.GoalsWidget;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
 		8B41F6642DEDD0D6001A66F9 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
@@ -451,6 +620,15 @@
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
+		3DF0399A2F21ECFE00EFB56A /* Build configuration list for PBXNativeTarget "GoalsWidgetExtension" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				3DF0399B2F21ECFE00EFB56A /* Debug */,
+				3DF0399C2F21ECFE00EFB56A /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
 		8B41F6402DEDD0D5001A66F9 /* Build configuration list for PBXProject "GoalsApp" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
@@ -488,6 +666,11 @@
 /* End XCLocalSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
+		3DF039AE2F21EEB800EFB56A /* GoalsWidgetShared */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 8B41F6902DEDD300001A66F9 /* XCLocalSwiftPackageReference "GoalsAppPackage" */;
+			productName = GoalsWidgetShared;
+		};
 		8B41F6822DEDD23B001A66F9 /* GoalsAppFeature */ = {
 			isa = XCSwiftPackageProductDependency;
 			package = 8B41F6902DEDD300001A66F9 /* XCLocalSwiftPackageReference "GoalsAppPackage" */;

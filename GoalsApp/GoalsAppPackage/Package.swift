@@ -10,14 +10,26 @@ let package = Package(
             name: "GoalsAppFeature",
             targets: ["GoalsAppFeature"]
         ),
+        .library(
+            name: "GoalsWidgetShared",
+            targets: ["GoalsWidgetShared"]
+        ),
     ],
     dependencies: [
         .package(path: "../../GoalsKit")
     ],
     targets: [
         .target(
+            name: "GoalsWidgetShared",
+            dependencies: [
+                .product(name: "GoalsDomain", package: "GoalsKit"),
+                .product(name: "GoalsData", package: "GoalsKit"),
+            ]
+        ),
+        .target(
             name: "GoalsAppFeature",
             dependencies: [
+                "GoalsWidgetShared",
                 .product(name: "GoalsDomain", package: "GoalsKit"),
                 .product(name: "GoalsData", package: "GoalsKit"),
                 .product(name: "GoalsCore", package: "GoalsKit"),
