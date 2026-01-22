@@ -59,10 +59,6 @@ struct AnkiInsightsDetailView: View {
                 .foregroundStyle(.purple)
             Text("Anki Learning")
                 .font(.headline)
-            Spacer()
-            if let trend = viewModel.metricTrend {
-                TrendBadge(trend: trend)
-            }
         }
     }
 

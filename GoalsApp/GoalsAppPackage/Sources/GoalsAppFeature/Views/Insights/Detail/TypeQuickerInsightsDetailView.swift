@@ -22,10 +22,6 @@ struct TypeQuickerInsightsDetailView: View {
                             .foregroundStyle(Color.accentColor)
                         Text("Typing Progress")
                             .font(.headline)
-                        Spacer()
-                        if let trend = viewModel.metricTrend {
-                            TrendBadge(trend: trend)
-                        }
                     }
 
                     if filteredStats.isEmpty {
