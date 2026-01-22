@@ -108,7 +108,8 @@ public final class TasksInsightsViewModel: InsightsSectionViewModel {
         let durationRangeData = InsightDurationRangeData(
             dataPoints: rangeDataPoints,
             defaultColor: .orange,
-            dateRange: dateRange
+            dateRange: dateRange,
+            useSimpleHours: true
         )
 
         return InsightSummary(
