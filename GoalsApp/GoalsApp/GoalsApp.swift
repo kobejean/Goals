@@ -45,7 +45,7 @@ struct GoalsApp: App {
                         .init(.golfCourseSelect, loopCount: 5),
                         .init(.golfGameResults, loopCount: 3),
                         .init(.konohaNoHiru, loopCount: 2)
-                    ])
+					].shuffled())
                 } catch {
                     print("Failed to play BGM: \(error)")
                 }

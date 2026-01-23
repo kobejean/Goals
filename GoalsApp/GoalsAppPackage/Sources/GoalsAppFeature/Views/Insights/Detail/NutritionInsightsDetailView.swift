@@ -103,24 +103,44 @@ struct NutritionInsightsDetailView: View {
         .padding(.vertical, 40)
     }
 
+    private var movingAverageData: [(date: Date, value: Double)] {
+        viewModel.movingAverageData(for: filteredSummaries)
+    }
+
     private var caloriesChartSection: some View {
         VStack(alignment: .leading, spacing: 8) {
             Text("Daily Calories")
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
 
-            Chart(filteredSummaries) { summary in
-                BarMark(
-                    x: .value("Date", summary.date, unit: .day),
-                    y: .value("Calories", summary.totalNutrients.calories)
-                )
-                .foregroundStyle(Color.green.gradient)
-                .cornerRadius(4)
+            Chart {
+                // Scatter plot of daily values
+                ForEach(filteredSummaries) { summary in
+                    PointMark(
+                        x: .value("Date", summary.date, unit: .day),
+                        y: .value("Calories", summary.totalCalories)
+                    )
+                    .foregroundStyle(Color.teal.opacity(0.4))
+                    .symbolSize(30)
+                }
+
+                // 7-day moving average line
+                ForEach(Array(movingAverageData.enumerated()), id: \.offset) { _, point in
+                    LineMark(
+                        x: .value("Date", point.date, unit: .day),
+                        y: .value("Moving Avg", point.value)
+                    )
+                    .foregroundStyle(Color.teal)
+                    .lineStyle(StrokeStyle(lineWidth: 2.5))
+                }
             }
             .frame(height: 200)
+            .chartYScale(domain: viewModel.chartYAxisRange(for: filteredSummaries))
             .chartYAxis {
                 AxisMarks(position: .leading)
             }
+            .chartYAxisLabel("kcal")
+            .chartLegend(.hidden)
             .padding()
             .background(
                 RoundedRectangle(cornerRadius: 12)

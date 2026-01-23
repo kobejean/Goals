@@ -112,6 +112,22 @@ public final class NutritionInsightsViewModel: InsightsSectionViewModel {
         return filtered
     }
 
+    /// Calculate 7-day moving average for calories
+    public func movingAverageData(for summaries: [NutritionDailySummary]) -> [(date: Date, value: Double)] {
+        let data = summaries.map { (date: $0.date, value: $0.totalCalories) }
+        return InsightBuilders.calculateMovingAverage(for: data, window: 7)
+    }
+
+    /// Calculate Y-axis range for chart
+    public func chartYAxisRange(for summaries: [NutritionDailySummary]) -> ClosedRange<Double> {
+        let values = summaries.map { $0.totalCalories }
+        guard let minVal = values.min(), let maxVal = values.max() else {
+            return 0...2000
+        }
+        let padding = (maxVal - minVal) * 0.1
+        return max(0, minVal - padding)...(maxVal + padding)
+    }
+
     // MARK: - Data Loading
 
     public func loadCachedData() async {

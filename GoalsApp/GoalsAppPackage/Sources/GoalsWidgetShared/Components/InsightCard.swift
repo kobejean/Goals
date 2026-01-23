@@ -76,15 +76,14 @@ public struct InsightCard: View {
             activityContent
 
         case .both:
-            HStack(alignment: .bottom, spacing: 12) {
+            HStack(alignment: .top, spacing: 12) {
                 // Left: Chart with current value
                 chartContent(height: 56, showValue: true, valueFont: .headline)
                     .frame(maxWidth: .infinity, alignment: .leading)
 
-                // Right: Activity grid (aligned to bottom/baseline)
+                // Right: Activity grid
                 activityContent
                     .frame(maxWidth: .infinity, alignment: .trailing)
-                    .padding(.bottom, 4)
             }
         }
     }
