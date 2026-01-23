@@ -24,7 +24,12 @@ public actor CachedAnkiDataSource: AnkiDataSourceProtocol, CachingDataSourceWrap
     public func fetchDailyStats(from startDate: Date, to endDate: Date) async throws -> [AnkiDailyStats] {
         // Get cached data to determine what's missing
         let cachedStats = try await fetchCached(AnkiDailyStats.self, from: startDate, to: endDate)
-        let cachedDates = Set(cachedStats.map { Calendar.current.startOfDay(for: $0.date) })
+
+        // Always refetch today since new reviews can happen throughout the day
+        let calendar = Calendar.current
+        let today = calendar.startOfDay(for: Date())
+        let cachedDates = Set(cachedStats.map { calendar.startOfDay(for: $0.date) })
+            .filter { $0 != today }
 
         // Calculate and fetch missing ranges
         let missingRanges = calculateMissingDateRanges(from: startDate, to: endDate, cachedDates: cachedDates)
