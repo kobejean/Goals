@@ -19,6 +19,9 @@ public enum UserDefaultsKeys {
     // Insights card order
     public static let insightsCardOrder = "insightsCardOrder"
 
+    // Insights fetch throttling
+    public static let insightsLastLoadedAt = "insightsLastLoadedAt"
+
     // Insights time range keys (per detail view)
     public static let typeQuickerInsightsTimeRange = "typeQuickerInsightsTimeRange"
     public static let sleepInsightsTimeRange = "sleepInsightsTimeRange"

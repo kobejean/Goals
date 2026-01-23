@@ -14,7 +14,9 @@ public final class InsightsViewModel {
 
     // MARK: - Throttling
 
-    private var lastLoadedAt: Date?
+    private var lastLoadedAt: Date? {
+        didSet { saveLastLoadedAt() }
+    }
     private let minRefreshInterval: TimeInterval = 60 * 60  // 1 hour
     public let atCoder: AtCoderInsightsViewModel
     public let sleep: SleepInsightsViewModel
@@ -71,6 +73,9 @@ public final class InsightsViewModel {
 
         // Load persisted card order or use default
         self.cardOrder = Self.loadCardOrder()
+
+        // Load persisted throttle timestamp
+        self.lastLoadedAt = Self.loadLastLoadedAt()
     }
 
     // MARK: - Card Data (computed from owned view models)
@@ -152,6 +157,14 @@ public final class InsightsViewModel {
         UserDefaults.standard.set(data, forKey: UserDefaultsKeys.insightsCardOrder)
         // Also save to shared defaults for widget access
         UserDefaults.shared.set(data, forKey: UserDefaultsKeys.insightsCardOrder)
+    }
+
+    private static func loadLastLoadedAt() -> Date? {
+        UserDefaults.standard.object(forKey: UserDefaultsKeys.insightsLastLoadedAt) as? Date
+    }
+
+    private func saveLastLoadedAt() {
+        UserDefaults.standard.set(lastLoadedAt, forKey: UserDefaultsKeys.insightsLastLoadedAt)
     }
 
     // MARK: - Data Loading

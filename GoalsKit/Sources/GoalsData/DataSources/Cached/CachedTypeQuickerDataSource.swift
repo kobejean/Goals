@@ -7,9 +7,25 @@ public actor CachedTypeQuickerDataSource: TypeQuickerDataSourceProtocol, Caching
     public let remote: TypeQuickerDataSource
     public let cache: DataCache
 
+    /// Tracks the last date we successfully fetched from remote.
+    /// Used to avoid re-fetching old data that won't change.
+    private var lastSuccessfulFetchDate: Date? {
+        didSet { saveLastSuccessfulFetchDate() }
+    }
+    private static let lastFetchKey = "typeQuickerLastSuccessfulFetchDate"
+
     public init(remote: TypeQuickerDataSource, cache: DataCache) {
         self.remote = remote
         self.cache = cache
+        self.lastSuccessfulFetchDate = Self.loadLastSuccessfulFetchDate()
+    }
+
+    private static func loadLastSuccessfulFetchDate() -> Date? {
+        UserDefaults.standard.object(forKey: lastFetchKey) as? Date
+    }
+
+    private func saveLastSuccessfulFetchDate() {
+        UserDefaults.standard.set(lastSuccessfulFetchDate, forKey: Self.lastFetchKey)
     }
 
     // MARK: - Configuration passthrough provided by CachingDataSourceWrapper
@@ -22,30 +38,32 @@ public actor CachedTypeQuickerDataSource: TypeQuickerDataSourceProtocol, Caching
     // MARK: - TypeQuickerDataSourceProtocol
 
     public func fetchStats(from startDate: Date, to endDate: Date) async throws -> [TypeQuickerStats] {
-        // Get cached data to determine what's missing
-        let cachedStats = try await fetchCached(TypeQuickerStats.self, from: startDate, to: endDate)
-        let cachedDates = Set(cachedStats.map { Calendar.current.startOfDay(for: $0.date) })
+        let calendar = Calendar.current
 
-        // Calculate and fetch missing ranges
-        let missingRanges = calculateMissingDateRanges(from: startDate, to: endDate, cachedDates: cachedDates)
+        // Only fetch from 1 day before last successful fetch (old data is stable).
+        // Missing days in the past are just days with no practice - no need to re-fetch.
+        let remoteFetchStart: Date
+        if let lastFetch = lastSuccessfulFetchDate {
+            let volatileStart = calendar.date(byAdding: .day, value: -1, to: lastFetch) ?? lastFetch
+            remoteFetchStart = max(calendar.startOfDay(for: volatileStart), calendar.startOfDay(for: startDate))
+        } else {
+            remoteFetchStart = calendar.startOfDay(for: startDate)
+        }
 
-        for range in missingRanges {
-            do {
-                let remoteStats = try await remote.fetchStats(from: range.start, to: range.end)
-                if !remoteStats.isEmpty {
-                    try await cache.store(remoteStats)
-                }
-            } catch {
-                // Don't fail if we already have cached data - use what we have
-                if !cachedStats.isEmpty {
-                    break
-                }
-                // Only throw if we have no cached data at all
+        do {
+            let remoteStats = try await remote.fetchStats(from: remoteFetchStart, to: endDate)
+            if !remoteStats.isEmpty {
+                try await cache.store(remoteStats)
+            }
+            lastSuccessfulFetchDate = calendar.startOfDay(for: endDate)
+        } catch {
+            // Don't fail if we have cached data - use what we have
+            let cachedStats = try await fetchCached(TypeQuickerStats.self, from: startDate, to: endDate)
+            if cachedStats.isEmpty {
                 throw error
             }
         }
 
-        // Single source of truth: always return from cache
         return try await fetchCached(TypeQuickerStats.self, from: startDate, to: endDate)
     }
 

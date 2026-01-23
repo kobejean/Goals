@@ -79,6 +79,8 @@ External data sources with transparent caching:
 
 All use `DataCache` backed by SwiftData's `CachedDataEntry` model.
 
+For comprehensive documentation on data flow, caching, persistence, and concurrency, see [`docs/DATA_ARCHITECTURE.md`](docs/DATA_ARCHITECTURE.md).
+
 ## Key Patterns
 
 ### State Management (MV Pattern)
