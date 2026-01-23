@@ -178,12 +178,31 @@ public struct ScheduleChart: View {
     // MARK: - Helpers
 
     /// Get Y value for a segment using appropriate coordinate system
+    /// Handles tasks that cross midnight by extending end hour past 24
     private func yValue(for segment: DurationSegment, isStart: Bool) -> Double {
         if data.useSimpleHours {
-            return isStart ? segment.startHour : segment.endHour
+            let startHour = segment.startHour
+            var endHour = segment.endHour
+
+            // Handle midnight crossing: if end < start, extend end past 24
+            if endHour < startHour {
+                endHour += 24.0
+            }
+
+            return isStart ? startHour : endHour
         } else {
             return isStart ? segment.startChartValue : segment.endChartValue
         }
+    }
+
+    /// Get adjusted end hour for a segment (handles midnight crossing)
+    private func adjustedEndHour(for segment: DurationSegment) -> Double {
+        let startHour = segment.startHour
+        var endHour = segment.endHour
+        if endHour < startHour {
+            endHour += 24.0
+        }
+        return endHour
     }
 
     /// Calculate X-axis domain from dateRange or fall back to data-derived domain
@@ -215,7 +234,8 @@ public struct ScheduleChart: View {
         // Get all values (both start and end) to find true min/max
         var allValues: [Double]
         if data.useSimpleHours {
-            allValues = allSegments.flatMap { [$0.startHour, $0.endHour] }
+            // Use adjusted end hours to handle midnight crossing
+            allValues = allSegments.flatMap { [$0.startHour, adjustedEndHour(for: $0)] }
         } else {
             allValues = allSegments.flatMap { [$0.startChartValue, $0.endChartValue] }
         }
@@ -235,8 +255,9 @@ public struct ScheduleChart: View {
 
         if style == .full {
             // Add padding and round to nice values for full mode
+            // Allow values > 24 for tasks that cross midnight
             let paddedMin = max(data.useSimpleHours ? 0 : -12, floor(minValue) - 1)
-            let paddedMax = min(data.useSimpleHours ? 24 : 14, ceil(maxValue) + 1)
+            let paddedMax = min(data.useSimpleHours ? 30 : 14, ceil(maxValue) + 1)
             return paddedMin...paddedMax
         } else {
             // Add small padding for compact mode (minimum 0.5 to avoid zero-height domain)
@@ -258,12 +279,16 @@ public struct ScheduleChart: View {
     }
 
     /// Format hour value for display in axis labels
+    /// Handles values outside 0-24 range (negative for overnight, >24 for midnight crossing)
     private func formatHour(_ hour: Double) -> String {
+        // Normalize to 0-24 range
         var h = Int(hour)
-        if h < 0 {
+        while h < 0 {
             h += 24
         }
-        h = h % 24
+        while h >= 24 {
+            h -= 24
+        }
         let period = h >= 12 ? "PM" : "AM"
         let displayHour = h == 0 ? 12 : (h > 12 ? h - 12 : h)
         return "\(displayHour) \(period)"
@@ -389,6 +414,55 @@ private struct FlexibleFlowLayout: Layout {
             legendItems: [
                 ScheduleLegendItem(name: "Work", color: .orange),
                 ScheduleLegendItem(name: "Study", color: .blue)
+            ],
+            chartHeight: 220
+        )
+    )
+    .padding()
+}
+
+#Preview("Full - Tasks (Midnight Crossing)") {
+    let calendar = Calendar.current
+    let today = calendar.startOfDay(for: Date())
+
+    let sampleData = (0..<7).map { daysAgo -> DurationRangeDataPoint in
+        let date = calendar.date(byAdding: .day, value: -daysAgo, to: today)!
+        var segments: [DurationSegment] = []
+
+        // Regular daytime task
+        segments.append(DurationSegment(
+            startTime: calendar.date(bySettingHour: 9, minute: 0, second: 0, of: date)!,
+            endTime: calendar.date(bySettingHour: 12, minute: 0, second: 0, of: date)!,
+            color: .orange,
+            label: "Work"
+        ))
+
+        // Task that crosses midnight (11 PM to 2 AM)
+        if daysAgo % 2 == 0 {
+            let startTime = calendar.date(bySettingHour: 23, minute: 0, second: 0, of: date)!
+            let endTime = calendar.date(bySettingHour: 2, minute: 0, second: 0, of: calendar.date(byAdding: .day, value: 1, to: date)!)!
+            segments.append(DurationSegment(
+                startTime: startTime,
+                endTime: endTime,
+                color: .purple,
+                label: "Night Shift"
+            ))
+        }
+
+        return DurationRangeDataPoint(date: date, segments: segments)
+    }
+
+    return ScheduleChart(
+        data: InsightDurationRangeData(
+            dataPoints: sampleData.reversed(),
+            defaultColor: .orange,
+            useSimpleHours: true
+        ),
+        style: .full,
+        configuration: ScheduleChartConfiguration(
+            legendItems: [
+                ScheduleLegendItem(name: "Work", color: .orange),
+                ScheduleLegendItem(name: "Night Shift", color: .purple)
             ],
             chartHeight: 220
         )
