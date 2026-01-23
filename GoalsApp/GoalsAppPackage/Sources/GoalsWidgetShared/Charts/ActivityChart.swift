@@ -40,7 +40,7 @@ public struct ActivityChart: View {
     private func cellView(for day: ActivityDay?, size: CGFloat) -> some View {
         if let day = day {
             RoundedRectangle(cornerRadius: cornerRadius)
-                .fill(day.color.opacity(max(0.2, day.intensity)))
+                .fill(day.color.opacity(0.2 + 0.8 * day.intensity))
                 .frame(width: size, height: size)
         } else {
             RoundedRectangle(cornerRadius: cornerRadius)
