@@ -3,7 +3,7 @@ import SwiftData
 import GoalsAppFeature
 
 @main
-struct GoalsAppApp: App {
+struct GoalsApp: App {
     @UIApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
     @State private var container: AppContainer?
     @State private var initError: Error?
@@ -39,8 +39,10 @@ struct GoalsAppApp: App {
             // Resume BGM when app becomes active
             if container.bgmPlayer.state == .stopped {
                 do {
-                    try container.bgmPlayer.play(track: .golfGameResults)
-                    container.bgmPlayer.setVolume(0.3)  // Background music level
+                    try container.bgmPlayer.play(playlist: [
+                        .init(.konohaNoHiru, loopCount: 2),
+                        .init(.golfGameResults, loopCount: 3)
+                    ])
                 } catch {
                     print("Failed to play BGM: \(error)")
                 }
