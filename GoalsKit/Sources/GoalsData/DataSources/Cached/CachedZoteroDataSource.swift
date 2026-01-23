@@ -3,13 +3,35 @@ import GoalsDomain
 
 /// Cached wrapper around ZoteroDataSource
 /// Returns cached data when Zotero API isn't available, fetches fresh data when possible
+/// Uses version-based incremental sync to minimize API requests
 public actor CachedZoteroDataSource: ZoteroDataSourceProtocol, CachingDataSourceWrapper {
     public let remote: ZoteroDataSource
     public let cache: DataCache
 
+    /// Tracks the last Zotero library version we successfully synced.
+    /// Used for incremental sync - only fetches items modified since this version.
+    private var lastLibraryVersion: Int? {
+        didSet { saveLastLibraryVersion() }
+    }
+    private static let libraryVersionKey = "zoteroLastLibraryVersion"
+
     public init(remote: ZoteroDataSource, cache: DataCache) {
         self.remote = remote
         self.cache = cache
+        self.lastLibraryVersion = Self.loadLastLibraryVersion()
+    }
+
+    private static func loadLastLibraryVersion() -> Int? {
+        let value = UserDefaults.standard.integer(forKey: libraryVersionKey)
+        return value > 0 ? value : nil
+    }
+
+    private func saveLastLibraryVersion() {
+        if let version = lastLibraryVersion {
+            UserDefaults.standard.set(version, forKey: Self.libraryVersionKey)
+        } else {
+            UserDefaults.standard.removeObject(forKey: Self.libraryVersionKey)
+        }
     }
 
     // MARK: - Configuration passthrough provided by CachingDataSourceWrapper
@@ -21,32 +43,79 @@ public actor CachedZoteroDataSource: ZoteroDataSourceProtocol, CachingDataSource
     // MARK: - ZoteroDataSourceProtocol
 
     public func fetchDailyStats(from startDate: Date, to endDate: Date) async throws -> [ZoteroDailyStats] {
-        // Get cached data to determine what's missing
+        // Get current cached data
         let cachedStats = try await fetchCached(ZoteroDailyStats.self, from: startDate, to: endDate)
-        let cachedDates = Set(cachedStats.map { Calendar.current.startOfDay(for: $0.date) })
 
-        // Calculate and fetch missing ranges
-        let missingRanges = calculateMissingDateRanges(from: startDate, to: endDate, cachedDates: cachedDates)
+        do {
+            // Use version-based incremental sync
+            // - If we have lastLibraryVersion, only fetch items modified since then
+            // - If not, do a full fetch (first time or after cache clear)
+            let (remoteStats, newLibraryVersion) = try await remote.fetchDailyStatsWithVersion(
+                from: startDate,
+                to: endDate,
+                sinceVersion: lastLibraryVersion
+            )
 
-        for range in missingRanges {
-            do {
-                let remoteStats = try await remote.fetchDailyStats(from: range.start, to: range.end)
-                if !remoteStats.isEmpty {
-                    try await cache.store(remoteStats)
-                }
-            } catch {
-                // Don't fail if we already have cached data - use what we have
-                // This is graceful degradation for when Zotero API isn't available
-                if !cachedStats.isEmpty {
-                    break
-                }
-                // Only throw if we have no cached data at all
+            if !remoteStats.isEmpty {
+                // Merge new stats with existing cached data
+                // For incremental sync, we need to combine counts for the same day
+                let mergedStats = mergeStats(existing: cachedStats, new: remoteStats)
+                try await cache.store(mergedStats)
+            }
+
+            // Update library version on success
+            if newLibraryVersion > 0 {
+                lastLibraryVersion = newLibraryVersion
+            }
+        } catch {
+            // Don't fail if we already have cached data - use what we have
+            // This is graceful degradation for when Zotero API isn't available
+            if cachedStats.isEmpty {
                 throw error
             }
         }
 
         // Single source of truth: always return from cache
         return try await fetchCached(ZoteroDailyStats.self, from: startDate, to: endDate)
+    }
+
+    /// Merges new stats with existing cached stats.
+    /// For incremental sync, new stats may include modified items that were already counted.
+    /// To avoid double-counting: only add stats for dates that didn't exist before,
+    /// and for today's date (which is volatile and may have genuinely new items).
+    private func mergeStats(existing: [ZoteroDailyStats], new: [ZoteroDailyStats]) -> [ZoteroDailyStats] {
+        let calendar = Calendar.current
+        let today = calendar.startOfDay(for: Date())
+        var statsByDay: [Date: ZoteroDailyStats] = [:]
+
+        // First, add all existing stats
+        for stat in existing {
+            let day = calendar.startOfDay(for: stat.date)
+            statsByDay[day] = stat
+        }
+
+        // Then merge in new stats
+        for stat in new {
+            let day = calendar.startOfDay(for: stat.date)
+            if let existingStat = statsByDay[day] {
+                // For today's date, add to existing counts (genuinely new items likely)
+                // For past dates, the incremental data might include modified items
+                // we already counted, so only add if it's today
+                if day == today {
+                    statsByDay[day] = ZoteroDailyStats(
+                        date: existingStat.date,
+                        annotationCount: existingStat.annotationCount + stat.annotationCount,
+                        noteCount: existingStat.noteCount + stat.noteCount
+                    )
+                }
+                // For past dates, skip - they're likely modified items we already counted
+            } else {
+                // New date we haven't seen before - add it
+                statsByDay[day] = stat
+            }
+        }
+
+        return statsByDay.values.sorted { $0.date < $1.date }
     }
 
     public func fetchReadingStatus() async throws -> ZoteroReadingStatus? {

@@ -100,18 +100,50 @@ public actor ZoteroDataSource: ZoteroDataSourceProtocol {
     // MARK: - ZoteroDataSourceProtocol
 
     public func fetchDailyStats(from startDate: Date, to endDate: Date) async throws -> [ZoteroDailyStats] {
+        let (stats, _) = try await fetchDailyStatsWithVersion(from: startDate, to: endDate, sinceVersion: nil)
+        return stats
+    }
+
+    /// Fetches daily stats with version-based incremental sync support.
+    /// - Parameters:
+    ///   - startDate: Start of date range
+    ///   - endDate: End of date range
+    ///   - sinceVersion: If provided, only fetches items modified since this library version
+    /// - Returns: Tuple of daily stats and the current library version from the API
+    public func fetchDailyStatsWithVersion(
+        from startDate: Date,
+        to endDate: Date,
+        sinceVersion: Int?
+    ) async throws -> (stats: [ZoteroDailyStats], libraryVersion: Int) {
         guard let apiKey = apiKey, let userID = userID else {
             throw DataSourceError.notConfigured
         }
 
-        // Fetch all annotations created in the date range
-        let annotations = try await fetchAnnotations(apiKey: apiKey, userID: userID, from: startDate, to: endDate)
+        // Fetch annotations and notes in parallel
+        async let annotationsResult = fetchAnnotations(
+            apiKey: apiKey,
+            userID: userID,
+            from: startDate,
+            to: endDate,
+            sinceVersion: sinceVersion
+        )
+        async let notesResult = fetchNotes(
+            apiKey: apiKey,
+            userID: userID,
+            from: startDate,
+            to: endDate,
+            sinceVersion: sinceVersion
+        )
 
-        // Fetch all notes created in the date range
-        let notes = try await fetchNotes(apiKey: apiKey, userID: userID, from: startDate, to: endDate)
+        let (annotations, annotationsVersion) = try await annotationsResult
+        let (notes, notesVersion) = try await notesResult
+
+        // Use the maximum library version from both requests
+        let libraryVersion = max(annotationsVersion, notesVersion)
 
         // Aggregate by day
-        return aggregateByDay(annotations: annotations, notes: notes, from: startDate, to: endDate)
+        let stats = aggregateByDay(annotations: annotations, notes: notes, from: startDate, to: endDate)
+        return (stats, libraryVersion)
     }
 
     public func fetchReadingStatus() async throws -> ZoteroReadingStatus? {
@@ -150,7 +182,7 @@ public actor ZoteroDataSource: ZoteroDataSourceProtocol {
 
         do {
             // Just check if the request succeeds - don't need to decode the response
-            let (_, _) = try await performRequestWithTotalCount(url: url, apiKey: apiKey)
+            let (_, _, _) = try await performRequestWithTotalCount(url: url, apiKey: apiKey)
             // If we get here without throwing, the connection works
             return true
         } catch let error as DataSourceError {
@@ -199,7 +231,7 @@ public actor ZoteroDataSource: ZoteroDataSourceProtocol {
         return try JSONDecoder().decode(T.self, from: data)
     }
 
-    private func performRequestWithTotalCount(url: URL, apiKey: String) async throws -> (data: Data, totalResults: Int) {
+    private func performRequestWithTotalCount(url: URL, apiKey: String) async throws -> (data: Data, totalResults: Int, libraryVersion: Int) {
         var request = URLRequest(url: url)
         request.setValue(apiKey, forHTTPHeaderField: "Zotero-API-Key")
         request.setValue("3", forHTTPHeaderField: "Zotero-API-Version")
@@ -227,28 +259,44 @@ public actor ZoteroDataSource: ZoteroDataSourceProtocol {
         }
 
         let totalResults = Int(httpResponse.value(forHTTPHeaderField: "Total-Results") ?? "0") ?? 0
+        let libraryVersion = Int(httpResponse.value(forHTTPHeaderField: "Last-Modified-Version") ?? "0") ?? 0
 
-        return (data, totalResults)
+        return (data, totalResults, libraryVersion)
     }
 
-    private func fetchAnnotations(apiKey: String, userID: String, from startDate: Date, to endDate: Date) async throws -> [ZoteroItem] {
+    private func fetchAnnotations(
+        apiKey: String,
+        userID: String,
+        from startDate: Date,
+        to endDate: Date,
+        sinceVersion: Int? = nil
+    ) async throws -> (items: [ZoteroItem], libraryVersion: Int) {
         var allItems: [ZoteroItem] = []
         var start = 0
+        var latestLibraryVersion = 0
 
         while true {
-            let url = try buildURL(path: "/users/\(userID)/items", queryItems: [
+            var queryItems = [
                 URLQueryItem(name: "itemType", value: "annotation"),
-                URLQueryItem(name: "since", value: "0"),
                 URLQueryItem(name: "sort", value: "dateAdded"),
                 URLQueryItem(name: "direction", value: "asc"),
                 URLQueryItem(name: "start", value: "\(start)"),
                 URLQueryItem(name: "limit", value: "\(Self.maxItemsPerPage)")
-            ])
+            ]
 
-            let (data, totalResults) = try await performRequestWithTotalCount(url: url, apiKey: apiKey)
+            // Use version-based sync if we have a previous version, otherwise fetch all
+            if let version = sinceVersion {
+                queryItems.append(URLQueryItem(name: "since", value: "\(version)"))
+            }
+
+            let url = try buildURL(path: "/users/\(userID)/items", queryItems: queryItems)
+
+            let (data, totalResults, libraryVersion) = try await performRequestWithTotalCount(url: url, apiKey: apiKey)
+            latestLibraryVersion = max(latestLibraryVersion, libraryVersion)
             let items = try JSONDecoder().decode([ZoteroItem].self, from: data)
 
-            // Filter items within date range
+            // When using incremental sync (sinceVersion provided), we get all changed items
+            // and need to filter by date. When doing full fetch, also filter by date.
             let filteredItems = items.filter { item in
                 guard let dateAdded = item.data.dateAdded else { return false }
                 return dateAdded >= startDate && dateAdded <= endDate
@@ -261,33 +309,48 @@ public actor ZoteroDataSource: ZoteroDataSourceProtocol {
                 break
             }
 
-            // If the last item is past our end date, we can stop
-            if let lastDate = items.last?.data.dateAdded, lastDate > endDate {
+            // If the last item is past our end date, we can stop (only for full fetches)
+            if sinceVersion == nil, let lastDate = items.last?.data.dateAdded, lastDate > endDate {
                 break
             }
         }
 
-        return allItems
+        return (allItems, latestLibraryVersion)
     }
 
-    private func fetchNotes(apiKey: String, userID: String, from startDate: Date, to endDate: Date) async throws -> [ZoteroItem] {
+    private func fetchNotes(
+        apiKey: String,
+        userID: String,
+        from startDate: Date,
+        to endDate: Date,
+        sinceVersion: Int? = nil
+    ) async throws -> (items: [ZoteroItem], libraryVersion: Int) {
         var allItems: [ZoteroItem] = []
         var start = 0
+        var latestLibraryVersion = 0
 
         while true {
-            let url = try buildURL(path: "/users/\(userID)/items", queryItems: [
+            var queryItems = [
                 URLQueryItem(name: "itemType", value: "note"),
-                URLQueryItem(name: "since", value: "0"),
                 URLQueryItem(name: "sort", value: "dateAdded"),
                 URLQueryItem(name: "direction", value: "asc"),
                 URLQueryItem(name: "start", value: "\(start)"),
                 URLQueryItem(name: "limit", value: "\(Self.maxItemsPerPage)")
-            ])
+            ]
 
-            let (data, totalResults) = try await performRequestWithTotalCount(url: url, apiKey: apiKey)
+            // Use version-based sync if we have a previous version, otherwise fetch all
+            if let version = sinceVersion {
+                queryItems.append(URLQueryItem(name: "since", value: "\(version)"))
+            }
+
+            let url = try buildURL(path: "/users/\(userID)/items", queryItems: queryItems)
+
+            let (data, totalResults, libraryVersion) = try await performRequestWithTotalCount(url: url, apiKey: apiKey)
+            latestLibraryVersion = max(latestLibraryVersion, libraryVersion)
             let items = try JSONDecoder().decode([ZoteroItem].self, from: data)
 
-            // Filter items within date range
+            // When using incremental sync (sinceVersion provided), we get all changed items
+            // and need to filter by date. When doing full fetch, also filter by date.
             let filteredItems = items.filter { item in
                 guard let dateAdded = item.data.dateAdded else { return false }
                 return dateAdded >= startDate && dateAdded <= endDate
@@ -300,13 +363,13 @@ public actor ZoteroDataSource: ZoteroDataSourceProtocol {
                 break
             }
 
-            // If the last item is past our end date, we can stop
-            if let lastDate = items.last?.data.dateAdded, lastDate > endDate {
+            // If the last item is past our end date, we can stop (only for full fetches)
+            if sinceVersion == nil, let lastDate = items.last?.data.dateAdded, lastDate > endDate {
                 break
             }
         }
 
-        return allItems
+        return (allItems, latestLibraryVersion)
     }
 
     private func fetchCollectionItemCount(apiKey: String, userID: String, collectionKey: String) async throws -> Int {
@@ -317,7 +380,7 @@ public actor ZoteroDataSource: ZoteroDataSourceProtocol {
             URLQueryItem(name: "limit", value: "1")
         ])
 
-        let (_, totalResults) = try await performRequestWithTotalCount(url: url, apiKey: apiKey)
+        let (_, totalResults, _) = try await performRequestWithTotalCount(url: url, apiKey: apiKey)
         return totalResults
     }
 
