@@ -1,5 +1,6 @@
 import SwiftUI
 import GoalsDomain
+import GoalsWidgetShared
 
 #if canImport(UIKit)
 import UIKit
@@ -210,9 +211,12 @@ private struct NutritionEntryRow: View {
     }
 }
 
-/// Card showing macro ratio as a simple visualization
+/// Card showing macro ratio as a radar chart visualization
 struct MacroRatioCard: View {
     let nutrients: NutrientValues
+
+    // Daily macro targets in grams
+    private let idealMacros = (protein: 150.0, carbs: 250.0, fat: 65.0)
 
     private var totalMacros: Double {
         nutrients.protein + nutrients.carbohydrates + nutrients.fat
@@ -225,39 +229,21 @@ struct MacroRatioCard: View {
                 .foregroundStyle(.secondary)
 
             if totalMacros > 0 {
-                GeometryReader { geometry in
-                    HStack(spacing: 2) {
-                        // Protein bar
-                        RoundedRectangle(cornerRadius: 4)
-                            .fill(Color.blue)
-                            .frame(width: geometry.size.width * nutrients.proteinRatio)
-
-                        // Carbs bar
-                        RoundedRectangle(cornerRadius: 4)
-                            .fill(Color.green)
-                            .frame(width: geometry.size.width * nutrients.carbsRatio)
-
-                        // Fat bar
-                        RoundedRectangle(cornerRadius: 4)
-                            .fill(Color.orange)
-                            .frame(width: geometry.size.width * nutrients.fatRatio)
-                    }
-                }
-                .frame(height: 12)
-
-                // Legend
-                HStack(spacing: 16) {
-                    MacroLegendItem(color: .blue, label: "P", percentage: nutrients.proteinRatio)
-                    MacroLegendItem(color: .green, label: "C", percentage: nutrients.carbsRatio)
-                    MacroLegendItem(color: .orange, label: "F", percentage: nutrients.fatRatio)
-                }
+                MacroRadarChart(
+                    current: (nutrients.protein, nutrients.carbohydrates, nutrients.fat),
+                    ideal: idealMacros
+                )
+                .frame(height: 180)
             } else {
                 Text("No macros logged")
                     .font(.caption)
                     .foregroundStyle(.secondary)
+                    .frame(height: 180)
+                    .frame(maxWidth: .infinity)
             }
         }
-        .padding()
+        .padding(.horizontal)
+        .padding(.vertical, 12)
         .background(
             RoundedRectangle(cornerRadius: 12)
                 .fill(Color.gray.opacity(0.15))
@@ -265,21 +251,3 @@ struct MacroRatioCard: View {
     }
 }
 
-/// Legend item for macro ratio
-private struct MacroLegendItem: View {
-    let color: Color
-    let label: String
-    let percentage: Double
-
-    var body: some View {
-        HStack(spacing: 4) {
-            Circle()
-                .fill(color)
-                .frame(width: 8, height: 8)
-
-            Text("\(label) \(Int(percentage * 100))%")
-                .font(.caption)
-                .foregroundStyle(.secondary)
-        }
-    }
-}

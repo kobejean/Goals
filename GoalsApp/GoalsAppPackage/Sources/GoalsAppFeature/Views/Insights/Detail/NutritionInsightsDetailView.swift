@@ -35,12 +35,12 @@ struct NutritionInsightsDetailView: View {
             if !viewModel.entries.isEmpty {
                 ToolbarItem(placement: .principal) {
                     Picker("Time Range", selection: $timeRange) {
-                        ForEach([TimeRange.week, .month, .quarter, .year, .all], id: \.self) { range in
+                        ForEach([TimeRange.day, .week, .month, .quarter, .year, .all], id: \.self) { range in
                             Text(range.displayName).tag(range)
                         }
                     }
                     .pickerStyle(.segmented)
-                    .frame(width: 240)
+                    .frame(width: 280)
                 }
             }
         }
@@ -149,6 +149,9 @@ struct NutritionInsightsDetailView: View {
         }
     }
 
+    // Daily macro targets in grams
+    private let idealMacros = (protein: 150.0, carbs: 250.0, fat: 65.0)
+
     private var macroBreakdownSection: some View {
         VStack(alignment: .leading, spacing: 8) {
             Text("Macro Breakdown (\(timeRange.displayName))")
@@ -157,6 +160,18 @@ struct NutritionInsightsDetailView: View {
 
             let totalNutrients = filteredSummaries.reduce(NutrientValues.zero) { $0 + $1.totalNutrients }
             let avgNutrients = totalNutrients.divided(by: Double(max(1, filteredSummaries.count)))
+
+            MacroRadarChart(
+                current: (avgNutrients.protein, avgNutrients.carbohydrates, avgNutrients.fat),
+                ideal: idealMacros
+            )
+            .frame(height: 200)
+            .padding(.horizontal)
+            .padding(.vertical, 12)
+            .background(
+                RoundedRectangle(cornerRadius: 12)
+                    .fill(Color.gray.opacity(0.15))
+            )
 
             HStack(spacing: 16) {
                 MacroCard(

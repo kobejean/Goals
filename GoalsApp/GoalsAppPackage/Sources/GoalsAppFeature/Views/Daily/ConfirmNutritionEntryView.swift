@@ -1,6 +1,7 @@
 import SwiftUI
 import GoalsDomain
 import GoalsData
+import GoalsWidgetShared
 
 #if canImport(UIKit)
 import UIKit
@@ -154,6 +155,9 @@ struct ConfirmNutritionEntryView: View {
         }
     }
 
+    // Per-meal macro targets in grams (daily targets / 3 meals)
+    private let mealMacroTargets = (protein: 50.0, carbs: 83.0, fat: 22.0)
+
     private var nutritionDetailsSection: some View {
         VStack(alignment: .leading, spacing: 16) {
             Text("Nutrition Facts")
@@ -175,6 +179,19 @@ struct ConfirmNutritionEntryView: View {
                 NutritionRow(label: "Sodium", value: String(format: "%.0f", effectiveNutrients.sodium), unit: "mg")
             }
             .padding()
+            .background(
+                RoundedRectangle(cornerRadius: 12)
+                    .fill(Color.gray.opacity(0.15))
+            )
+
+            // Macro radar chart (per-meal targets)
+            MacroRadarChart(
+                current: (effectiveNutrients.protein, effectiveNutrients.carbohydrates, effectiveNutrients.fat),
+                ideal: mealMacroTargets
+            )
+            .frame(height: 180)
+            .padding(.horizontal)
+            .padding(.vertical, 12)
             .background(
                 RoundedRectangle(cornerRadius: 12)
                     .fill(Color.gray.opacity(0.15))

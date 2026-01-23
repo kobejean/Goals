@@ -1,11 +1,15 @@
 import SwiftUI
 import GoalsDomain
+import GoalsWidgetShared
 
 /// View for editing an existing nutrition entry
 struct EditNutritionEntryView: View {
     let entry: NutritionEntry
     let onSave: (NutritionEntry) -> Void
     let onCancel: () -> Void
+
+    // Per-meal macro targets in grams (daily targets / 3 meals)
+    private let mealMacroTargets = (protein: 50.0, carbs: 83.0, fat: 22.0)
 
     @State private var name: String
     @State private var portionMultiplier: Double
@@ -58,6 +62,20 @@ struct EditNutritionEntryView: View {
                     NutritionTextField(label: "Protein", value: $protein, unit: "g")
                     NutritionTextField(label: "Carbohydrates", value: $carbohydrates, unit: "g")
                     NutritionTextField(label: "Fat", value: $fat, unit: "g")
+                }
+
+                Section {
+                    MacroRadarChart(
+                        current: (
+                            (Double(protein) ?? 0) * portionMultiplier,
+                            (Double(carbohydrates) ?? 0) * portionMultiplier,
+                            (Double(fat) ?? 0) * portionMultiplier
+                        ),
+                        ideal: mealMacroTargets
+                    )
+                    .frame(height: 180)
+                    .listRowInsets(EdgeInsets(top: 8, leading: 0, bottom: 8, trailing: 0))
+                    .listRowBackground(Color.clear)
                 }
 
                 Section("Additional") {

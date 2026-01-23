@@ -2,6 +2,7 @@ import Foundation
 
 /// Time range options for filtering data in insights views
 public enum TimeRange: String, CaseIterable, Sendable {
+    case day
     case week
     case month
     case quarter
@@ -10,6 +11,7 @@ public enum TimeRange: String, CaseIterable, Sendable {
 
     public var displayName: String {
         switch self {
+        case .day: return "1D"
         case .week: return "1W"
         case .month: return "1M"
         case .quarter: return "3M"
@@ -21,6 +23,8 @@ public enum TimeRange: String, CaseIterable, Sendable {
     public func startDate(from endDate: Date) -> Date {
         let calendar = Calendar.current
         switch self {
+        case .day:
+            return calendar.startOfDay(for: endDate)
         case .week:
             return calendar.date(byAdding: .day, value: -7, to: endDate) ?? endDate
         case .month:
@@ -36,6 +40,7 @@ public enum TimeRange: String, CaseIterable, Sendable {
 
     public var xAxisStride: Calendar.Component {
         switch self {
+        case .day: return .hour
         case .week: return .day
         case .month: return .weekOfYear
         case .quarter: return .month
@@ -46,6 +51,7 @@ public enum TimeRange: String, CaseIterable, Sendable {
 
     public var xAxisCount: Int {
         switch self {
+        case .day: return 4
         case .week: return 1
         case .month: return 1
         case .quarter: return 1
@@ -56,6 +62,7 @@ public enum TimeRange: String, CaseIterable, Sendable {
 
     public var xAxisFormat: Date.FormatStyle {
         switch self {
+        case .day: return .dateTime.hour()
         case .week: return .dateTime.weekday(.abbreviated)
         case .month: return .dateTime.month(.abbreviated).day()
         case .quarter: return .dateTime.month(.abbreviated)
