@@ -2,10 +2,20 @@ import Foundation
 import GoalsDomain
 
 /// Cached wrapper around HealthKitSleepDataSource
-/// Checks cache first, then fetches only missing data from HealthKit
+/// Uses DateBasedStrategy for incremental fetching (past sleep data doesn't change)
+///
+/// Note: Previously used gap-filling which had iteration issues for large date ranges.
+/// Sleep data is immutable once recorded, so date-based incremental is simpler and more efficient.
 public actor CachedHealthKitSleepDataSource: HealthKitSleepDataSourceProtocol, CachingDataSourceWrapper {
     public let remote: HealthKitSleepDataSource
     public let cache: DataCache
+
+    /// Strategy for incremental fetching.
+    /// Sleep records are immutable once recorded, so we only need to fetch recent data.
+    public let incrementalStrategy = DateBasedStrategy(
+        strategyKey: "healthkit.sleep",
+        volatileWindowDays: 1
+    )
 
     public init(remote: HealthKitSleepDataSource, cache: DataCache) {
         self.remote = remote
@@ -32,16 +42,20 @@ public actor CachedHealthKitSleepDataSource: HealthKitSleepDataSourceProtocol, C
     // MARK: - HealthKitSleepDataSourceProtocol
 
     public func fetchSleepData(from startDate: Date, to endDate: Date) async throws -> [SleepDailySummary] {
-        // Get cached data to determine what's missing
-        let cachedSummaries = try await fetchCached(SleepDailySummary.self, from: startDate, to: endDate)
-        let cachedDates = Set(cachedSummaries.map { Calendar.current.startOfDay(for: $0.date) })
+        // Calculate fetch range using strategy
+        let fetchRange = try await calculateIncrementalFetchRange(for: (startDate, endDate))
 
-        // Calculate and fetch missing ranges
-        let missingRanges = calculateMissingDateRanges(from: startDate, to: endDate, cachedDates: cachedDates)
-        for range in missingRanges {
-            let remoteSummaries = try await remote.fetchSleepData(from: range.start, to: range.end)
+        do {
+            let remoteSummaries = try await remote.fetchSleepData(from: fetchRange.start, to: fetchRange.end)
             if !remoteSummaries.isEmpty {
                 try await cache.store(remoteSummaries)
+            }
+            try await recordSuccessfulFetch(range: (fetchRange.start, fetchRange.end))
+        } catch {
+            // Don't fail if we have cached data
+            let cachedSummaries = try await fetchCached(SleepDailySummary.self, from: startDate, to: endDate)
+            if cachedSummaries.isEmpty {
+                throw error
             }
         }
 

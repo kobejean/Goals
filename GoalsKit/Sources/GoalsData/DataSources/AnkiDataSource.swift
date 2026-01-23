@@ -77,9 +77,19 @@ public actor AnkiDataSource: AnkiDataSourceProtocol {
     // MARK: - AnkiDataSourceProtocol
 
     public func fetchDailyStats(from startDate: Date, to endDate: Date) async throws -> [AnkiDailyStats] {
+        let dateFormatter = DateFormatter()
+        dateFormatter.dateFormat = "yyyy-MM-dd HH:mm:ss"
+
+        print("[AnkiDataSource] fetchDailyStats from \(dateFormatter.string(from: startDate)) to \(dateFormatter.string(from: endDate))")
+        print("[AnkiDataSource] Task.isCancelled at start: \(Task.isCancelled)")
+
         guard let host = host, let port = port else {
+            print("[AnkiDataSource] ERROR: Not configured")
             throw DataSourceError.notConfigured
         }
+
+        // Check for cancellation before network call
+        try Task.checkCancellation()
 
         // Get all deck names or use selected decks
         let decksToFetch: [String]
@@ -89,7 +99,10 @@ public actor AnkiDataSource: AnkiDataSourceProtocol {
             decksToFetch = try await fetchDeckNames()
         }
 
+        print("[AnkiDataSource] Fetching from decks: \(decksToFetch)")
+
         guard !decksToFetch.isEmpty else {
+            print("[AnkiDataSource] No decks to fetch")
             return []
         }
 
@@ -108,8 +121,16 @@ public actor AnkiDataSource: AnkiDataSourceProtocol {
             return reviews
         }
 
+        print("[AnkiDataSource] Total reviews fetched: \(allReviews.count)")
+
         // Filter reviews by date range and aggregate by day
-        return aggregateReviewsByDay(reviews: allReviews, from: startDate, to: endDate)
+        let stats = aggregateReviewsByDay(reviews: allReviews, from: startDate, to: endDate)
+        print("[AnkiDataSource] Aggregated into \(stats.count) daily stats")
+        for stat in stats.suffix(5) {
+            dateFormatter.dateFormat = "yyyy-MM-dd"
+            print("[AnkiDataSource]   - \(dateFormatter.string(from: stat.date)): \(stat.reviewCount) reviews, \(stat.studyTimeMinutes) min")
+        }
+        return stats
     }
 
     public func fetchLatestStats() async throws -> AnkiDailyStats? {
@@ -229,11 +250,24 @@ public actor AnkiDataSource: AnkiDataSourceProtocol {
         let startDay = calendar.startOfDay(for: startDate)
         let endDay = calendar.startOfDay(for: endDate)
 
+        let dateFormatter = DateFormatter()
+        dateFormatter.dateFormat = "yyyy-MM-dd"
+        print("[AnkiDataSource.aggregate] Date range: \(dateFormatter.string(from: startDay)) to \(dateFormatter.string(from: endDay))")
+
+        // Check for today's reviews before filtering
+        let today = calendar.startOfDay(for: Date())
+        let todayReviewsBeforeFilter = reviews.filter { calendar.isDate($0.date, inSameDayAs: today) }
+        print("[AnkiDataSource.aggregate] Today's reviews before filter: \(todayReviewsBeforeFilter.count)")
+
         // Filter reviews within date range
         let filteredReviews = reviews.filter { review in
             let reviewDay = calendar.startOfDay(for: review.date)
             return reviewDay >= startDay && reviewDay <= endDay
         }
+
+        let todayReviewsAfterFilter = filteredReviews.filter { calendar.isDate($0.date, inSameDayAs: today) }
+        print("[AnkiDataSource.aggregate] Today's reviews after filter: \(todayReviewsAfterFilter.count)")
+        print("[AnkiDataSource.aggregate] Total filtered reviews: \(filteredReviews.count)")
 
         // Group by day
         let grouped = Dictionary(grouping: filteredReviews) { review in

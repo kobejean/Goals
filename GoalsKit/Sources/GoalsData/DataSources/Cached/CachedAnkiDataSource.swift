@@ -2,10 +2,17 @@ import Foundation
 import GoalsDomain
 
 /// Cached wrapper around AnkiDataSource
-/// Returns cached data when Anki isn't running, fetches fresh data when available
+/// Uses DateBasedStrategy for incremental fetching (past review stats don't change)
 public actor CachedAnkiDataSource: AnkiDataSourceProtocol, CachingDataSourceWrapper {
     public let remote: AnkiDataSource
     public let cache: DataCache
+
+    /// Strategy for incremental fetching.
+    /// Anki review stats are immutable once recorded, so we only need to fetch recent data.
+    public let incrementalStrategy = DateBasedStrategy(
+        strategyKey: "anki.dailyStats",
+        volatileWindowDays: 1
+    )
 
     public init(remote: AnkiDataSource, cache: DataCache) {
         self.remote = remote
@@ -22,36 +29,24 @@ public actor CachedAnkiDataSource: AnkiDataSourceProtocol, CachingDataSourceWrap
     // MARK: - AnkiDataSourceProtocol
 
     public func fetchDailyStats(from startDate: Date, to endDate: Date) async throws -> [AnkiDailyStats] {
-        // Get cached data to determine what's missing
-        let cachedStats = try await fetchCached(AnkiDailyStats.self, from: startDate, to: endDate)
+        // Calculate what we need to fetch based on strategy
+        let fetchRange = try await calculateIncrementalFetchRange(for: (startDate, endDate))
 
-        // Always refetch today since new reviews can happen throughout the day
-        let calendar = Calendar.current
-        let today = calendar.startOfDay(for: Date())
-        let cachedDates = Set(cachedStats.map { calendar.startOfDay(for: $0.date) })
-            .filter { $0 != today }
-
-        // Calculate and fetch missing ranges
-        let missingRanges = calculateMissingDateRanges(from: startDate, to: endDate, cachedDates: cachedDates)
-
-        for range in missingRanges {
-            do {
-                let remoteStats = try await remote.fetchDailyStats(from: range.start, to: range.end)
-                if !remoteStats.isEmpty {
-                    try await cache.store(remoteStats)
-                }
-            } catch {
-                // Don't fail if we already have cached data - use what we have
-                // This is the graceful degradation for when Anki isn't running
-                if !cachedStats.isEmpty {
-                    break
-                }
-                // Only throw if we have no cached data at all
+        do {
+            let remoteStats = try await remote.fetchDailyStats(from: fetchRange.start, to: fetchRange.end)
+            if !remoteStats.isEmpty {
+                try await cache.store(remoteStats)
+            }
+            try await recordSuccessfulFetch(range: (fetchRange.start, fetchRange.end))
+        } catch {
+            // Don't fail if we have cached data - use what we have
+            let cachedStats = try await fetchCached(AnkiDailyStats.self, from: startDate, to: endDate)
+            if cachedStats.isEmpty {
                 throw error
             }
         }
 
-        // Single source of truth: always return from cache
+        // Return all cached data for the requested range
         return try await fetchCached(AnkiDailyStats.self, from: startDate, to: endDate)
     }
 

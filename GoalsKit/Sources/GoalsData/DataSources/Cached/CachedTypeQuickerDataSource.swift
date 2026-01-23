@@ -2,30 +2,21 @@ import Foundation
 import GoalsDomain
 
 /// Cached wrapper around TypeQuickerDataSource
-/// Checks cache first, then fetches only missing data from remote
+/// Uses DateBasedStrategy for incremental fetching (past typing stats don't change)
 public actor CachedTypeQuickerDataSource: TypeQuickerDataSourceProtocol, CachingDataSourceWrapper {
     public let remote: TypeQuickerDataSource
     public let cache: DataCache
 
-    /// Tracks the last date we successfully fetched from remote.
-    /// Used to avoid re-fetching old data that won't change.
-    private var lastSuccessfulFetchDate: Date? {
-        didSet { saveLastSuccessfulFetchDate() }
-    }
-    private static let lastFetchKey = "typeQuickerLastSuccessfulFetchDate"
+    /// Strategy for incremental fetching.
+    /// TypeQuicker stats are immutable once recorded, so we only need to fetch recent data.
+    public let incrementalStrategy = DateBasedStrategy(
+        strategyKey: "typeQuicker.stats",
+        volatileWindowDays: 1
+    )
 
     public init(remote: TypeQuickerDataSource, cache: DataCache) {
         self.remote = remote
         self.cache = cache
-        self.lastSuccessfulFetchDate = Self.loadLastSuccessfulFetchDate()
-    }
-
-    private static func loadLastSuccessfulFetchDate() -> Date? {
-        UserDefaults.standard.object(forKey: lastFetchKey) as? Date
-    }
-
-    private func saveLastSuccessfulFetchDate() {
-        UserDefaults.standard.set(lastSuccessfulFetchDate, forKey: Self.lastFetchKey)
     }
 
     // MARK: - Configuration passthrough provided by CachingDataSourceWrapper
@@ -38,24 +29,15 @@ public actor CachedTypeQuickerDataSource: TypeQuickerDataSourceProtocol, Caching
     // MARK: - TypeQuickerDataSourceProtocol
 
     public func fetchStats(from startDate: Date, to endDate: Date) async throws -> [TypeQuickerStats] {
-        let calendar = Calendar.current
-
-        // Only fetch from 1 day before last successful fetch (old data is stable).
-        // Missing days in the past are just days with no practice - no need to re-fetch.
-        let remoteFetchStart: Date
-        if let lastFetch = lastSuccessfulFetchDate {
-            let volatileStart = calendar.date(byAdding: .day, value: -1, to: lastFetch) ?? lastFetch
-            remoteFetchStart = max(calendar.startOfDay(for: volatileStart), calendar.startOfDay(for: startDate))
-        } else {
-            remoteFetchStart = calendar.startOfDay(for: startDate)
-        }
+        // Calculate what we need to fetch based on strategy
+        let fetchRange = try await calculateIncrementalFetchRange(for: (startDate, endDate))
 
         do {
-            let remoteStats = try await remote.fetchStats(from: remoteFetchStart, to: endDate)
+            let remoteStats = try await remote.fetchStats(from: fetchRange.start, to: fetchRange.end)
             if !remoteStats.isEmpty {
                 try await cache.store(remoteStats)
             }
-            lastSuccessfulFetchDate = calendar.startOfDay(for: endDate)
+            try await recordSuccessfulFetch(range: (fetchRange.start, fetchRange.end))
         } catch {
             // Don't fail if we have cached data - use what we have
             let cachedStats = try await fetchCached(TypeQuickerStats.self, from: startDate, to: endDate)

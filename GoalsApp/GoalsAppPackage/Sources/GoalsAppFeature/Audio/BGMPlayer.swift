@@ -27,11 +27,17 @@ public final class BGMPlayer {
     /// Predefined BGM tracks
     public enum Track: Sendable {
         case konohaNoHiru
+        case tennisResults
+        case bowlingResults
+        case golfCourseSelect
         case golfGameResults
 
         public var filename: String {
             switch self {
             case .konohaNoHiru: return "木ノ葉の昼"
+            case .tennisResults: return "11 Tennis (Results)"
+            case .bowlingResults: return "24 Bowling (Results Screen)"
+            case .golfCourseSelect: return "25 Golf (Course Select)"
             case .golfGameResults: return "29 Golf (Game Results)"
             }
         }
@@ -39,6 +45,9 @@ public final class BGMPlayer {
         public var fileExtension: String {
             switch self {
             case .konohaNoHiru: return "m4a"
+            case .tennisResults: return "flac"
+            case .bowlingResults: return "flac"
+            case .golfCourseSelect: return "flac"
             case .golfGameResults: return "flac"
             }
         }
@@ -47,6 +56,12 @@ public final class BGMPlayer {
             switch self {
             case .konohaNoHiru:
                 return LoopSection(start: 17.4410, end: 75.186030)
+            case .tennisResults:
+                return LoopSection(start: 6.411090, end: 67.502063)
+            case .bowlingResults:
+                return LoopSection(start: 5.496155, end: 42.41809)
+            case .golfCourseSelect:
+                return LoopSection(start: 2.759060, end: 46.843000)
             case .golfGameResults:
                 return LoopSection(start: 22.011780, end: 124.864908)
             }
@@ -466,15 +481,11 @@ public final class BGMPlayer {
             }
 
             let remaining = AVAudioFrameCount(file.length - currentFrame)
-            if remaining > 0 {
-                player.scheduleSegment(file, startingFrame: currentFrame, frameCount: remaining, at: nil) { [weak self] in
-                    Task { @MainActor in
-                        guard let self, self.generation == gen else { return }
-                        self.advancePlaylist()
-                    }
+            player.scheduleSegment(file, startingFrame: currentFrame, frameCount: remaining, at: nil) { [weak self] in
+                Task { @MainActor in
+                    guard let self, self.generation == gen else { return }
+                    self.advancePlaylist()
                 }
-            } else {
-                advancePlaylist()
             }
         }
     }

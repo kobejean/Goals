@@ -40,8 +40,11 @@ struct GoalsApp: App {
             if container.bgmPlayer.state == .stopped {
                 do {
                     try container.bgmPlayer.play(playlist: [
-                        .init(.konohaNoHiru, loopCount: 2),
-                        .init(.golfGameResults, loopCount: 3)
+                        .init(.bowlingResults, loopCount: 5),
+                        .init(.tennisResults, loopCount: 3),
+                        .init(.golfCourseSelect, loopCount: 5),
+                        .init(.golfGameResults, loopCount: 3),
+                        .init(.konohaNoHiru, loopCount: 2)
                     ])
                 } catch {
                     print("Failed to play BGM: \(error)")

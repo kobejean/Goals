@@ -7,8 +7,44 @@ import GoalsDomain
 public actor DataCache {
     private let modelContainer: ModelContainer
 
+    /// UserDefaults key prefix for strategy metadata
+    private static let metadataKeyPrefix = "cache.strategy."
+
     public init(modelContainer: ModelContainer) {
         self.modelContainer = modelContainer
+    }
+
+    // MARK: - Strategy Metadata Storage
+
+    /// Store metadata for an incremental fetch strategy.
+    /// Metadata is stored in UserDefaults as JSON for simplicity and persistence.
+    public func storeStrategyMetadata<S: IncrementalFetchStrategy>(
+        _ metadata: S.Metadata,
+        for strategy: S
+    ) throws {
+        let key = Self.metadataKeyPrefix + strategy.strategyKey
+        let data = try JSONEncoder().encode(metadata)
+        UserDefaults.standard.set(data, forKey: key)
+    }
+
+    /// Fetch stored metadata for an incremental fetch strategy.
+    /// Returns nil if no metadata has been stored yet.
+    public func fetchStrategyMetadata<S: IncrementalFetchStrategy>(
+        for strategy: S
+    ) throws -> S.Metadata? {
+        let key = Self.metadataKeyPrefix + strategy.strategyKey
+        guard let data = UserDefaults.standard.data(forKey: key) else {
+            return nil
+        }
+        return try JSONDecoder().decode(S.Metadata.self, from: data)
+    }
+
+    /// Clear stored metadata for an incremental fetch strategy.
+    public func clearStrategyMetadata<S: IncrementalFetchStrategy>(
+        for strategy: S
+    ) {
+        let key = Self.metadataKeyPrefix + strategy.strategyKey
+        UserDefaults.standard.removeObject(forKey: key)
     }
 
     // MARK: - Store Operations

@@ -2,36 +2,23 @@ import Foundation
 import GoalsDomain
 
 /// Cached wrapper around ZoteroDataSource
-/// Returns cached data when Zotero API isn't available, fetches fresh data when possible
-/// Uses version-based incremental sync to minimize API requests
+/// Uses VersionBasedStrategy for incremental sync (annotations can be edited)
+///
+/// Zotero data is mutable - annotations can be edited after creation.
+/// The Zotero API supports version-based incremental sync, so we use that.
 public actor CachedZoteroDataSource: ZoteroDataSourceProtocol, CachingDataSourceWrapper {
     public let remote: ZoteroDataSource
     public let cache: DataCache
 
-    /// Tracks the last Zotero library version we successfully synced.
-    /// Used for incremental sync - only fetches items modified since this version.
-    private var lastLibraryVersion: Int? {
-        didSet { saveLastLibraryVersion() }
-    }
-    private static let libraryVersionKey = "zoteroLastLibraryVersion"
+    /// Strategy for incremental fetching.
+    /// Zotero annotations are mutable and the API supports version-based sync.
+    public let incrementalStrategy = VersionBasedStrategy(
+        strategyKey: "zotero.dailyStats"
+    )
 
     public init(remote: ZoteroDataSource, cache: DataCache) {
         self.remote = remote
         self.cache = cache
-        self.lastLibraryVersion = Self.loadLastLibraryVersion()
-    }
-
-    private static func loadLastLibraryVersion() -> Int? {
-        let value = UserDefaults.standard.integer(forKey: libraryVersionKey)
-        return value > 0 ? value : nil
-    }
-
-    private func saveLastLibraryVersion() {
-        if let version = lastLibraryVersion {
-            UserDefaults.standard.set(version, forKey: Self.libraryVersionKey)
-        } else {
-            UserDefaults.standard.removeObject(forKey: Self.libraryVersionKey)
-        }
     }
 
     // MARK: - Configuration passthrough provided by CachingDataSourceWrapper
@@ -46,14 +33,18 @@ public actor CachedZoteroDataSource: ZoteroDataSourceProtocol, CachingDataSource
         // Get current cached data
         let cachedStats = try await fetchCached(ZoteroDailyStats.self, from: startDate, to: endDate)
 
+        // Get version for incremental fetch
+        let metadata = try? await cache.fetchStrategyMetadata(for: incrementalStrategy)
+        let sinceVersion = incrementalStrategy.versionForIncrementalFetch(metadata: metadata)
+
         do {
             // Use version-based incremental sync
-            // - If we have lastLibraryVersion, only fetch items modified since then
+            // - If we have sinceVersion, only fetch items modified since then
             // - If not, do a full fetch (first time or after cache clear)
             let (remoteStats, newLibraryVersion) = try await remote.fetchDailyStatsWithVersion(
                 from: startDate,
                 to: endDate,
-                sinceVersion: lastLibraryVersion
+                sinceVersion: sinceVersion
             )
 
             if !remoteStats.isEmpty {
@@ -65,7 +56,13 @@ public actor CachedZoteroDataSource: ZoteroDataSourceProtocol, CachingDataSource
 
             // Update library version on success
             if newLibraryVersion > 0 {
-                lastLibraryVersion = newLibraryVersion
+                let updatedMetadata = incrementalStrategy.updateMetadata(
+                    previous: metadata,
+                    fetchedRange: (startDate, endDate),
+                    fetchedAt: Date(),
+                    newVersion: newLibraryVersion
+                )
+                try await cache.storeStrategyMetadata(updatedMetadata, for: incrementalStrategy)
             }
         } catch {
             // Don't fail if we already have cached data - use what we have

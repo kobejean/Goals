@@ -2,10 +2,21 @@ import Foundation
 import GoalsDomain
 
 /// Cached wrapper around AtCoderDataSource
-/// Uses count-based cache validation (inspired by AtCoderProblems)
+/// Uses count-based cache validation for submissions (ensures complete history integrity)
+///
+/// AtCoder submissions are immutable, but we need complete submission history for
+/// accurate effort calculations. Count-based validation detects missing cache entries.
 public actor CachedAtCoderDataSource: AtCoderDataSourceProtocol, CachingDataSourceWrapper {
     public let remote: AtCoderDataSource
     public let cache: DataCache
+
+    /// Strategy property to satisfy protocol requirement.
+    /// AtCoder uses custom count-based validation instead of date-based incremental,
+    /// so this strategy is not used for submissions but satisfies the compiler.
+    public let incrementalStrategy = AlwaysFetchRecentStrategy(
+        strategyKey: "atcoder.unused",
+        recentDays: 2
+    )
 
     /// Time interval to always re-fetch (in seconds) - 2 days
     /// Recent submissions within this window are always fetched fresh
