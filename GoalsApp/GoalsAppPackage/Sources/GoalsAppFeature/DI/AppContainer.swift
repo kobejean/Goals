@@ -162,6 +162,10 @@ public final class AppContainer {
 
     public let badgeNotificationManager: BadgeNotificationManager
 
+    // MARK: - Audio
+
+    public let bgmPlayer: BGMPlayer
+
     // MARK: - Cloud Backup
 
     /// Sync queue for queueing CloudKit operations (always available)
@@ -346,6 +350,9 @@ public final class AppContainer {
 
         // Initialize managers
         self.badgeNotificationManager = BadgeNotificationManager()
+
+        // Initialize audio
+        self.bgmPlayer = BGMPlayer()
 
         // Cloud backup service is configured asynchronously after init
         self.cloudBackupService = nil

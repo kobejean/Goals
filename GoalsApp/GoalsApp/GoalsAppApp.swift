@@ -7,6 +7,7 @@ struct GoalsAppApp: App {
     @UIApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
     @State private var container: AppContainer?
     @State private var initError: Error?
+    @Environment(\.scenePhase) private var scenePhase
 
     var body: some Scene {
         WindowGroup {
@@ -24,6 +25,33 @@ struct GoalsAppApp: App {
             .task {
                 await initializeApp()
             }
+            .onChange(of: scenePhase) { _, newPhase in
+                handleScenePhaseChange(newPhase)
+            }
+        }
+    }
+
+    private func handleScenePhaseChange(_ phase: ScenePhase) {
+        guard let container = container else { return }
+
+        switch phase {
+        case .active:
+            // Resume BGM when app becomes active
+            if container.bgmPlayer.state == .stopped {
+                do {
+                    try container.bgmPlayer.play(track: .konohaNoHiru)
+                    container.bgmPlayer.setVolume(0.3)  // Background music level
+                } catch {
+                    print("Failed to play BGM: \(error)")
+                }
+            } else {
+                container.bgmPlayer.resume()
+            }
+        case .inactive, .background:
+            // Pause BGM when app goes to background
+            container.bgmPlayer.pause()
+        @unknown default:
+            break
         }
     }
 
