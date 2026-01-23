@@ -204,6 +204,7 @@ public final class AppContainer {
         // Migrate data from old store to shared store (one-time migration)
         if !inMemory {
             DataMigrationService.migrateToSharedStoreIfNeeded()
+            DataMigrationService.createNutritionTableIfNeeded()
         }
 
         // Create LOCAL-ONLY cache container FIRST for fast startup

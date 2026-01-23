@@ -1,9 +1,91 @@
 import Foundation
 import GoalsWidgetShared
+import SQLite3
 
 /// Service to handle one-time data migrations
 public enum DataMigrationService {
     private static let migrationKey = "hasCompletedSharedStoreMigration_v2"
+    private static let nutritionTableMigrationKey = "hasCreatedNutritionTable_v1"
+
+    /// Create the nutrition entry table if it doesn't exist
+    /// Must be called before creating the ModelContainer
+    public static func createNutritionTableIfNeeded() {
+        // Check if migration already completed
+        guard !UserDefaults.standard.bool(forKey: nutritionTableMigrationKey) else {
+            return
+        }
+
+        guard let storeURL = SharedStorage.sharedMainStoreURL,
+              FileManager.default.fileExists(atPath: storeURL.path) else {
+            // No store exists yet, SwiftData will create it with the table
+            UserDefaults.standard.set(true, forKey: nutritionTableMigrationKey)
+            return
+        }
+
+        var db: OpaquePointer?
+        guard sqlite3_open(storeURL.path, &db) == SQLITE_OK else {
+            print("⚠️ Failed to open database for nutrition table migration")
+            return
+        }
+        defer { sqlite3_close(db) }
+
+        // Check if table already exists
+        let checkSQL = "SELECT name FROM sqlite_master WHERE type='table' AND name='ZNUTRITIONENTRYMODEL';"
+        var checkStmt: OpaquePointer?
+        if sqlite3_prepare_v2(db, checkSQL, -1, &checkStmt, nil) == SQLITE_OK {
+            if sqlite3_step(checkStmt) == SQLITE_ROW {
+                // Table exists
+                sqlite3_finalize(checkStmt)
+                UserDefaults.standard.set(true, forKey: nutritionTableMigrationKey)
+                print("✅ Nutrition table already exists")
+                return
+            }
+        }
+        sqlite3_finalize(checkStmt)
+
+        // Create the table with SwiftData naming conventions
+        let createSQL = """
+            CREATE TABLE IF NOT EXISTS ZNUTRITIONENTRYMODEL (
+                Z_PK INTEGER PRIMARY KEY AUTOINCREMENT,
+                Z_ENT INTEGER,
+                Z_OPT INTEGER,
+                ZID BLOB,
+                ZDATE TIMESTAMP,
+                ZPHOTOASSETID VARCHAR,
+                ZNAME VARCHAR,
+                ZPORTIONMULTIPLIER FLOAT,
+                ZCALORIES FLOAT,
+                ZPROTEIN FLOAT,
+                ZCARBOHYDRATES FLOAT,
+                ZFAT FLOAT,
+                ZFIBER FLOAT,
+                ZSUGAR FLOAT,
+                ZSODIUM FLOAT,
+                ZVITAMINA FLOAT,
+                ZVITAMINC FLOAT,
+                ZVITAMIND FLOAT,
+                ZCALCIUM FLOAT,
+                ZIRON FLOAT,
+                ZPOTASSIUM FLOAT,
+                ZSOURCERAW VARCHAR,
+                ZCONFIDENCERAW VARCHAR,
+                ZHASNUTRITIONLABEL INTEGER,
+                ZCREATEDAT TIMESTAMP,
+                ZUPDATEDAT TIMESTAMP
+            );
+            """
+
+        var errMsg: UnsafeMutablePointer<CChar>?
+        if sqlite3_exec(db, createSQL, nil, nil, &errMsg) == SQLITE_OK {
+            print("✅ Created nutrition entry table")
+            UserDefaults.standard.set(true, forKey: nutritionTableMigrationKey)
+        } else {
+            if let errMsg = errMsg {
+                print("⚠️ Failed to create nutrition table: \(String(cString: errMsg))")
+                sqlite3_free(errMsg)
+            }
+        }
+    }
 
     /// Migrate data from the old app-private store to the new shared store
     /// This is a one-time migration that runs on first launch after the update
