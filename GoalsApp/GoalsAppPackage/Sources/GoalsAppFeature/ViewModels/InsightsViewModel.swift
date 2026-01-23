@@ -23,6 +23,7 @@ public final class InsightsViewModel {
     public let tasks: TasksInsightsViewModel
     public let anki: AnkiInsightsViewModel
     public let zotero: ZoteroInsightsViewModel
+    public let nutrition: NutritionInsightsViewModel
 
     // MARK: - Card Ordering
 
@@ -43,6 +44,7 @@ public final class InsightsViewModel {
         goalRepository: GoalRepositoryProtocol,
         ankiDataSource: CachedAnkiDataSource,
         zoteroDataSource: CachedZoteroDataSource,
+        nutritionRepository: NutritionRepositoryProtocol,
         taskCachingService: TaskCachingService? = nil
     ) {
         self.typeQuicker = TypeQuickerInsightsViewModel(
@@ -69,6 +71,9 @@ public final class InsightsViewModel {
         self.zotero = ZoteroInsightsViewModel(
             dataSource: zoteroDataSource,
             goalRepository: goalRepository
+        )
+        self.nutrition = NutritionInsightsViewModel(
+            nutritionRepository: nutritionRepository
         )
 
         // Load persisted card order or use default
@@ -107,6 +112,9 @@ public final class InsightsViewModel {
             },
             .zotero: makeCardConfig(type: .zotero, from: zotero) {
                 AnyView(ZoteroInsightsDetailView(viewModel: self.zotero))
+            },
+            .nutrition: makeCardConfig(type: .nutrition, from: nutrition) {
+                AnyView(NutritionInsightsDetailView(viewModel: self.nutrition))
             }
         ]
     }
@@ -183,6 +191,7 @@ public final class InsightsViewModel {
             group.addTask { await self.load(self.tasks, isThrottled: isThrottled) }
             group.addTask { await self.load(self.anki, isThrottled: isThrottled) }
             group.addTask { await self.load(self.zotero, isThrottled: isThrottled) }
+            group.addTask { await self.load(self.nutrition, isThrottled: isThrottled) }
         }
 
         if !isThrottled {

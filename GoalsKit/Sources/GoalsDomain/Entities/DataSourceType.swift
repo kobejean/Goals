@@ -20,6 +20,9 @@ public enum DataSourceType: String, Codable, Sendable, CaseIterable {
     /// Zotero reference management and reading progress
     case zotero
 
+    /// Photo-based nutrition tracking with AI analysis
+    case nutrition
+
     /// Display name for the data source
     public var displayName: String {
         switch self {
@@ -35,6 +38,8 @@ public enum DataSourceType: String, Codable, Sendable, CaseIterable {
             return "Anki"
         case .zotero:
             return "Zotero"
+        case .nutrition:
+            return "Nutrition"
         }
     }
 
@@ -53,6 +58,8 @@ public enum DataSourceType: String, Codable, Sendable, CaseIterable {
             return "rectangle.stack"
         case .zotero:
             return "books.vertical"
+        case .nutrition:
+            return "fork.knife"
         }
     }
 
@@ -71,6 +78,8 @@ public enum DataSourceType: String, Codable, Sendable, CaseIterable {
             return "Reviews, study time, retention, and streak from Anki"
         case .zotero:
             return "Reading progress and annotations from Zotero"
+        case .nutrition:
+            return "Photo-based nutrition tracking with AI analysis"
         }
     }
 }

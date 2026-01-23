@@ -14,14 +14,25 @@ public struct ActivityChart: View {
 
     public var body: some View {
         GeometryReader { geometry in
-            // Calculate optimal number of weeks based on available width
             let availableWidth = geometry.size.width
-            let weeks = max(1, Int((availableWidth + cellSpacing) / (targetCellSize + cellSpacing)))
+            let availableHeight = geometry.size.height
+
+            // Calculate cell size from height (7 rows)
+            let verticalSpacing = cellSpacing * 6
+            let cellSizeFromHeight = (availableHeight - verticalSpacing) / 7
+
+            // Use the cell size constrained by height to determine weeks
+            let effectiveCellSize = max(cellSizeFromHeight, 4) // minimum 4pt cells
+            let weeks = max(1, Int((availableWidth + cellSpacing) / (effectiveCellSize + cellSpacing)))
             let grid = buildGrid(weeks: weeks)
             let weekCount = max(grid.count, 1)
+
             // Calculate actual cell size to fill available width exactly
-            let totalSpacing = cellSpacing * CGFloat(weekCount - 1)
-            let cellSize = (availableWidth - totalSpacing) / CGFloat(weekCount)
+            let horizontalSpacing = cellSpacing * CGFloat(weekCount - 1)
+            let cellSizeFromWidth = (availableWidth - horizontalSpacing) / CGFloat(weekCount)
+
+            // Use the smaller cell size to ensure cells are square and fit both dimensions
+            let cellSize = min(cellSizeFromWidth, cellSizeFromHeight)
 
             HStack(alignment: .top, spacing: cellSpacing) {
                 ForEach(Array(grid.enumerated()), id: \.offset) { _, week in
@@ -32,7 +43,7 @@ public struct ActivityChart: View {
                     }
                 }
             }
-            .frame(maxWidth: .infinity, alignment: .trailing)
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .trailing)
         }
     }
 

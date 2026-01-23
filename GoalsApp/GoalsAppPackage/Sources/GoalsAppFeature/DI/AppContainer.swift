@@ -28,6 +28,7 @@ public final class AppContainer {
         case .tasks: return tasksDataSource.availableMetrics
         case .anki: return ankiDataSource.availableMetrics
         case .zotero: return zoteroDataSource.availableMetrics
+        case .nutrition: return [] // Nutrition doesn't expose metrics for goals
         }
     }
 
@@ -82,6 +83,11 @@ public final class AppContainer {
         }
 
         // HealthKit doesn't need configuration - it uses system authorization
+
+        // Configure Gemini
+        if let apiKey = UserDefaults.standard.geminiAPIKey, !apiKey.isEmpty {
+            await geminiDataSource.configure(apiKey: apiKey)
+        }
     }
 
     // MARK: - ViewModels (lazily created, persist for app lifetime)
@@ -102,6 +108,7 @@ public final class AppContainer {
             goalRepository: goalRepository,
             ankiDataSource: ankiDataSource,
             zoteroDataSource: zoteroDataSource,
+            nutritionRepository: nutritionRepository,
             taskCachingService: taskCachingService
         )
         _insightsViewModel = vm
@@ -130,6 +137,7 @@ public final class AppContainer {
     public let goalRepository: GoalRepositoryProtocol
     public let badgeRepository: BadgeRepositoryProtocol
     public let taskRepository: TaskRepositoryProtocol
+    public let nutritionRepository: NutritionRepositoryProtocol
 
     // MARK: - Caching
 
@@ -147,6 +155,7 @@ public final class AppContainer {
     public let tasksDataSource: TasksDataSource
     public let ankiDataSource: CachedAnkiDataSource
     public let zoteroDataSource: CachedZoteroDataSource
+    public let geminiDataSource: GeminiDataSource
 
     // MARK: - Caching Services
 
@@ -249,6 +258,7 @@ public final class AppContainer {
             EarnedBadgeModel.self,
             TaskDefinitionModel.self,
             TaskSessionModel.self,
+            NutritionEntryModel.self,
         ])
 
         let mainConfiguration: ModelConfiguration
@@ -298,6 +308,8 @@ public final class AppContainer {
         let localTaskRepo = SwiftDataTaskRepository(modelContainer: modelContainer)
         self.taskRepository = CloudBackedTaskRepository(local: localTaskRepo, syncQueue: cloudSyncQueue)
 
+        self.nutritionRepository = SwiftDataNutritionRepository(modelContainer: modelContainer)
+
         // Initialize networking
         self.httpClient = HTTPClient()
 
@@ -323,6 +335,7 @@ public final class AppContainer {
             remote: ZoteroDataSource(),
             cache: dataCache
         )
+        self.geminiDataSource = GeminiDataSource()
 
         // Initialize caching services
         self.taskCachingService = TaskCachingService(

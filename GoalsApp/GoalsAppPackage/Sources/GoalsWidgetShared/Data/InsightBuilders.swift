@@ -431,6 +431,51 @@ public enum InsightBuilders {
         return (summary, activityData)
     }
 
+    // MARK: - Nutrition
+
+    /// Build Nutrition insight from daily summaries
+    /// Shows calorie intake trend and macro ratio
+    /// - Parameters:
+    ///   - summaries: Array of nutrition daily summaries
+    ///   - goals: Optional array of goals for goal line display
+    /// - Returns: Tuple of optional summary and activity data
+    public static func buildNutritionInsight(
+        from summaries: [NutritionDailySummary],
+        goals: [Goal] = []
+    ) -> (summary: InsightSummary?, activityData: InsightActivityData?) {
+        guard !summaries.isEmpty else { return (nil, nil) }
+
+        let type = InsightType.nutrition
+
+        // Build data points showing calories over time
+        let dataPoints = summaries.map { summary in
+            InsightDataPoint(date: summary.date, value: summary.totalCalories)
+        }
+
+        // Calculate today's totals
+        let calendar = Calendar.current
+        let today = calendar.startOfDay(for: Date())
+        let todaySummary = summaries.first { calendar.startOfDay(for: $0.date) == today }
+        let todayCalories = Int(todaySummary?.totalCalories ?? 0)
+
+        let trend = calculateTrend(for: summaries.map { $0.totalCalories })
+
+        let summary = InsightSummary(
+            title: type.displayTitle,
+            systemImage: type.systemImage,
+            color: type.color,
+            dataPoints: dataPoints,
+            currentValueFormatted: "\(todayCalories) kcal",
+            trend: trend
+        )
+
+        // Build activity data (calories as intensity relative to max)
+        let activityDays = buildActivityDays(from: summaries, color: type.color) { $0.totalCalories }
+        let activityData = InsightActivityData(days: activityDays, emptyColor: .gray.opacity(0.2))
+
+        return (summary, activityData)
+    }
+
     // MARK: - Shared Helpers
 
     /// Calculate trend percentage comparing recent values to previous values

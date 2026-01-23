@@ -17,6 +17,7 @@ public struct SettingsView: View {
     @State private var zoteroInProgressCollection = ""
     @State private var zoteroReadCollection = ""
     @State private var zoteroConnectionStatus: ZoteroConnectionStatus = .unknown
+    @State private var geminiAPIKey = ""
     @State private var typeQuickerSaveState: SaveState = .idle
     @State private var atCoderSaveState: SaveState = .idle
     @State private var ankiSaveState: SaveState = .idle
@@ -49,6 +50,7 @@ public struct SettingsView: View {
                 dataSourcesSection
                 ankiSection
                 zoteroSection
+                geminiSection
                 backupSection
                 aboutSection
             }
@@ -70,6 +72,7 @@ public struct SettingsView: View {
             .onChange(of: zoteroToReadCollection) { _, _ in Task { await saveZoteroSettings() } }
             .onChange(of: zoteroInProgressCollection) { _, _ in Task { await saveZoteroSettings() } }
             .onChange(of: zoteroReadCollection) { _, _ in Task { await saveZoteroSettings() } }
+            .onChange(of: geminiAPIKey) { _, newValue in Task { await saveGeminiSettings(apiKey: newValue) } }
         }
     }
 
@@ -212,6 +215,24 @@ public struct SettingsView: View {
         }
     }
 
+    private var geminiSection: some View {
+        Section {
+            HStack {
+                Label("API Key", systemImage: "key.fill")
+                Spacer()
+                SecureField("Enter API key", text: $geminiAPIKey)
+                    .multilineTextAlignment(.trailing)
+                    .textInputAutocapitalization(.never)
+                    .autocorrectionDisabled()
+                    .foregroundStyle(.secondary)
+            }
+        } header: {
+            Text("Gemini AI")
+        } footer: {
+            Text("Get your API key at aistudio.google.com. Used for nutrition photo analysis.")
+        }
+    }
+
     private var backupSection: some View {
         Section {
             NavigationLink {
@@ -321,6 +342,7 @@ public struct SettingsView: View {
         zoteroToReadCollection = UserDefaults.standard.zoteroToReadCollection ?? ""
         zoteroInProgressCollection = UserDefaults.standard.zoteroInProgressCollection ?? ""
         zoteroReadCollection = UserDefaults.standard.zoteroReadCollection ?? ""
+        geminiAPIKey = UserDefaults.standard.geminiAPIKey ?? ""
     }
 
     private func saveTypeQuickerSettings(username: String) async {
@@ -453,6 +475,18 @@ public struct SettingsView: View {
         } catch {
             zoteroConnectionStatus = .disconnected
         }
+    }
+
+    private func saveGeminiSettings(apiKey: String) async {
+        UserDefaults.standard.geminiAPIKey = apiKey
+
+        if !apiKey.isEmpty {
+            await container.geminiDataSource.configure(apiKey: apiKey)
+        } else {
+            await container.geminiDataSource.clearConfiguration()
+        }
+
+        container.notifySettingsChanged()
     }
 
     public init() {}

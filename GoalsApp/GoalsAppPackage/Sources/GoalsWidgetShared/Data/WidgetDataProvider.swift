@@ -47,6 +47,10 @@ public actor WidgetDataProvider {
             let readingStatuses = (try? await cache.fetch(ZoteroReadingStatus.self)) ?? []
             let readingStatus = readingStatuses.max { $0.date < $1.date }
             return InsightBuilders.buildZoteroInsight(from: stats, readingStatus: readingStatus)
+
+        case .nutrition:
+            let summaries = (try? await cache.fetch(NutritionDailySummary.self, from: startDate, to: endDate)) ?? []
+            return InsightBuilders.buildNutritionInsight(from: summaries)
         }
     }
 }

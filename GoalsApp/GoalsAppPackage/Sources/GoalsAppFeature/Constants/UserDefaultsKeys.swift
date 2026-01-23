@@ -9,6 +9,9 @@ public enum UserDefaultsKeys {
     public static let ankiPort = "ankiPort"
     public static let ankiDecks = "ankiDecks"
 
+    // Gemini settings
+    public static let geminiAPIKey = "geminiAPIKey"
+
     // Zotero settings
     public static let zoteroAPIKey = "zoteroAPIKey"
     public static let zoteroUserID = "zoteroUserID"
@@ -122,6 +125,14 @@ public extension UserDefaults {
         set {
             set(newValue, forKey: UserDefaultsKeys.zoteroReadCollection)
             UserDefaults.shared.set(newValue, forKey: UserDefaultsKeys.zoteroReadCollection)
+        }
+    }
+
+    var geminiAPIKey: String? {
+        get { string(forKey: UserDefaultsKeys.geminiAPIKey) }
+        set {
+            set(newValue, forKey: UserDefaultsKeys.geminiAPIKey)
+            UserDefaults.shared.set(newValue, forKey: UserDefaultsKeys.geminiAPIKey)
         }
     }
 }

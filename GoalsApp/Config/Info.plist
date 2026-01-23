@@ -50,6 +50,8 @@
     </array>
     <key>UILaunchScreen</key>
     <dict/>
+    <key>NSPhotoLibraryUsageDescription</key>
+    <string>Goals uses your photo library to analyze food photos for nutrition tracking.</string>
     <key>NSAppTransportSecurity</key>
     <dict>
         <key>NSAllowsLocalNetworking</key>

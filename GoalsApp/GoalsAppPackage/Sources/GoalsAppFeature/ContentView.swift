@@ -12,10 +12,10 @@ public struct ContentView: View {
                 .tabItem { AppTab.insights.label }
                 .accessibilityIdentifier("tab-insights")
 
-            TasksView()
-                .tag(AppTab.tasks)
-                .tabItem { AppTab.tasks.label }
-                .accessibilityIdentifier("tab-tasks")
+            DailyView()
+                .tag(AppTab.daily)
+                .tabItem { AppTab.daily.label }
+                .accessibilityIdentifier("tab-daily")
 
             GoalsListView()
                 .tag(AppTab.goals)
