@@ -5,86 +5,74 @@ import SQLite3
 /// Service to handle one-time data migrations
 public enum DataMigrationService {
     private static let migrationKey = "hasCompletedSharedStoreMigration_v2"
-    private static let nutritionTableMigrationKey = "hasCreatedNutritionTable_v1"
+    private static let nutritionTableCleanupKey = "hasCleanedNutritionTable_v1"
 
-    /// Create the nutrition entry table if it doesn't exist
+    /// Clean up manually created nutrition table so SwiftData can properly migrate
     /// Must be called before creating the ModelContainer
     public static func createNutritionTableIfNeeded() {
-        // Check if migration already completed
-        guard !UserDefaults.standard.bool(forKey: nutritionTableMigrationKey) else {
+        // Check if cleanup already completed
+        guard !UserDefaults.standard.bool(forKey: nutritionTableCleanupKey) else {
             return
         }
 
         guard let storeURL = SharedStorage.sharedMainStoreURL,
               FileManager.default.fileExists(atPath: storeURL.path) else {
-            // No store exists yet, SwiftData will create it with the table
-            UserDefaults.standard.set(true, forKey: nutritionTableMigrationKey)
+            // No store exists yet, SwiftData will create it properly
+            UserDefaults.standard.set(true, forKey: nutritionTableCleanupKey)
             return
         }
 
         var db: OpaquePointer?
         guard sqlite3_open(storeURL.path, &db) == SQLITE_OK else {
-            print("⚠️ Failed to open database for nutrition table migration")
+            print("⚠️ Failed to open database for nutrition table cleanup")
             return
         }
         defer { sqlite3_close(db) }
 
-        // Check if table already exists
-        let checkSQL = "SELECT name FROM sqlite_master WHERE type='table' AND name='ZNUTRITIONENTRYMODEL';"
+        // Check if table exists but entity is NOT registered in Z_PRIMARYKEY
+        // This means it was manually created and needs to be dropped for proper migration
+        let checkRegisteredSQL = "SELECT Z_ENT FROM Z_PRIMARYKEY WHERE Z_NAME = 'NutritionEntryModel';"
         var checkStmt: OpaquePointer?
-        if sqlite3_prepare_v2(db, checkSQL, -1, &checkStmt, nil) == SQLITE_OK {
+        var isRegistered = false
+        if sqlite3_prepare_v2(db, checkRegisteredSQL, -1, &checkStmt, nil) == SQLITE_OK {
             if sqlite3_step(checkStmt) == SQLITE_ROW {
-                // Table exists
-                sqlite3_finalize(checkStmt)
-                UserDefaults.standard.set(true, forKey: nutritionTableMigrationKey)
-                print("✅ Nutrition table already exists")
-                return
+                isRegistered = true
             }
         }
         sqlite3_finalize(checkStmt)
 
-        // Create the table with SwiftData naming conventions
-        let createSQL = """
-            CREATE TABLE IF NOT EXISTS ZNUTRITIONENTRYMODEL (
-                Z_PK INTEGER PRIMARY KEY AUTOINCREMENT,
-                Z_ENT INTEGER,
-                Z_OPT INTEGER,
-                ZID BLOB,
-                ZDATE TIMESTAMP,
-                ZPHOTOASSETID VARCHAR,
-                ZNAME VARCHAR,
-                ZPORTIONMULTIPLIER FLOAT,
-                ZCALORIES FLOAT,
-                ZPROTEIN FLOAT,
-                ZCARBOHYDRATES FLOAT,
-                ZFAT FLOAT,
-                ZFIBER FLOAT,
-                ZSUGAR FLOAT,
-                ZSODIUM FLOAT,
-                ZVITAMINA FLOAT,
-                ZVITAMINC FLOAT,
-                ZVITAMIND FLOAT,
-                ZCALCIUM FLOAT,
-                ZIRON FLOAT,
-                ZPOTASSIUM FLOAT,
-                ZSOURCERAW VARCHAR,
-                ZCONFIDENCERAW VARCHAR,
-                ZHASNUTRITIONLABEL INTEGER,
-                ZCREATEDAT TIMESTAMP,
-                ZUPDATEDAT TIMESTAMP
-            );
-            """
+        if isRegistered {
+            // Entity is properly registered, SwiftData created it
+            print("✅ NutritionEntryModel is properly registered")
+            UserDefaults.standard.set(true, forKey: nutritionTableCleanupKey)
+            return
+        }
 
-        var errMsg: UnsafeMutablePointer<CChar>?
-        if sqlite3_exec(db, createSQL, nil, nil, &errMsg) == SQLITE_OK {
-            print("✅ Created nutrition entry table")
-            UserDefaults.standard.set(true, forKey: nutritionTableMigrationKey)
-        } else {
-            if let errMsg = errMsg {
-                print("⚠️ Failed to create nutrition table: \(String(cString: errMsg))")
-                sqlite3_free(errMsg)
+        // Check if the table exists (but wasn't registered - our manual creation)
+        let checkTableSQL = "SELECT name FROM sqlite_master WHERE type='table' AND name='ZNUTRITIONENTRYMODEL';"
+        var tableExists = false
+        if sqlite3_prepare_v2(db, checkTableSQL, -1, &checkStmt, nil) == SQLITE_OK {
+            if sqlite3_step(checkStmt) == SQLITE_ROW {
+                tableExists = true
             }
         }
+        sqlite3_finalize(checkStmt)
+
+        if tableExists {
+            // Drop the manually created table so SwiftData can create it properly
+            print("🔄 Dropping manually created ZNUTRITIONENTRYMODEL table...")
+            var errMsg: UnsafeMutablePointer<CChar>?
+            if sqlite3_exec(db, "DROP TABLE ZNUTRITIONENTRYMODEL;", nil, nil, &errMsg) == SQLITE_OK {
+                print("✅ Dropped table, SwiftData will recreate it")
+            } else {
+                if let errMsg = errMsg {
+                    print("⚠️ Failed to drop table: \(String(cString: errMsg))")
+                    sqlite3_free(errMsg)
+                }
+            }
+        }
+
+        UserDefaults.standard.set(true, forKey: nutritionTableCleanupKey)
     }
 
     /// Migrate data from the old app-private store to the new shared store
