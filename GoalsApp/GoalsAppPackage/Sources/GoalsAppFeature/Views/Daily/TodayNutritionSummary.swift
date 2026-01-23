@@ -25,7 +25,7 @@ struct TodayNutritionSummary: View {
             MacroRatioCard(nutrients: totalNutrients)
 
             // Entry list
-            VStack(spacing: 8) {
+            List {
                 ForEach(entries) { entry in
                     NutritionEntryRow(
                         entry: entry,
@@ -36,6 +36,9 @@ struct TodayNutritionSummary: View {
                             }
                         }
                     )
+                    .listRowInsets(EdgeInsets())
+                    .listRowSeparator(.hidden)
+                    .listRowBackground(Color.clear)
                     .swipeActions(edge: .trailing, allowsFullSwipe: true) {
                         Button(role: .destructive) {
                             Task {
@@ -47,6 +50,8 @@ struct TodayNutritionSummary: View {
                     }
                 }
             }
+            .listStyle(.plain)
+            .frame(minHeight: CGFloat(entries.count) * 80)
         }
     }
 
