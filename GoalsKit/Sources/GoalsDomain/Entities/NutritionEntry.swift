@@ -34,6 +34,9 @@ public struct NutritionEntry: Sendable, Equatable, Codable, Identifiable {
     /// Photo asset ID from PhotoKit (PHAsset.localIdentifier)
     public let photoAssetId: String
 
+    /// Thumbnail image data (JPEG, ~200px) for fast display without Photo Library access
+    public let thumbnailData: Data?
+
     /// Name/description of the food
     public var name: String
 
@@ -62,6 +65,7 @@ public struct NutritionEntry: Sendable, Equatable, Codable, Identifiable {
         id: UUID = UUID(),
         date: Date = Date(),
         photoAssetId: String,
+        thumbnailData: Data? = nil,
         name: String,
         portionMultiplier: Double = 1.0,
         baseNutrients: NutrientValues,
@@ -74,6 +78,7 @@ public struct NutritionEntry: Sendable, Equatable, Codable, Identifiable {
         self.id = id
         self.date = date
         self.photoAssetId = photoAssetId
+        self.thumbnailData = thumbnailData
         self.name = name
         self.portionMultiplier = portionMultiplier
         self.baseNutrients = baseNutrients

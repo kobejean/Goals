@@ -231,9 +231,12 @@ struct ConfirmNutritionEntryView: View {
     }
 
     private func confirmEntry() {
+        let thumbnailData = generateThumbnail(from: analysis.imageData, maxSize: 200)
+
         let entry = NutritionEntry(
             date: Date(),
             photoAssetId: analysis.photoAssetId,
+            thumbnailData: thumbnailData,
             name: name,
             portionMultiplier: portionMultiplier,
             baseNutrients: analysis.analysisResult.nutrients,
@@ -242,6 +245,32 @@ struct ConfirmNutritionEntryView: View {
             hasNutritionLabel: analysis.analysisResult.hasNutritionLabel
         )
         onConfirm(entry)
+    }
+
+    /// Generates a thumbnail from image data
+    /// - Parameters:
+    ///   - imageData: Original image data
+    ///   - maxSize: Maximum dimension (width or height) in points
+    /// - Returns: JPEG data for the thumbnail, or nil if generation fails
+    private func generateThumbnail(from imageData: Data, maxSize: CGFloat) -> Data? {
+        #if canImport(UIKit)
+        guard let image = UIImage(data: imageData) else { return nil }
+
+        let scale = min(maxSize / image.size.width, maxSize / image.size.height, 1.0)
+        let newSize = CGSize(
+            width: image.size.width * scale,
+            height: image.size.height * scale
+        )
+
+        let renderer = UIGraphicsImageRenderer(size: newSize)
+        let thumbnail = renderer.image { _ in
+            image.draw(in: CGRect(origin: .zero, size: newSize))
+        }
+
+        return thumbnail.jpegData(compressionQuality: 0.7)
+        #else
+        return nil
+        #endif
     }
 }
 

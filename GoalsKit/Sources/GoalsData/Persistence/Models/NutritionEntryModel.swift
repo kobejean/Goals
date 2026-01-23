@@ -8,6 +8,7 @@ public final class NutritionEntryModel {
     public var id: UUID = UUID()
     public var date: Date = Date()
     public var photoAssetId: String = ""
+    @Attribute(.externalStorage) public var thumbnailData: Data?
     public var name: String = ""
     public var portionMultiplier: Double = 1.0
 
@@ -39,6 +40,7 @@ public final class NutritionEntryModel {
         id: UUID = UUID(),
         date: Date = Date(),
         photoAssetId: String,
+        thumbnailData: Data? = nil,
         name: String,
         portionMultiplier: Double = 1.0,
         calories: Double = 0,
@@ -63,6 +65,7 @@ public final class NutritionEntryModel {
         self.id = id
         self.date = date
         self.photoAssetId = photoAssetId
+        self.thumbnailData = thumbnailData
         self.name = name
         self.portionMultiplier = portionMultiplier
         self.calories = calories
@@ -114,6 +117,7 @@ public extension NutritionEntryModel {
             id: id,
             date: date,
             photoAssetId: photoAssetId,
+            thumbnailData: thumbnailData,
             name: name,
             portionMultiplier: portionMultiplier,
             baseNutrients: baseNutrients,
@@ -131,6 +135,7 @@ public extension NutritionEntryModel {
             id: entry.id,
             date: entry.date,
             photoAssetId: entry.photoAssetId,
+            thumbnailData: entry.thumbnailData,
             name: entry.name,
             portionMultiplier: entry.portionMultiplier,
             calories: entry.baseNutrients.calories,

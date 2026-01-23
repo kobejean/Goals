@@ -1,6 +1,10 @@
 import SwiftUI
 import GoalsDomain
 
+#if canImport(UIKit)
+import UIKit
+#endif
+
 /// Summary of today's nutrition entries with edit and delete actions
 struct TodayNutritionSummary: View {
     let entries: [NutritionEntry]
@@ -101,10 +105,10 @@ private struct NutritionEntryRow: View {
 
     var body: some View {
         HStack(spacing: 12) {
-            // Confidence indicator
-            Circle()
-                .fill(confidenceColor)
-                .frame(width: 8, height: 8)
+            // Thumbnail or placeholder
+            thumbnailView
+                .frame(width: 44, height: 44)
+                .clipShape(RoundedRectangle(cornerRadius: 8))
 
             VStack(alignment: .leading, spacing: 4) {
                 Text(entry.name)
@@ -121,6 +125,11 @@ private struct NutritionEntryRow: View {
                             .font(.caption)
                             .foregroundStyle(.secondary)
                     }
+
+                    // Confidence indicator
+                    Circle()
+                        .fill(confidenceColor)
+                        .frame(width: 6, height: 6)
                 }
             }
 
@@ -160,6 +169,32 @@ private struct NutritionEntryRow: View {
         )
     }
 
+    @ViewBuilder
+    private var thumbnailView: some View {
+        #if canImport(UIKit)
+        if let data = entry.thumbnailData,
+           let uiImage = UIImage(data: data) {
+            Image(uiImage: uiImage)
+                .resizable()
+                .scaledToFill()
+        } else {
+            placeholderView
+        }
+        #else
+        placeholderView
+        #endif
+    }
+
+    private var placeholderView: some View {
+        Rectangle()
+            .fill(Color.gray.opacity(0.2))
+            .overlay {
+                Image(systemName: "fork.knife")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+    }
+
     private var confidenceColor: Color {
         switch entry.confidence {
         case .high: return .green
@@ -168,7 +203,6 @@ private struct NutritionEntryRow: View {
         case .unableToIdentify, .none: return .gray
         }
     }
-
 }
 
 /// Card showing macro ratio as a simple visualization
