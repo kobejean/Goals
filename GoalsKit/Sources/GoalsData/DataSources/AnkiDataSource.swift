@@ -30,8 +30,18 @@ public actor AnkiDataSource: AnkiDataSourceProtocol {
     private var selectedDecks: [String]?
     private let urlSession: URLSession
 
-    public init(urlSession: URLSession = .shared) {
-        self.urlSession = urlSession
+    public init(urlSession: URLSession? = nil) {
+        if let urlSession = urlSession {
+            self.urlSession = urlSession
+        } else {
+            // Use ephemeral config to avoid connection pooling issues with AnkiConnect
+            // AnkiConnect is single-threaded and doesn't handle connection reuse well
+            let config = URLSessionConfiguration.ephemeral
+            config.httpMaximumConnectionsPerHost = 1
+            config.timeoutIntervalForRequest = 30
+            config.timeoutIntervalForResource = 60
+            self.urlSession = URLSession(configuration: config)
+        }
     }
 
     public func isConfigured() async -> Bool {
@@ -77,19 +87,12 @@ public actor AnkiDataSource: AnkiDataSourceProtocol {
     // MARK: - AnkiDataSourceProtocol
 
     public func fetchDailyStats(from startDate: Date, to endDate: Date) async throws -> [AnkiDailyStats] {
-        let dateFormatter = DateFormatter()
-        dateFormatter.dateFormat = "yyyy-MM-dd HH:mm:ss"
-
-        print("[AnkiDataSource] fetchDailyStats from \(dateFormatter.string(from: startDate)) to \(dateFormatter.string(from: endDate))")
-        print("[AnkiDataSource] Task.isCancelled at start: \(Task.isCancelled)")
+        // Check for cancellation immediately - avoid any work if already cancelled
+        try Task.checkCancellation()
 
         guard let host = host, let port = port else {
-            print("[AnkiDataSource] ERROR: Not configured")
             throw DataSourceError.notConfigured
         }
-
-        // Check for cancellation before network call
-        try Task.checkCancellation()
 
         // Get all deck names or use selected decks
         let decksToFetch: [String]
@@ -99,38 +102,25 @@ public actor AnkiDataSource: AnkiDataSourceProtocol {
             decksToFetch = try await fetchDeckNames()
         }
 
-        print("[AnkiDataSource] Fetching from decks: \(decksToFetch)")
-
         guard !decksToFetch.isEmpty else {
-            print("[AnkiDataSource] No decks to fetch")
             return []
         }
 
-        // Fetch reviews from all decks in parallel
-        let allReviews = try await withThrowingTaskGroup(of: [AnkiCardReview].self) { group in
-            for deck in decksToFetch {
-                group.addTask {
-                    try await self.fetchCardReviews(deck: deck, host: host, port: port)
-                }
+        // Fetch reviews from all decks sequentially
+        // AnkiConnect is single-threaded and can't handle parallel requests
+        // Add small delay between requests to let AnkiConnect recover
+        var allReviews: [AnkiCardReview] = []
+        for (index, deck) in decksToFetch.enumerated() {
+            try Task.checkCancellation()
+            if index > 0 {
+                try await Task.sleep(for: .milliseconds(50))
             }
-
-            var reviews: [AnkiCardReview] = []
-            for try await deckReviews in group {
-                reviews.append(contentsOf: deckReviews)
-            }
-            return reviews
+            let deckReviews = try await fetchCardReviews(deck: deck, host: host, port: port)
+            allReviews.append(contentsOf: deckReviews)
         }
-
-        print("[AnkiDataSource] Total reviews fetched: \(allReviews.count)")
 
         // Filter reviews by date range and aggregate by day
-        let stats = aggregateReviewsByDay(reviews: allReviews, from: startDate, to: endDate)
-        print("[AnkiDataSource] Aggregated into \(stats.count) daily stats")
-        for stat in stats.suffix(5) {
-            dateFormatter.dateFormat = "yyyy-MM-dd"
-            print("[AnkiDataSource]   - \(dateFormatter.string(from: stat.date)): \(stat.reviewCount) reviews, \(stat.studyTimeMinutes) min")
-        }
-        return stats
+        return aggregateReviewsByDay(reviews: allReviews, from: startDate, to: endDate)
     }
 
     public func fetchLatestStats() async throws -> AnkiDailyStats? {
@@ -188,19 +178,37 @@ public actor AnkiDataSource: AnkiDataSourceProtocol {
         var urlRequest = URLRequest(url: url)
         urlRequest.httpMethod = "POST"
         urlRequest.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        urlRequest.setValue("close", forHTTPHeaderField: "Connection") // Force new connection each request
         urlRequest.httpBody = try JSONEncoder().encode(request)
 
-        let (data, response) = try await urlSession.data(for: urlRequest)
+        // Retry logic for transient connection failures
+        var lastError: Error?
+        for attempt in 1...3 {
+            do {
+                try Task.checkCancellation()
+                let (data, response) = try await urlSession.data(for: urlRequest)
 
-        guard let httpResponse = response as? HTTPURLResponse else {
-            throw DataSourceError.invalidResponse
+                guard let httpResponse = response as? HTTPURLResponse else {
+                    throw DataSourceError.invalidResponse
+                }
+
+                guard (200...299).contains(httpResponse.statusCode) else {
+                    throw DataSourceError.httpError(statusCode: httpResponse.statusCode)
+                }
+
+                return try JSONDecoder().decode(T.self, from: data)
+            } catch let error as URLError where error.code == .networkConnectionLost {
+                lastError = error
+                print("[AnkiDataSource] Connection lost (attempt \(attempt)/3), retrying...")
+                if attempt < 3 {
+                    try await Task.sleep(for: .milliseconds(200 * attempt))
+                }
+            } catch {
+                throw error
+            }
         }
 
-        guard (200...299).contains(httpResponse.statusCode) else {
-            throw DataSourceError.httpError(statusCode: httpResponse.statusCode)
-        }
-
-        return try JSONDecoder().decode(T.self, from: data)
+        throw lastError ?? DataSourceError.connectionFailed("Connection lost after 3 retries")
     }
 
     private func fetchCardReviews(deck: String, host: String, port: Int) async throws -> [AnkiCardReview] {
@@ -250,24 +258,11 @@ public actor AnkiDataSource: AnkiDataSourceProtocol {
         let startDay = calendar.startOfDay(for: startDate)
         let endDay = calendar.startOfDay(for: endDate)
 
-        let dateFormatter = DateFormatter()
-        dateFormatter.dateFormat = "yyyy-MM-dd"
-        print("[AnkiDataSource.aggregate] Date range: \(dateFormatter.string(from: startDay)) to \(dateFormatter.string(from: endDay))")
-
-        // Check for today's reviews before filtering
-        let today = calendar.startOfDay(for: Date())
-        let todayReviewsBeforeFilter = reviews.filter { calendar.isDate($0.date, inSameDayAs: today) }
-        print("[AnkiDataSource.aggregate] Today's reviews before filter: \(todayReviewsBeforeFilter.count)")
-
         // Filter reviews within date range
         let filteredReviews = reviews.filter { review in
             let reviewDay = calendar.startOfDay(for: review.date)
             return reviewDay >= startDay && reviewDay <= endDay
         }
-
-        let todayReviewsAfterFilter = filteredReviews.filter { calendar.isDate($0.date, inSameDayAs: today) }
-        print("[AnkiDataSource.aggregate] Today's reviews after filter: \(todayReviewsAfterFilter.count)")
-        print("[AnkiDataSource.aggregate] Total filtered reviews: \(filteredReviews.count)")
 
         // Group by day
         let grouped = Dictionary(grouping: filteredReviews) { review in

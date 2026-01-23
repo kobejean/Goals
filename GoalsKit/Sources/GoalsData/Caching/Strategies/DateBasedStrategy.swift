@@ -19,9 +19,15 @@ public struct DateBasedStrategy: IncrementalFetchStrategy, Sendable {
     /// For most sources this is 1 (today's data might update throughout the day).
     public let volatileWindowDays: Int
 
-    public init(strategyKey: String, volatileWindowDays: Int = 1) {
+    /// Maximum number of days to look back on first fetch.
+    /// Prevents unbounded lookback when TimeRange.all requests 100 years.
+    /// Default is 730 days (2 years).
+    public let maxInitialLookbackDays: Int
+
+    public init(strategyKey: String, volatileWindowDays: Int = 1, maxInitialLookbackDays: Int = 730) {
         self.strategyKey = strategyKey
         self.volatileWindowDays = volatileWindowDays
+        self.maxInitialLookbackDays = maxInitialLookbackDays
     }
 
     public func calculateFetchRange(
@@ -31,8 +37,18 @@ public struct DateBasedStrategy: IncrementalFetchStrategy, Sendable {
         let calendar = Calendar.current
 
         guard let metadata = metadata else {
-            // No previous fetch - fetch full requested range
-            return (calendar.startOfDay(for: requested.start), requested.end)
+            // No previous fetch - limit to maxInitialLookbackDays
+            let maxLookbackStart = calendar.date(
+                byAdding: .day,
+                value: -maxInitialLookbackDays,
+                to: requested.end
+            ) ?? requested.start
+
+            let boundedStart = max(
+                calendar.startOfDay(for: maxLookbackStart),
+                calendar.startOfDay(for: requested.start)
+            )
+            return (boundedStart, requested.end)
         }
 
         // Calculate the volatile window start (data that might have changed)

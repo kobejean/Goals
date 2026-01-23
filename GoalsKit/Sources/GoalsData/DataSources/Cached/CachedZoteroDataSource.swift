@@ -16,9 +16,29 @@ public actor CachedZoteroDataSource: ZoteroDataSourceProtocol, CachingDataSource
         strategyKey: "zotero.dailyStats"
     )
 
+    /// Old UserDefaults key for migration
+    private static let legacyLibraryVersionKey = "zoteroLastLibraryVersion"
+
     public init(remote: ZoteroDataSource, cache: DataCache) {
         self.remote = remote
         self.cache = cache
+    }
+
+    /// Migrate old UserDefaults-based lastLibraryVersion to new strategy metadata
+    private func migrateFromLegacyMetadataIfNeeded() async {
+        // Check if new metadata already exists
+        if let _ = try? await cache.fetchStrategyMetadata(for: incrementalStrategy) {
+            return // Already migrated
+        }
+
+        // Check for legacy metadata
+        let legacyVersion = UserDefaults.standard.integer(forKey: Self.legacyLibraryVersionKey)
+        if legacyVersion > 0 {
+            let metadata = VersionBasedStrategy.Metadata(lastVersion: legacyVersion, lastFetchDate: Date())
+            try? await cache.storeStrategyMetadata(metadata, for: incrementalStrategy)
+            // Remove legacy key after migration
+            UserDefaults.standard.removeObject(forKey: Self.legacyLibraryVersionKey)
+        }
     }
 
     // MARK: - Configuration passthrough provided by CachingDataSourceWrapper
@@ -30,6 +50,9 @@ public actor CachedZoteroDataSource: ZoteroDataSourceProtocol, CachingDataSource
     // MARK: - ZoteroDataSourceProtocol
 
     public func fetchDailyStats(from startDate: Date, to endDate: Date) async throws -> [ZoteroDailyStats] {
+        // Migrate legacy metadata if needed (one-time operation)
+        await migrateFromLegacyMetadataIfNeeded()
+
         // Get current cached data
         let cachedStats = try await fetchCached(ZoteroDailyStats.self, from: startDate, to: endDate)
 

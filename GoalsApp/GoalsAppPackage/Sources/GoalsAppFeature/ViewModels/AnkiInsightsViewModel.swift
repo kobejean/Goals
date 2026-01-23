@@ -208,14 +208,13 @@ public final class AnkiInsightsViewModel: InsightsSectionViewModel {
         do {
             stats = try await dataSource.fetchDailyStats(from: startDate, to: endDate)
             fetchStatus = .success
+        } catch is CancellationError {
+            // Task was cancelled - don't change status (another fetch may be in progress)
         } catch {
-            // Keep cached data on error (Anki might not be running)
+            // Show error status even if we have cached data
+            fetchStatus = .error
             if stats.isEmpty {
                 errorMessage = "Unable to connect to Anki. Make sure Anki is running with AnkiConnect installed."
-                fetchStatus = .error
-            } else {
-                // Have cached data, show success despite fetch error
-                fetchStatus = .success
             }
         }
     }
