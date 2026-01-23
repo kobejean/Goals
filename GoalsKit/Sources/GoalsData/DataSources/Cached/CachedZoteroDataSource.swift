@@ -111,20 +111,43 @@ public actor CachedZoteroDataSource: ZoteroDataSourceProtocol, CachingDataSource
         return statsWithProgress
     }
 
-    /// Compute reading progress scores from cached reading status snapshots
-    /// Score = toRead×0.25 + inProgress×0.5 + read×1.0
+    /// Compute reading progress delta scores from cached reading status snapshots
+    /// Returns the change in reading progress from the previous day (delta)
+    /// Score formula: toRead×0.25 + inProgress×0.5 + read×1.0
     private func computeReadingProgressScores(from startDate: Date, to endDate: Date) async throws -> [Date: Double] {
         let snapshots = try await fetchCached(ZoteroReadingStatus.self, from: startDate, to: endDate)
+        guard !snapshots.isEmpty else { return [:] }
 
         let calendar = Calendar.current
         var scores: [Date: Double] = [:]
 
-        for snapshot in snapshots {
+        // Sort snapshots by date to compute deltas
+        let sortedSnapshots = snapshots.sorted { $0.date < $1.date }
+
+        // Compute absolute score for each snapshot
+        func absoluteScore(for snapshot: ZoteroReadingStatus) -> Double {
+            Double(snapshot.toReadCount) * 0.25 +
+            Double(snapshot.inProgressCount) * 0.5 +
+            Double(snapshot.readCount) * 1.0
+        }
+
+        var previousScore: Double? = nil
+
+        for snapshot in sortedSnapshots {
             let day = calendar.startOfDay(for: snapshot.date)
-            let score = Double(snapshot.toReadCount) * 0.25 +
-                        Double(snapshot.inProgressCount) * 0.5 +
-                        Double(snapshot.readCount) * 1.0
-            scores[day] = score
+            let currentScore = absoluteScore(for: snapshot)
+
+            if let prevScore = previousScore {
+                // Delta = current - previous (how much progress made today)
+                let delta = currentScore - prevScore
+                // Only record positive deltas (progress), ignore negative (items removed)
+                scores[day] = max(0, delta)
+            } else {
+                // First snapshot - no previous to compare, so delta is 0
+                scores[day] = 0
+            }
+
+            previousScore = currentScore
         }
 
         return scores

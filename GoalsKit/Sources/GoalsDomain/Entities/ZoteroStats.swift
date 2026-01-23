@@ -5,7 +5,8 @@ public struct ZoteroDailyStats: Sendable, Equatable, Codable {
     public let date: Date
     public let annotationCount: Int
     public let noteCount: Int
-    /// Reading progress score: toRead×0.25 + inProgress×0.5 + read×1.0
+    /// Reading progress delta: change in score from previous day
+    /// Score formula: toRead×0.25 + inProgress×0.5 + read×1.0
     public let readingProgressScore: Double
 
     public init(
