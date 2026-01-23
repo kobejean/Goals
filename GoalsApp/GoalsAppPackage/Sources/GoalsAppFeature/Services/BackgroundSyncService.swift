@@ -146,9 +146,8 @@ public final class BackgroundSyncService: Sendable {
         guard await atCoderDataSource.isConfigured() else { return }
 
         do {
-            // Fetching stats and history will update the cache automatically
-            _ = try await atCoderDataSource.fetchStats()
-            _ = try await atCoderDataSource.fetchContestHistory()
+            // Use combined method to avoid redundant ranking API calls
+            _ = try await atCoderDataSource.fetchStatsAndContestHistory()
             // Fetch daily effort for activity grid (submissions + difficulty calculation)
             _ = try await atCoderDataSource.fetchDailyEffort(from: nil)
         } catch {

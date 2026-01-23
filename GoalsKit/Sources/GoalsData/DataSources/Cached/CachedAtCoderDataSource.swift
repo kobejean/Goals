@@ -27,18 +27,25 @@ public actor CachedAtCoderDataSource: AtCoderDataSourceProtocol, CachingDataSour
     // MARK: - AtCoderDataSourceProtocol
 
     public func fetchStats() async throws -> AtCoderCurrentStats? {
-        // Always fetch fresh stats from remote (current snapshot)
-        // Don't cache - this is a point-in-time snapshot, not historical data
-        try await remote.fetchStats()
+        let (stats, _) = try await fetchStatsAndContestHistory()
+        return stats
     }
 
     public func fetchContestHistory() async throws -> [AtCoderContestResult] {
-        // Fetch from remote and store in cache
-        let freshHistory = try await remote.fetchContestHistory()
+        let (_, history) = try await fetchStatsAndContestHistory()
+        return history
+    }
+
+    public func fetchStatsAndContestHistory() async throws -> (stats: AtCoderCurrentStats?, history: [AtCoderContestResult]) {
+        // Fetch both from remote in a single operation (avoids redundant ranking API calls)
+        let (stats, freshHistory) = try await remote.fetchStatsAndContestHistory()
+
+        // Store contest history in cache
         try await cache.store(freshHistory)
 
-        // Single source of truth: always return from cache
-        return try await fetchCached(AtCoderContestResult.self)
+        // Single source of truth for history: always return from cache
+        let cachedHistory = try await fetchCached(AtCoderContestResult.self)
+        return (stats, cachedHistory)
     }
 
     public func fetchSubmissions(from fromDate: Date?) async throws -> [AtCoderSubmission] {

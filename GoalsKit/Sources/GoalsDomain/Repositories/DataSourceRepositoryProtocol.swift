@@ -90,6 +90,11 @@ public protocol AtCoderDataSourceProtocol: DataSourceRepositoryProtocol {
     /// Fetches contest history (historical records, cached)
     func fetchContestHistory() async throws -> [AtCoderContestResult]
 
+    /// Fetches both stats and contest history in a single operation.
+    /// More efficient than calling fetchStats() and fetchContestHistory() separately
+    /// because ranking APIs are only called once.
+    func fetchStatsAndContestHistory() async throws -> (stats: AtCoderCurrentStats?, history: [AtCoderContestResult])
+
     /// Fetches daily effort data (submissions grouped by day and difficulty)
     func fetchDailyEffort(from fromDate: Date?) async throws -> [AtCoderDailyEffort]
 

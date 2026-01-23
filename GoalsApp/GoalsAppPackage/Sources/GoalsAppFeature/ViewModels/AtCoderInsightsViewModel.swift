@@ -104,13 +104,14 @@ public final class AtCoderInsightsViewModel: InsightsSectionViewModel {
 
         // Fetch fresh data (updates cache internally), then update UI
         do {
-            async let statsTask = dataSource.fetchStats()
+            // Use combined method to avoid redundant ranking API calls
+            async let statsAndHistoryTask = dataSource.fetchStatsAndContestHistory()
             async let effortTask = dataSource.fetchDailyEffort(from: nil)
-            async let historyTask = dataSource.fetchContestHistory()
 
-            stats = try await statsTask
+            let (fetchedStats, fetchedHistory) = try await statsAndHistoryTask
+            stats = fetchedStats
+            contestHistory = fetchedHistory
             dailyEffort = try await effortTask
-            contestHistory = try await historyTask
             fetchStatus = .success
         } catch {
             // Keep cached data on error

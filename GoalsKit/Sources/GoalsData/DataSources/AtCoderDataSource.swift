@@ -66,11 +66,24 @@ public actor AtCoderDataSource: AtCoderDataSourceProtocol {
     }
 
     public func fetchStats() async throws -> AtCoderCurrentStats? {
+        let (stats, _) = try await fetchStatsAndContestHistory()
+        return stats
+    }
+
+    public func fetchContestHistory() async throws -> [AtCoderContestResult] {
+        let (_, history) = try await fetchStatsAndContestHistory()
+        return history
+    }
+
+    /// Fetches both stats and contest history in a single operation, avoiding redundant API calls.
+    /// This is more efficient than calling fetchStats() and fetchContestHistory() separately
+    /// because ranking APIs (ac_rank, streak_rank) are only called once.
+    public func fetchStatsAndContestHistory() async throws -> (stats: AtCoderCurrentStats?, history: [AtCoderContestResult]) {
         guard let username = username else {
             throw DataSourceError.notConfigured
         }
 
-        // Fetch data from multiple APIs concurrently
+        // Fetch all data concurrently - ranking APIs called only once
         async let contestHistoryTask = fetchContestHistoryFromAPI(username: username)
         async let acRankTask = fetchACRank(username: username)
         async let streakRankTask = fetchStreakRank(username: username)
@@ -79,46 +92,12 @@ public actor AtCoderDataSource: AtCoderDataSourceProtocol {
         let acRank = try? await acRankTask
         let streakRank = try? await streakRankTask
 
-        guard let latest = contestHistory.last else {
-            // User has no contest history, but might still have solved problems
-            if let acRank {
-                return AtCoderCurrentStats(
-                    date: Date(),
-                    rating: 0,
-                    highestRating: 0,
-                    contestsParticipated: 0,
-                    problemsSolved: acRank.count,
-                    longestStreak: streakRank?.count
-                )
-            }
-            return nil
-        }
-
-        return AtCoderCurrentStats(
-            date: Date(),
-            rating: latest.NewRating,
-            highestRating: contestHistory.map { $0.NewRating }.max() ?? 0,
-            contestsParticipated: contestHistory.count,
-            problemsSolved: acRank?.count ?? 0,
-            longestStreak: streakRank?.count
-        )
-    }
-
-    public func fetchContestHistory() async throws -> [AtCoderContestResult] {
-        guard let username = username else {
-            throw DataSourceError.notConfigured
-        }
-
-        let contestHistory = try await fetchContestHistoryFromAPI(username: username)
-
-        // Also fetch AC count for the most recent stats
-        let acRank = try? await fetchACRank(username: username)
-        let streakRank = try? await fetchStreakRank(username: username)
         let problemsSolved = acRank?.count ?? 0
         let longestStreak = streakRank?.count
 
+        // Build contest history
         var highestSoFar = 0
-        return contestHistory.enumerated().map { (index, result) in
+        let history = contestHistory.enumerated().map { (index, result) in
             highestSoFar = max(highestSoFar, result.NewRating)
             return AtCoderContestResult(
                 date: result.endTime,
@@ -130,6 +109,33 @@ public actor AtCoderDataSource: AtCoderDataSourceProtocol {
                 contestScreenName: result.ContestScreenName
             )
         }
+
+        // Build current stats
+        let stats: AtCoderCurrentStats?
+        if let latest = contestHistory.last {
+            stats = AtCoderCurrentStats(
+                date: Date(),
+                rating: latest.NewRating,
+                highestRating: contestHistory.map { $0.NewRating }.max() ?? 0,
+                contestsParticipated: contestHistory.count,
+                problemsSolved: problemsSolved,
+                longestStreak: longestStreak
+            )
+        } else if acRank != nil {
+            // User has no contest history but has solved problems
+            stats = AtCoderCurrentStats(
+                date: Date(),
+                rating: 0,
+                highestRating: 0,
+                contestsParticipated: 0,
+                problemsSolved: problemsSolved,
+                longestStreak: longestStreak
+            )
+        } else {
+            stats = nil
+        }
+
+        return (stats, history)
     }
 
     // MARK: - Submission APIs
