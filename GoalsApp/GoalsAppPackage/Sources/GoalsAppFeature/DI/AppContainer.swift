@@ -174,6 +174,11 @@ public final class AppContainer {
     }
 
     private init(inMemory: Bool) throws {
+        // Migrate data from old store to shared store (one-time migration)
+        if !inMemory {
+            DataMigrationService.migrateToSharedStoreIfNeeded()
+        }
+
         // Create LOCAL-ONLY cache container FIRST for fast startup
         // Use shared App Group container so widgets can read the cache
         let cacheSchema = Schema([CachedDataEntry.self])
@@ -228,11 +233,27 @@ public final class AppContainer {
             TaskSessionModel.self,
         ])
 
-        let mainConfiguration = ModelConfiguration(
-            schema: mainSchema,
-            isStoredInMemoryOnly: inMemory,
-            cloudKitDatabase: .none  // Temporarily disabled - was causing 30+ second startup
-        )
+        let mainConfiguration: ModelConfiguration
+        if inMemory {
+            mainConfiguration = ModelConfiguration(
+                schema: mainSchema,
+                isStoredInMemoryOnly: true,
+                cloudKitDatabase: .none
+            )
+        } else if let storeURL = SharedStorage.sharedMainStoreURL {
+            // Use shared container for widget access to tasks
+            mainConfiguration = ModelConfiguration(
+                schema: mainSchema,
+                url: storeURL,
+                cloudKitDatabase: .none  // Temporarily disabled - was causing 30+ second startup
+            )
+        } else {
+            mainConfiguration = ModelConfiguration(
+                schema: mainSchema,
+                isStoredInMemoryOnly: false,
+                cloudKitDatabase: .none
+            )
+        }
 
         self.modelContainer = try ModelContainer(
             for: mainSchema,

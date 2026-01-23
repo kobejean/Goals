@@ -67,6 +67,9 @@ public final class TasksViewModel: Sendable {
             if activeSession != nil {
                 startTimer()
             }
+
+            // Sync widget cache after loading data
+            try? await taskCachingService?.syncWidgetCache()
         } catch {
             errorMessage = error.localizedDescription
         }
@@ -93,6 +96,7 @@ public final class TasksViewModel: Sendable {
 
             // Sync to cache for widget access
             try? await taskCachingService?.syncTodayToCache()
+            try? await taskCachingService?.syncWidgetCache()
             WidgetCenter.shared.reloadAllTimelines()
         } catch {
             errorMessage = error.localizedDescription
@@ -105,6 +109,10 @@ public final class TasksViewModel: Sendable {
             let created = try await taskRepository.createTask(task)
             tasks.append(created)
             tasks.sort { $0.sortOrder < $1.sortOrder }
+
+            // Sync widget cache
+            try? await taskCachingService?.syncWidgetCache()
+            WidgetCenter.shared.reloadTimelines(ofKind: "TaskControlPanelWidget")
         } catch {
             errorMessage = error.localizedDescription
         }
@@ -117,6 +125,10 @@ public final class TasksViewModel: Sendable {
             if let index = tasks.firstIndex(where: { $0.id == updated.id }) {
                 tasks[index] = updated
             }
+
+            // Sync widget cache
+            try? await taskCachingService?.syncWidgetCache()
+            WidgetCenter.shared.reloadTimelines(ofKind: "TaskControlPanelWidget")
         } catch {
             errorMessage = error.localizedDescription
         }
@@ -127,6 +139,10 @@ public final class TasksViewModel: Sendable {
         do {
             try await taskRepository.deleteTask(id: task.id)
             tasks.removeAll { $0.id == task.id }
+
+            // Sync widget cache
+            try? await taskCachingService?.syncWidgetCache()
+            WidgetCenter.shared.reloadTimelines(ofKind: "TaskControlPanelWidget")
         } catch {
             errorMessage = error.localizedDescription
         }

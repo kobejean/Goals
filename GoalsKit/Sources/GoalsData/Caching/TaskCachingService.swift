@@ -58,4 +58,34 @@ public actor TaskCachingService {
             TaskDailySummary(date: day, sessions: daySessions, tasks: tasks)
         }.sorted { $0.date < $1.date }
     }
+
+    // MARK: - Widget Cache
+
+    /// Sync task data to UserDefaults for the Task Control Panel widget
+    public func syncWidgetCache() async throws {
+        // Fetch active tasks
+        let tasks = try await taskRepository.fetchActiveTasks()
+
+        // Fetch active session
+        let activeSession = try await taskRepository.fetchActiveSession()
+
+        // Convert to cached models
+        let cachedTasks = tasks.map { CachedTaskInfo(from: $0) }
+
+        // Build cached active session if exists
+        var cachedActiveSession: CachedActiveSession?
+        if let session = activeSession,
+           let task = tasks.first(where: { $0.id == session.taskId }) {
+            cachedActiveSession = CachedActiveSession(
+                sessionId: session.id,
+                taskId: session.taskId,
+                taskName: task.name,
+                taskColorRaw: task.color.rawValue,
+                startDate: session.startDate
+            )
+        }
+
+        // Write to shared storage
+        WidgetCacheWriter.write(tasks: cachedTasks, activeSession: cachedActiveSession)
+    }
 }

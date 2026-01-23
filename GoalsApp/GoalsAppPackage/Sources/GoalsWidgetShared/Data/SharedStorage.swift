@@ -19,4 +19,17 @@ public enum SharedStorage {
     public static var sharedCacheStoreURL: URL? {
         sharedContainerURL?.appendingPathComponent("Library/Application Support/CacheStore.sqlite")
     }
+
+    /// URL for the shared SwiftData main store (tasks, goals, badges)
+    public static var sharedMainStoreURL: URL? {
+        sharedContainerURL?.appendingPathComponent("Library/Application Support/default.store")
+    }
+
+    // MARK: - Task Control Panel Widget Cache Keys
+
+    /// Key for cached task definitions in widget storage
+    public static let widgetTasksKey = "widget.tasks"
+
+    /// Key for cached active session in widget storage
+    public static let widgetActiveSessionKey = "widget.activeSession"
 }
