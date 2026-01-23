@@ -2,7 +2,7 @@ import SwiftUI
 import GoalsDomain
 import GoalsWidgetShared
 
-/// Displays the currently active task with elapsed time
+/// Displays the currently active task
 struct ActiveTaskStatusView: View {
     let activeSession: CachedActiveSession?
 
@@ -20,13 +20,6 @@ struct ActiveTaskStatusView: View {
                     .lineLimit(1)
 
                 Spacer()
-
-                // Live elapsed time - counts up from start date
-                // Uses .timer style which auto-updates in widgets
-                Text(session.startDate, style: .timer)
-                    .multilineTextAlignment(.trailing) // Fix for widget alignment bug
-                    .monospacedDigit()
-                    .foregroundStyle(.secondary)
             } else {
                 // No active task indicator
                 Circle()
