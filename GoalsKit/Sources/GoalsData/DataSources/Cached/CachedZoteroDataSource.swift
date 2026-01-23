@@ -95,8 +95,78 @@ public actor CachedZoteroDataSource: ZoteroDataSourceProtocol, CachingDataSource
             }
         }
 
-        // Single source of truth: always return from cache
-        return try await fetchCached(ZoteroDailyStats.self, from: startDate, to: endDate)
+        // Fetch fresh reading status first so we have today's snapshot for progress calculation
+        _ = try? await fetchReadingStatus()
+
+        // Compute reading progress scores from reading status snapshots and merge into stats
+        let statsFromCache = try await fetchCached(ZoteroDailyStats.self, from: startDate, to: endDate)
+        let progressScores = try await computeReadingProgressScores(from: startDate, to: endDate)
+        let statsWithProgress = mergeReadingProgress(stats: statsFromCache, progressScores: progressScores)
+
+        // Store the merged stats back to cache
+        if !progressScores.isEmpty {
+            try await cache.store(statsWithProgress)
+        }
+
+        return statsWithProgress
+    }
+
+    /// Compute reading progress scores from cached reading status snapshots
+    /// Score = toRead×0.25 + inProgress×0.5 + read×1.0
+    private func computeReadingProgressScores(from startDate: Date, to endDate: Date) async throws -> [Date: Double] {
+        let snapshots = try await fetchCached(ZoteroReadingStatus.self, from: startDate, to: endDate)
+
+        let calendar = Calendar.current
+        var scores: [Date: Double] = [:]
+
+        for snapshot in snapshots {
+            let day = calendar.startOfDay(for: snapshot.date)
+            let score = Double(snapshot.toReadCount) * 0.25 +
+                        Double(snapshot.inProgressCount) * 0.5 +
+                        Double(snapshot.readCount) * 1.0
+            scores[day] = score
+        }
+
+        return scores
+    }
+
+    /// Merge computed reading progress scores into daily stats
+    private func mergeReadingProgress(stats: [ZoteroDailyStats], progressScores: [Date: Double]) -> [ZoteroDailyStats] {
+        guard !progressScores.isEmpty else {
+            return stats
+        }
+
+        let calendar = Calendar.current
+        var statsByDay: [Date: ZoteroDailyStats] = [:]
+
+        // Index existing stats by day
+        for stat in stats {
+            let day = calendar.startOfDay(for: stat.date)
+            statsByDay[day] = stat
+        }
+
+        // Merge reading progress scores
+        for (day, score) in progressScores {
+            if let existingStat = statsByDay[day] {
+                // Update existing stat with reading progress score
+                statsByDay[day] = ZoteroDailyStats(
+                    date: existingStat.date,
+                    annotationCount: existingStat.annotationCount,
+                    noteCount: existingStat.noteCount,
+                    readingProgressScore: score
+                )
+            } else {
+                // Create new stat entry for reading progress only
+                statsByDay[day] = ZoteroDailyStats(
+                    date: day,
+                    annotationCount: 0,
+                    noteCount: 0,
+                    readingProgressScore: score
+                )
+            }
+        }
+
+        return statsByDay.values.sorted { $0.date < $1.date }
     }
 
     /// Merges new stats with existing cached stats.
@@ -125,7 +195,8 @@ public actor CachedZoteroDataSource: ZoteroDataSourceProtocol, CachingDataSource
                     statsByDay[day] = ZoteroDailyStats(
                         date: existingStat.date,
                         annotationCount: existingStat.annotationCount + stat.annotationCount,
-                        noteCount: existingStat.noteCount + stat.noteCount
+                        noteCount: existingStat.noteCount + stat.noteCount,
+                        readingProgressScore: existingStat.readingProgressScore
                     )
                 }
                 // For past dates, skip - they're likely modified items we already counted

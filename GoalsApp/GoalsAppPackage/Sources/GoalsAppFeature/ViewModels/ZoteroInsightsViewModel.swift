@@ -73,7 +73,9 @@ public final class ZoteroInsightsViewModel: InsightsSectionViewModel {
         case .notes:
             return stats.trendPercentage { Double($0.noteCount) }
         case .totalActivity:
-            return stats.trendPercentage { Double($0.totalActivity) }
+            return stats.trendPercentage { $0.weightedPoints }
+        case .readingProgress:
+            return stats.trendPercentage { $0.readingProgressScore }
         }
     }
 
@@ -100,7 +102,8 @@ public final class ZoteroInsightsViewModel: InsightsSectionViewModel {
             ZoteroChartDataPoint(
                 date: stat.date,
                 annotations: stat.annotationCount,
-                notes: stat.noteCount
+                notes: stat.noteCount,
+                readingProgressScore: stat.readingProgressScore
             )
         }
     }
@@ -219,10 +222,10 @@ public final class ZoteroInsightsViewModel: InsightsSectionViewModel {
             readingStatus = cachedStatus
         }
 
-        // Fetch fresh stats (updates cache internally), then update UI
+        // Fetch fresh stats (updates cache internally, including reading status), then update UI
         do {
             stats = try await dataSource.fetchDailyStats(from: startDate, to: endDate)
-            readingStatus = try await dataSource.fetchReadingStatus()
+            readingStatus = try await dataSource.fetchCachedReadingStatus()
             fetchStatus = .success
         } catch {
             // Keep cached data on error (API might not be available)

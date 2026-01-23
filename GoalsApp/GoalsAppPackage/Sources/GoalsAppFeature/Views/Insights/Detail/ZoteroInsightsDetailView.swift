@@ -279,7 +279,14 @@ struct ZoteroInsightsDetailView: View {
     // MARK: - Helpers
 
     private func formatMetricValue(_ value: Double, for metric: ZoteroMetric) -> String {
-        String(format: "%.0f items", value)
+        switch metric {
+        case .annotations, .notes:
+            return String(format: "%.0f items", value)
+        case .totalActivity:
+            return String(format: "%.1f pts", value)
+        case .readingProgress:
+            return String(format: "%.1f", value)
+        }
     }
 
     private func formatNumber(_ value: Int) -> String {

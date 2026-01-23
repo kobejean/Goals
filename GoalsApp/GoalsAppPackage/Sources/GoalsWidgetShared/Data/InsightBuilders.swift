@@ -117,7 +117,7 @@ public enum InsightBuilders {
             systemImage: type.systemImage,
             color: currentColor,
             dataPoints: dataPoints,
-            currentValueFormatted: "\(currentRating)",
+            currentValueFormatted: "\(currentRating) ELO",
             trend: trend,
             goalValue: goalValue
         )
@@ -367,9 +367,10 @@ public enum InsightBuilders {
     // MARK: - Zotero
 
     /// Build Zotero insight from daily stats and optional reading status
-    /// Uses scatter + moving average chart with streak or reading progress display
+    /// Uses scatter + moving average chart showing reading progress score
+    /// Score formula: toRead×0.25 + inProgress×0.5 + read×1.0
     /// - Parameters:
-    ///   - stats: Array of Zotero daily stats (annotations/notes)
+    ///   - stats: Array of Zotero daily stats (annotations/notes/reading progress)
     ///   - readingStatus: Optional reading status for collection counts
     ///   - goals: Optional array of goals for goal line display
     /// - Returns: Tuple of optional summary and activity data
@@ -386,14 +387,14 @@ public enum InsightBuilders {
         let cutoffDate = Calendar.current.date(byAdding: .day, value: -30, to: Date()) ?? Date()
         let last30DaysStats = stats.filter { $0.date >= cutoffDate }
 
-        // Raw scatter points (last 30 days) showing total activity
+        // Raw scatter points (last 30 days) showing weighted activity points
         let scatterPoints = last30DaysStats.map { stat in
-            InsightDataPoint(date: stat.date, value: Double(stat.totalActivity))
+            InsightDataPoint(date: stat.date, value: stat.weightedPoints)
         }
 
-        // Calculate 30-day moving average for all stats, then filter to last 30 days
+        // Calculate 30-day moving average for weighted activity, then filter to last 30 days
         let allMovingAverage = calculateMovingAverage(
-            for: stats.map { (date: $0.date, value: Double($0.totalActivity)) },
+            for: stats.map { (date: $0.date, value: $0.weightedPoints) },
             window: 30
         )
         let movingAveragePoints = allMovingAverage.filter { $0.date >= cutoffDate }.map {
@@ -409,7 +410,7 @@ public enum InsightBuilders {
             currentValueFormatted = "\(currentStreak) Day Streak"
         }
 
-        let trend = calculateTrend(for: stats.map { Double($0.totalActivity) })
+        let trend = calculateTrend(for: stats.map { $0.weightedPoints })
         let goalValue = goals.targetValue(for: "dailyAnnotations")
 
         let summary = InsightSummary(
@@ -423,8 +424,8 @@ public enum InsightBuilders {
             goalValue: goalValue
         )
 
-        // Build activity data (annotations + notes as intensity)
-        let activityDays = buildActivityDays(from: stats, color: type.color) { Double($0.totalActivity) }
+        // Build activity data using weighted activity points as intensity
+        let activityDays = buildActivityDays(from: stats, color: type.color) { $0.weightedPoints }
         let activityData = InsightActivityData(days: activityDays, emptyColor: .gray.opacity(0.2))
 
         return (summary, activityData)
