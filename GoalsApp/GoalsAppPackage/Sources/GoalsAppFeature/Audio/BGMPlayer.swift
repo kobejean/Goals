@@ -407,8 +407,8 @@ public final class BGMPlayer {
         case .intro:
             let currentFrame = AVAudioFramePosition(elapsed * sampleRate)
             let loopStartFrame = AVAudioFramePosition(loop.start * sampleRate)
-            let remaining = AVAudioFrameCount(loopStartFrame - currentFrame)
-            if remaining > 0 {
+            if currentFrame < loopStartFrame {
+                let remaining = AVAudioFrameCount(loopStartFrame - currentFrame)
                 player.scheduleSegment(file, startingFrame: currentFrame, frameCount: remaining, at: nil)
             }
             if targetLoops == 0 {
@@ -459,8 +459,13 @@ public final class BGMPlayer {
             let outroElapsed = elapsed - loop.end
             let outroStart = AVAudioFramePosition(loop.end * sampleRate)
             let currentFrame = outroStart + AVAudioFramePosition(outroElapsed * sampleRate)
-            let remaining = AVAudioFrameCount(file.length - currentFrame)
 
+            guard currentFrame < file.length else {
+                advancePlaylist()
+                return
+            }
+
+            let remaining = AVAudioFrameCount(file.length - currentFrame)
             if remaining > 0 {
                 player.scheduleSegment(file, startingFrame: currentFrame, frameCount: remaining, at: nil) { [weak self] in
                     Task { @MainActor in
