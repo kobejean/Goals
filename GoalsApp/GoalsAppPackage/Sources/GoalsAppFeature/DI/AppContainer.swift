@@ -88,6 +88,9 @@ public final class AppContainer {
         if let apiKey = UserDefaults.standard.geminiAPIKey, !apiKey.isEmpty {
             await geminiDataSource.configure(apiKey: apiKey)
         }
+
+        // Backfill thumbnails for existing nutrition entries (one-time migration)
+        await thumbnailBackfillService.backfillIfNeeded()
     }
 
     // MARK: - ViewModels (lazily created, persist for app lifetime)
@@ -160,6 +163,7 @@ public final class AppContainer {
     // MARK: - Caching Services
 
     public let taskCachingService: TaskCachingService
+    public let thumbnailBackfillService: ThumbnailBackfillService
 
     // MARK: - Use Cases
 
@@ -336,6 +340,9 @@ public final class AppContainer {
         self.taskCachingService = TaskCachingService(
             taskRepository: taskRepository,
             cache: dataCache
+        )
+        self.thumbnailBackfillService = ThumbnailBackfillService(
+            nutritionRepository: nutritionRepository
         )
 
         // Initialize use cases
