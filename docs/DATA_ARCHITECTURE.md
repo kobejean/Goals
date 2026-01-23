@@ -57,7 +57,7 @@ The Goals app uses a layered architecture with clean separation of concerns:
 
 ## Data Sources
 
-The app integrates with 6 external data sources:
+The app integrates with 7 data sources:
 
 | Source | Type | Protocol/API | Description |
 |--------|------|--------------|-------------|
@@ -67,6 +67,7 @@ The app integrates with 6 external data sources:
 | **Zotero** | HTTP REST | `api.zotero.org` | Research reading stats (annotations, notes, reading progress) |
 | **Tasks** | Local SwiftData | On-device | Time tracking (daily duration, session count) |
 | **HealthKit Sleep** | iOS Framework | HealthKit | Sleep data (duration, stages, efficiency) |
+| **Nutrition** | Local SwiftData | On-device | Meal tracking (calories, macros, photos via Gemini AI) |
 
 ### Data Source Protocols
 
@@ -124,6 +125,13 @@ public protocol DataSourceRepositoryProtocol: Sendable {
 - **API**: iOS HealthKit framework
 - **Metrics**: Sleep duration, efficiency, REM/deep/core sleep, bedtime, wake time
 - **Auth**: HealthKit authorization request
+
+#### Nutrition
+- **Location**: `GoalsKit/Sources/GoalsData/Persistence/Repositories/SwiftDataNutritionRepository.swift`
+- **Storage**: Local SwiftData (`NutritionEntryModel`)
+- **Metrics**: Calories, protein, carbohydrates, fat, daily totals
+- **Features**: Photo-based entry via Gemini AI analysis, thumbnail storage
+- **Auth**: None (local data), Gemini API key for photo analysis
 
 ---
 
@@ -266,7 +274,7 @@ func fetchStats(from startDate: Date, to endDate: Date) async throws -> [Stats] 
 The app uses separate ModelContainers for different purposes:
 
 #### 1. Main Store
-**Models**: `GoalModel`, `TaskDefinitionModel`, `TaskSessionModel`, `EarnedBadgeModel`
+**Models**: `GoalModel`, `TaskDefinitionModel`, `TaskSessionModel`, `EarnedBadgeModel`, `NutritionEntryModel`
 
 ```swift
 let mainSchema = Schema([
@@ -274,6 +282,7 @@ let mainSchema = Schema([
     EarnedBadgeModel.self,
     TaskDefinitionModel.self,
     TaskSessionModel.self,
+    NutritionEntryModel.self,
 ])
 ```
 
@@ -305,6 +314,7 @@ if let containerURL = SharedStorage.sharedContainerURL {
 | `TaskDefinitionModel` | Task definitions for time tracking |
 | `TaskSessionModel` | Individual task sessions |
 | `EarnedBadgeModel` | Badges earned by users |
+| `NutritionEntryModel` | Nutrition entries with nutrients and photo data |
 | `CachedDataEntry` | Cached external data |
 
 ---
@@ -352,19 +362,31 @@ public protocol BadgeRepositoryProtocol: Sendable {
     func earnBadge(_ badge: EarnedBadge) async throws
     func hasEarnedBadge(badgeId: String, goalId: UUID) async throws -> Bool
 }
+
+// NutritionRepositoryProtocol
+public protocol NutritionRepositoryProtocol: Sendable {
+    func fetchEntries(from startDate: Date, to endDate: Date) async throws -> [NutritionEntry]
+    func fetchEntry(id: UUID) async throws -> NutritionEntry?
+    func createEntry(_ entry: NutritionEntry) async throws -> NutritionEntry
+    func updateEntry(_ entry: NutritionEntry) async throws
+    func deleteEntry(id: UUID) async throws
+}
 ```
 
 ### Repository Implementations (GoalsData)
 
 **Location**: `GoalsKit/Sources/GoalsData/Persistence/Repositories/`
 
-| Protocol | Implementation |
-|----------|----------------|
-| `GoalRepositoryProtocol` | `SwiftDataGoalRepository` |
-| `TaskRepositoryProtocol` | `SwiftDataTaskRepository` |
-| `BadgeRepositoryProtocol` | `SwiftDataBadgeRepository` |
+| Protocol | Implementation | Cloud-Backed Decorator |
+|----------|----------------|------------------------|
+| `GoalRepositoryProtocol` | `SwiftDataGoalRepository` | `CloudBackedGoalRepository` |
+| `TaskRepositoryProtocol` | `SwiftDataTaskRepository` | `CloudBackedTaskRepository` |
+| `BadgeRepositoryProtocol` | `SwiftDataBadgeRepository` | `CloudBackedBadgeRepository` |
+| `NutritionRepositoryProtocol` | `SwiftDataNutritionRepository` | — |
 
 All SwiftData repositories are `@MainActor` isolated and use `ModelContainer.mainContext`.
+
+Cloud-backed decorators queue operations for CloudKit sync via `CloudSyncQueue`.
 
 ---
 
@@ -480,24 +502,25 @@ Goal progress updated
 **Location**: `GoalsApp/GoalsAppPackage/Sources/GoalsAppFeature/DI/AppContainer.swift`
 
 The `AppContainer` is the central DI container that:
-1. Creates and owns all ModelContainers
-2. Instantiates all repositories
+1. Creates and owns all ModelContainers (main store + cache store)
+2. Instantiates all repositories with cloud-backed decorators
 3. Creates cached data source wrappers
 4. Provides use case instances
-5. Offers ViewModel factory methods
+5. Manages cloud backup services
+6. Offers lazy ViewModel properties
 
 ```swift
 @MainActor
 @Observable
 public final class AppContainer {
-    // Model Containers
-    public let modelContainer: ModelContainer      // Main store
-    private let cacheContainer: ModelContainer     // Cache store (internal)
+    // Model Container
+    public let modelContainer: ModelContainer      // Main store (goals, tasks, badges, nutrition)
 
-    // Repositories
+    // Repositories (with cloud-backed decorators)
     public let goalRepository: GoalRepositoryProtocol
     public let badgeRepository: BadgeRepositoryProtocol
     public let taskRepository: TaskRepositoryProtocol
+    public let nutritionRepository: NutritionRepositoryProtocol
 
     // Caching
     public let dataCache: DataCache
@@ -509,13 +532,24 @@ public final class AppContainer {
     public let tasksDataSource: TasksDataSource
     public let ankiDataSource: CachedAnkiDataSource
     public let zoteroDataSource: CachedZoteroDataSource
+    public let geminiDataSource: GeminiDataSource  // For nutrition photo analysis
+
+    // Caching Services
+    public let taskCachingService: TaskCachingService
+    public let thumbnailBackfillService: ThumbnailBackfillService
 
     // Use Cases
     public let createGoalUseCase: CreateGoalUseCase
     public let syncDataSourcesUseCase: SyncDataSourcesUseCase
     public let badgeEvaluationUseCase: BadgeEvaluationUseCase
 
-    // ViewModels (lazily created)
+    // Cloud Backup
+    public let cloudSyncQueue: CloudSyncQueue
+    public private(set) var cloudBackupService: CloudKitBackupService?
+    public private(set) var cloudSyncScheduler: BackgroundCloudSyncScheduler?
+    public private(set) var dataRecoveryService: DataRecoveryService?
+
+    // ViewModels (lazily created, persist for app lifetime)
     public var insightsViewModel: InsightsViewModel { ... }
     public var tasksViewModel: TasksViewModel { ... }
 }
@@ -552,6 +586,52 @@ self.syncDataSourcesUseCase = SyncDataSourcesUseCase(
 
 ---
 
+## Cloud Backup & Sync
+
+### CloudKit Integration
+
+The app uses CloudKit for backup and cross-device sync (currently disabled for faster startup):
+
+**Location**: `GoalsKit/Sources/GoalsData/CloudSync/`
+
+| Component | Purpose |
+|-----------|---------|
+| `CloudKitBackupService` | Direct CloudKit operations (zone setup, record CRUD) |
+| `CloudSyncQueue` | Queues operations for reliable sync (persisted to disk) |
+| `SyncOperation` | Represents a queued sync operation (create/update/delete) |
+| `BackgroundCloudSyncScheduler` | Schedules background sync tasks |
+| `CloudBackupable` | Protocol for types that can be backed up |
+
+### Cloud-Backed Repository Pattern
+
+Repositories are wrapped with cloud-backed decorators that:
+1. Perform local SwiftData operation first (fast, reliable)
+2. Queue CloudKit operation for background sync
+3. Handle conflicts and retries automatically
+
+```swift
+// Example: CloudBackedGoalRepository
+public final class CloudBackedGoalRepository: GoalRepositoryProtocol {
+    private let local: GoalRepositoryProtocol
+    private let syncQueue: CloudSyncQueue
+
+    public func create(_ goal: Goal) async throws -> Goal {
+        let created = try await local.create(goal)  // Local first
+        await syncQueue.enqueue(.create(goal))       // Queue for sync
+        return created
+    }
+}
+```
+
+### Data Recovery
+
+`DataRecoveryService` enables restoring data from CloudKit backup:
+- Fetches all records from CloudKit zone
+- Replaces local data with cloud data
+- Used for device migration or data recovery
+
+---
+
 ## Concurrency Model
 
 ### Actor Isolation
@@ -564,7 +644,9 @@ self.syncDataSourcesUseCase = SyncDataSourcesUseCase(
 | `AnkiDataSource` | Actor | Thread-safe JSON-RPC operations |
 | `ZoteroDataSource` | Actor | Thread-safe HTTP operations |
 | `HealthKitSleepDataSource` | Actor | Thread-safe HealthKit operations |
+| `GeminiDataSource` | Actor | Thread-safe AI API operations |
 | Cached wrappers | Actor | Inherits from wrapped source |
+| `CloudSyncQueue` | Actor | Thread-safe queue operations |
 
 ### @MainActor Isolation
 
@@ -573,6 +655,7 @@ self.syncDataSourcesUseCase = SyncDataSourcesUseCase(
 | `SwiftDataGoalRepository` | SwiftData mainContext access |
 | `SwiftDataTaskRepository` | SwiftData mainContext access |
 | `SwiftDataBadgeRepository` | SwiftData mainContext access |
+| `SwiftDataNutritionRepository` | SwiftData mainContext access |
 | `TasksDataSource` | Uses TaskRepository |
 | `AppContainer` | UI state coordination |
 | ViewModels | UI state management |
@@ -603,9 +686,14 @@ public struct SyncDataSourcesUseCase: Sendable {
 | Cached Wrappers | `GoalsKit/Sources/GoalsData/DataSources/Cached/` |
 | DataCache | `GoalsKit/Sources/GoalsData/Caching/DataCache.swift` |
 | CacheableRecord | `GoalsKit/Sources/GoalsDomain/Caching/CacheableRecord.swift` |
+| Caching Strategies | `GoalsKit/Sources/GoalsData/Caching/Strategies/` |
 | SwiftData Models | `GoalsKit/Sources/GoalsData/Persistence/Models/` |
 | Repository Implementations | `GoalsKit/Sources/GoalsData/Persistence/Repositories/` |
 | Repository Protocols | `GoalsKit/Sources/GoalsDomain/Repositories/` |
 | Use Cases | `GoalsKit/Sources/GoalsDomain/UseCases/` |
+| Cloud Sync | `GoalsKit/Sources/GoalsData/CloudSync/` |
 | AppContainer | `GoalsApp/GoalsAppPackage/Sources/GoalsAppFeature/DI/AppContainer.swift` |
 | Domain Entities | `GoalsKit/Sources/GoalsDomain/Entities/` |
+| ViewModels | `GoalsApp/GoalsAppPackage/Sources/GoalsAppFeature/ViewModels/` |
+| Insight Builders | `GoalsApp/GoalsAppPackage/Sources/GoalsWidgetShared/Data/InsightBuilders.swift` |
+| Shared Charts | `GoalsApp/GoalsAppPackage/Sources/GoalsWidgetShared/Charts/` |

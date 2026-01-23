@@ -172,32 +172,6 @@ struct NutritionInsightsDetailView: View {
                 RoundedRectangle(cornerRadius: 12)
                     .fill(Color.gray.opacity(0.15))
             )
-
-            HStack(spacing: 16) {
-                MacroCard(
-                    name: "Protein",
-                    value: avgNutrients.protein,
-                    unit: "g",
-                    color: .blue,
-                    percentage: avgNutrients.proteinRatio
-                )
-
-                MacroCard(
-                    name: "Carbs",
-                    value: avgNutrients.carbohydrates,
-                    unit: "g",
-                    color: .green,
-                    percentage: avgNutrients.carbsRatio
-                )
-
-                MacroCard(
-                    name: "Fat",
-                    value: avgNutrients.fat,
-                    unit: "g",
-                    color: .orange,
-                    percentage: avgNutrients.fatRatio
-                )
-            }
         }
     }
 
@@ -230,39 +204,6 @@ struct NutritionInsightsDetailView: View {
 }
 
 // MARK: - Supporting Views
-
-private struct MacroCard: View {
-    let name: String
-    let value: Double
-    let unit: String
-    let color: Color
-    let percentage: Double
-
-    var body: some View {
-        VStack(spacing: 4) {
-            Text(name)
-                .font(.caption)
-                .foregroundStyle(.secondary)
-
-            Text(String(format: "%.0f", value))
-                .font(.title2.weight(.semibold).monospacedDigit())
-
-            Text(unit)
-                .font(.caption2)
-                .foregroundStyle(.secondary)
-
-            Text("\(Int(percentage * 100))%")
-                .font(.caption.weight(.medium))
-                .foregroundStyle(color)
-        }
-        .frame(maxWidth: .infinity)
-        .padding()
-        .background(
-            RoundedRectangle(cornerRadius: 12)
-                .fill(color.opacity(0.1))
-        )
-    }
-}
 
 private struct NutrientAverageRow: View {
     let label: String

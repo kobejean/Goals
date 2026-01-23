@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-Goals is an iOS app for tracking personal goals linked to external data sources (TypeQuicker for typing metrics, AtCoder for competitive programming stats, Anki for spaced repetition, Tasks for time tracking, Sleep for health). Built with Swift 6.1+, SwiftUI, and SwiftData. Targets iOS 18.0+. Includes home screen widgets.
+Goals is an iOS app for tracking personal goals linked to external data sources (TypeQuicker for typing metrics, AtCoder for competitive programming stats, Anki for spaced repetition, Zotero for research reading, Tasks for time tracking, Sleep for health, Nutrition for meal tracking). Built with Swift 6.1+, SwiftUI, and SwiftData. Targets iOS 18.0+. Includes home screen widgets with CloudKit backup support.
 
 ## Build & Test Commands
 
@@ -59,16 +59,21 @@ Goals/
 The widget extension (`GoalsWidget/`) imports `GoalsWidgetShared` to share:
 - **InsightBuilders**: Converts raw data (stats, history) into `InsightSummary` for display
 - **InsightType**: Enum defining all insight types with colors, icons, titles
-- **Chart components**: `SparklineChart`, `ActivityChart`, `DurationRangeChart`, etc.
+- **Chart components**: `SparklineChart`, `ActivityChart`, `DurationRangeChart`, `ScatterMovingAverageChart`, `MacroRadarChart`, `WPMAccuracyChart`, `ScheduleChart`
 - **InsightCard**: Reusable card component used by both app and widget
 
 Data flow: `WidgetDataProvider` fetches cached data → `InsightBuilders.build*()` → `InsightSummary` → Widget views
 
+Widget types:
+- **InsightWidget**: Small/medium/large widgets showing insight summaries
+- **TaskControlPanelWidget**: Quick task toggle buttons for time tracking
+
 ### Dependency Injection
 `AppContainer` (in GoalsAppFeature) manages all dependencies:
-- Creates ModelContainer with SwiftData schema
-- Instantiates repositories, data sources, use cases
-- Provides `makeInsightsViewModels()` factory for view models
+- Creates ModelContainer with SwiftData schema (main store + cache store)
+- Instantiates repositories (Goal, Task, Badge, Nutrition), data sources, use cases
+- Provides lazy `insightsViewModel` and `tasksViewModel` properties
+- Manages cloud backup services (CloudKitBackupService, CloudSyncQueue)
 - Use `AppContainer.preview()` for tests and SwiftUI previews
 
 ### Data Sources
@@ -76,8 +81,14 @@ External data sources with transparent caching:
 - `TypeQuickerDataSource` → `CachedTypeQuickerDataSource`
 - `AtCoderDataSource` → `CachedAtCoderDataSource`
 - `AnkiDataSource` → `CachedAnkiDataSource`
+- `ZoteroDataSource` → `CachedZoteroDataSource`
+- `HealthKitSleepDataSource` → `CachedHealthKitSleepDataSource`
 
-All use `DataCache` backed by SwiftData's `CachedDataEntry` model.
+Local data sources (no caching wrapper needed):
+- `TasksDataSource` - Uses TaskRepository directly
+- `NutritionRepository` - SwiftData persistence for meal tracking
+
+All cached sources use `DataCache` backed by SwiftData's `CachedDataEntry` model.
 
 For comprehensive documentation on data flow, caching, persistence, and concurrency, see [`docs/DATA_ARCHITECTURE.md`](docs/DATA_ARCHITECTURE.md).
 
@@ -102,14 +113,19 @@ For comprehensive documentation on data flow, caching, persistence, and concurre
 
 | What | Where |
 |------|-------|
-| App entry point | `GoalsApp/GoalsApp/GoalsAppApp.swift` |
+| App entry point | `GoalsApp/GoalsApp/GoalsApp.swift` |
+| App delegate | `GoalsApp/GoalsApp/AppDelegate.swift` |
 | Main views | `GoalsApp/GoalsAppPackage/Sources/GoalsAppFeature/Views/` |
 | ViewModels | `GoalsApp/GoalsAppPackage/Sources/GoalsAppFeature/ViewModels/` |
 | DI Container | `GoalsApp/GoalsAppPackage/Sources/GoalsAppFeature/DI/AppContainer.swift` |
 | Domain entities | `GoalsKit/Sources/GoalsDomain/Entities/` |
 | Repository protocols | `GoalsKit/Sources/GoalsDomain/Repositories/` |
 | SwiftData models | `GoalsKit/Sources/GoalsData/Persistence/Models/` |
+| Repository implementations | `GoalsKit/Sources/GoalsData/Persistence/Repositories/` |
 | Data sources | `GoalsKit/Sources/GoalsData/DataSources/` |
+| Cached data sources | `GoalsKit/Sources/GoalsData/DataSources/Cached/` |
+| Caching layer | `GoalsKit/Sources/GoalsData/Caching/` |
+| Cloud sync | `GoalsKit/Sources/GoalsData/CloudSync/` |
 | Build config | `GoalsApp/Config/*.xcconfig` |
 | Entitlements | `GoalsApp/Config/GoalsApp.entitlements` |
 | Widget extension | `GoalsApp/GoalsWidget/` |
@@ -117,6 +133,7 @@ For comprehensive documentation on data flow, caching, persistence, and concurre
 | Insight builders | `GoalsApp/GoalsAppPackage/Sources/GoalsWidgetShared/Data/InsightBuilders.swift` |
 | Insight types | `GoalsApp/GoalsAppPackage/Sources/GoalsWidgetShared/Models/InsightType.swift` |
 | Shared charts | `GoalsApp/GoalsAppPackage/Sources/GoalsWidgetShared/Charts/` |
+| Documentation | `docs/` |
 
 ## Adding Features
 
