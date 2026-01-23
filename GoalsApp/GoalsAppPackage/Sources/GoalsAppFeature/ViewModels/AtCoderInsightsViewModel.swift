@@ -12,6 +12,7 @@ public final class AtCoderInsightsViewModel: InsightsSectionViewModel {
     public let title = "AtCoder"
     public let systemImage = "chevron.left.forwardslash.chevron.right"
     public let color: Color = Color.accentColor
+    public let requiresThrottle = true
 
     // MARK: - Published State
 

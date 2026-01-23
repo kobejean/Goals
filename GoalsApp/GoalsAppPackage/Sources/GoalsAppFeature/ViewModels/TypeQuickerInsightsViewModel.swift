@@ -12,6 +12,7 @@ public final class TypeQuickerInsightsViewModel: InsightsSectionViewModel {
     public let title = "Typing"
     public let systemImage = "keyboard"
     public let color: Color = Color.accentColor
+    public let requiresThrottle = true
 
     // MARK: - Published State
 

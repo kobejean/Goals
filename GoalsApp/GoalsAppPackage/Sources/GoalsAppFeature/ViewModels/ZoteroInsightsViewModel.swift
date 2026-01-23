@@ -12,6 +12,7 @@ public final class ZoteroInsightsViewModel: InsightsSectionViewModel {
     public let title = "Zotero"
     public let systemImage = "books.vertical"
     public let color: Color = .purple
+    public let requiresThrottle = true
 
     // MARK: - Published State
 

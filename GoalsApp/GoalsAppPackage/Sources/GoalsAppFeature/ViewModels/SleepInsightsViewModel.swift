@@ -12,6 +12,7 @@ public final class SleepInsightsViewModel: InsightsSectionViewModel {
     public let title = "Sleep"
     public let systemImage = "bed.double.fill"
     public let color: Color = .indigo
+    public let requiresThrottle = true
 
     // MARK: - Published State
 

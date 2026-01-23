@@ -12,6 +12,7 @@ public final class AnkiInsightsViewModel: InsightsSectionViewModel {
     public let title = "Anki"
     public let systemImage = "rectangle.stack"
     public let color: Color = .red
+    public let requiresThrottle = true
 
     // MARK: - Published State
 

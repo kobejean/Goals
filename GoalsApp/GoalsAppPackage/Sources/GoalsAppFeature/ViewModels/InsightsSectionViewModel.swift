@@ -23,6 +23,10 @@ public protocol InsightsSectionViewModel: AnyObject, Observable, Sendable {
     /// Current fetch status for the insight data
     var fetchStatus: InsightFetchStatus { get }
 
+    /// Whether this data source requires throttling (e.g., network-based sources)
+    /// Local data sources (SwiftData, etc.) can return false to always load fresh data
+    var requiresThrottle: Bool { get }
+
     /// Load cached data only (for instant display when throttled)
     func loadCachedData() async
 

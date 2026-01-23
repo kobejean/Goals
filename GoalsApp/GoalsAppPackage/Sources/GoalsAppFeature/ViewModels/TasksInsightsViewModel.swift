@@ -12,6 +12,7 @@ public final class TasksInsightsViewModel: InsightsSectionViewModel {
     public let title = "Tasks"
     public let systemImage = "timer"
     public let color: Color = .orange
+    public let requiresThrottle = false  // Local SwiftData, no network calls
 
     // MARK: - Published State
 
