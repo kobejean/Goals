@@ -201,11 +201,6 @@ public final class AppContainer {
     }
 
     private init(inMemory: Bool) throws {
-        // Migrate data from old store to shared store (one-time migration)
-        if !inMemory {
-            DataMigrationService.migrateToSharedStoreIfNeeded()
-        }
-
         // Create LOCAL-ONLY cache container FIRST for fast startup
         // Use shared App Group container so widgets can read the cache
         let cacheSchema = Schema([CachedDataEntry.self])
