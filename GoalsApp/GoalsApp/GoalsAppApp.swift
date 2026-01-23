@@ -45,11 +45,11 @@ struct GoalsAppApp: App {
                     print("Failed to play BGM: \(error)")
                 }
             } else {
-                container.bgmPlayer.resume()
+                container.bgmPlayer.resumeWithFadeIn()
             }
         case .inactive, .background:
-            // Pause BGM when app goes to background
-            container.bgmPlayer.pause()
+            // Fade out BGM when app goes to background
+            container.bgmPlayer.fadeOutAndPause()
         @unknown default:
             break
         }

@@ -51,7 +51,7 @@ public final class BGMPlayer {
             case .konohaNoHiru:
                 return LoopSection(start: 17.4410, end: 75.186030)
             case .golfGameResults:
-                return LoopSection(start: 22.011780, end: 123.864908)
+                return LoopSection(start: 22.011780, end: 124.864908)
             }
         }
     }
@@ -96,6 +96,13 @@ public final class BGMPlayer {
     private var outroBuffer: AVAudioPCMBuffer?
     private var loopSection: LoopSection?
     private var volume: Float = 1.0
+
+    // Time tracking for position save/restore
+    private var playbackStartTime: Date?
+    private var savedElapsedTime: TimeInterval = 0  // Total elapsed time when paused
+
+    // Fade task tracking
+    private var fadeTask: Task<Void, Never>?
 
     // MARK: - Initialization
 
@@ -142,41 +149,34 @@ public final class BGMPlayer {
         player.volume = volume
 
         if let loopSection = loopSection {
-            // Schedule intro (from start to loop start)
-            let introFrameCount = AVAudioFramePosition(loopSection.start * file.processingFormat.sampleRate)
-            if introFrameCount > 0 {
-                player.scheduleSegment(
-                    file,
-                    startingFrame: 0,
-                    frameCount: AVAudioFrameCount(introFrameCount),
-                    at: nil
-                )
+            let sampleRate = file.processingFormat.sampleRate
+            let loopStartFrame = AVAudioFramePosition(loopSection.start * sampleRate)
+            let loopEndFrame = AVAudioFramePosition(loopSection.end * sampleRate)
+
+            // Schedule intro (from start to loop start) using scheduleSegment
+            if loopStartFrame > 0 {
+                player.scheduleSegment(file, startingFrame: 0, frameCount: AVAudioFrameCount(loopStartFrame), at: nil)
             }
 
-            // Create and schedule loop buffer
-            let loopStartFrame = AVAudioFramePosition(loopSection.start * file.processingFormat.sampleRate)
-            let loopEndFrame = AVAudioFramePosition(loopSection.end * file.processingFormat.sampleRate)
+            // Create loop buffer for seamless looping
             let loopFrameCount = AVAudioFrameCount(loopEndFrame - loopStartFrame)
-
             guard let loopBuffer = AVAudioPCMBuffer(pcmFormat: file.processingFormat, frameCapacity: loopFrameCount) else {
                 throw BGMError.failedToCreateBuffer
             }
-
             file.framePosition = loopStartFrame
             try file.read(into: loopBuffer, frameCount: loopFrameCount)
             self.loopBuffer = loopBuffer
 
-            // Schedule loop buffer with looping option
+            // Schedule loop buffer with looping option (plays after intro)
             player.scheduleBuffer(loopBuffer, at: nil, options: .loops)
 
             // Pre-create outro buffer for when finishPlaying() is called
-            let outroStartFrame = loopEndFrame
-            let outroFrameCount = AVAudioFrameCount(file.length - outroStartFrame)
+            let outroFrameCount = AVAudioFrameCount(file.length - loopEndFrame)
             if outroFrameCount > 0 {
                 guard let outroBuffer = AVAudioPCMBuffer(pcmFormat: file.processingFormat, frameCapacity: outroFrameCount) else {
                     throw BGMError.failedToCreateBuffer
                 }
-                file.framePosition = outroStartFrame
+                file.framePosition = loopEndFrame
                 try file.read(into: outroBuffer, frameCount: outroFrameCount)
                 self.outroBuffer = outroBuffer
             }
@@ -189,6 +189,7 @@ public final class BGMPlayer {
         }
 
         player.play()
+        playbackStartTime = Date()
 
         // Monitor for state changes
         startStateMonitoring()
@@ -231,22 +232,198 @@ public final class BGMPlayer {
         outroBuffer = nil
         loopSection = nil
         state = .stopped
+        savedElapsedTime = 0
+        playbackStartTime = nil
     }
 
     /// Pauses playback.
     public func pause() {
+        stopStateMonitoring()
+
+        // Save elapsed time
+        if let startTime = playbackStartTime {
+            savedElapsedTime = Date().timeIntervalSince(startTime)
+            print("BGM pause: savedElapsedTime=\(savedElapsedTime)s")
+        }
+
         playerNode?.pause()
+        engine?.pause()
     }
 
     /// Resumes playback after pausing.
     public func resume() {
-        playerNode?.play()
+        guard let engine = engine,
+              let player = playerNode,
+              let file = audioFile,
+              let loopSection = loopSection,
+              let loopBuffer = loopBuffer else {
+            playerNode?.play()
+            return
+        }
+
+        do {
+            if !engine.isRunning {
+                try engine.start()
+            }
+            player.stop()
+            player.volume = volume
+
+            let sampleRate = file.processingFormat.sampleRate
+            let loopStart = loopSection.start
+            let loopEnd = loopSection.end
+            let loopDuration = loopEnd - loopStart
+
+            // Calculate current position based on saved elapsed time
+            let elapsed = savedElapsedTime
+
+            if elapsed < loopStart {
+                // In intro: schedule from current position to loop start, then loop
+                let currentFrame = AVAudioFramePosition(elapsed * sampleRate)
+                let loopStartFrame = AVAudioFramePosition(loopStart * sampleRate)
+                let remainingIntroFrames = AVAudioFrameCount(loopStartFrame - currentFrame)
+
+                if remainingIntroFrames > 0 {
+                    player.scheduleSegment(file, startingFrame: currentFrame, frameCount: remainingIntroFrames, at: nil)
+                }
+                player.scheduleBuffer(loopBuffer, at: nil, options: .loops)
+                print("BGM resume: from intro at \(elapsed)s")
+
+            } else if elapsed < loopEnd {
+                // In loop: calculate position within loop, schedule remainder then loop
+                let timeInLoop = (elapsed - loopStart).truncatingRemainder(dividingBy: loopDuration)
+                let savedFrame = Int(timeInLoop * sampleRate)
+                let loopFrameCount = Int(loopBuffer.frameLength)
+                let remainingFrames = loopFrameCount - savedFrame
+
+                if savedFrame > 0 && remainingFrames > 0,
+                   let remainderBuffer = AVAudioPCMBuffer(pcmFormat: file.processingFormat, frameCapacity: AVAudioFrameCount(remainingFrames)) {
+                    copyBuffer(from: loopBuffer, to: remainderBuffer, sourceOffset: AVAudioFrameCount(savedFrame), frameCount: AVAudioFrameCount(remainingFrames))
+                    if remainderBuffer.frameLength > 0 {
+                        player.scheduleBuffer(remainderBuffer, at: nil, options: [])
+                    }
+                }
+                player.scheduleBuffer(loopBuffer, at: nil, options: .loops)
+                print("BGM resume: from loop at \(timeInLoop)s into loop")
+
+            } else {
+                // In outro: schedule from current position to end
+                let currentFrame = AVAudioFramePosition(loopEnd * sampleRate) + AVAudioFramePosition((elapsed - loopEnd) * sampleRate)
+                let remainingFrames = AVAudioFrameCount(file.length - currentFrame)
+
+                if remainingFrames > 0 {
+                    player.scheduleSegment(file, startingFrame: currentFrame, frameCount: remainingFrames, at: nil)
+                }
+                print("BGM resume: from outro at \(elapsed - loopEnd)s into outro")
+            }
+
+            player.play()
+            playbackStartTime = Date().addingTimeInterval(-savedElapsedTime)
+            startStateMonitoring()
+        } catch {
+            print("BGM resume failed: \(error)")
+        }
+    }
+
+    /// Copies audio data from one buffer to another
+    private func copyBuffer(from source: AVAudioPCMBuffer, to destination: AVAudioPCMBuffer, sourceOffset: AVAudioFrameCount, frameCount: AVAudioFrameCount) {
+        let channelCount = Int(source.format.channelCount)
+
+        // Try float format first
+        if let srcData = source.floatChannelData,
+           let dstData = destination.floatChannelData {
+            for channel in 0..<channelCount {
+                memcpy(dstData[channel],
+                       srcData[channel].advanced(by: Int(sourceOffset)),
+                       Int(frameCount) * MemoryLayout<Float>.size)
+            }
+            destination.frameLength = frameCount
+            print("BGM copyBuffer: copied \(frameCount) float frames from offset \(sourceOffset)")
+            return
+        }
+
+        // Try int16 format
+        if let srcData = source.int16ChannelData,
+           let dstData = destination.int16ChannelData {
+            for channel in 0..<channelCount {
+                memcpy(dstData[channel],
+                       srcData[channel].advanced(by: Int(sourceOffset)),
+                       Int(frameCount) * MemoryLayout<Int16>.size)
+            }
+            destination.frameLength = frameCount
+            print("BGM copyBuffer: copied \(frameCount) int16 frames from offset \(sourceOffset)")
+            return
+        }
+
+        // Try int32 format
+        if let srcData = source.int32ChannelData,
+           let dstData = destination.int32ChannelData {
+            for channel in 0..<channelCount {
+                memcpy(dstData[channel],
+                       srcData[channel].advanced(by: Int(sourceOffset)),
+                       Int(frameCount) * MemoryLayout<Int32>.size)
+            }
+            destination.frameLength = frameCount
+            print("BGM copyBuffer: copied \(frameCount) int32 frames from offset \(sourceOffset)")
+            return
+        }
+
+        print("BGM copyBuffer: FAILED - unsupported format. float=\(source.floatChannelData != nil), int16=\(source.int16ChannelData != nil), int32=\(source.int32ChannelData != nil)")
     }
 
     /// Sets the playback volume (0.0 to 1.0).
     public func setVolume(_ volume: Float) {
         self.volume = max(0, min(1, volume))
         playerNode?.volume = self.volume
+    }
+
+    /// Fades out the audio over the specified duration, then pauses.
+    /// - Parameter duration: Fade duration in seconds (default 0.5)
+    public func fadeOutAndPause(duration: TimeInterval = 0.5) {
+        guard let player = playerNode, state != .stopped else { return }
+
+        // Cancel any existing fade task
+        fadeTask?.cancel()
+
+        let startVolume = player.volume
+        let steps = 20
+        let stepDuration = duration / Double(steps)
+
+        fadeTask = Task { @MainActor in
+            for step in 1...steps {
+                guard !Task.isCancelled else { return }
+                try? await Task.sleep(for: .milliseconds(Int(stepDuration * 1000)))
+                guard !Task.isCancelled else { return }
+                let progress = Float(step) / Float(steps)
+                player.volume = startVolume * (1 - progress)
+            }
+            guard !Task.isCancelled else { return }
+            self.pause()
+        }
+    }
+
+    /// Fades in the audio over the specified duration after resuming.
+    /// - Parameter duration: Fade duration in seconds (default 0.3)
+    public func resumeWithFadeIn(duration: TimeInterval = 0.3) {
+        guard state != .stopped else { return }
+
+        // Cancel any pending fade-out task
+        fadeTask?.cancel()
+        fadeTask = nil
+
+        playerNode?.volume = 0
+        resume()
+
+        let targetVolume = volume
+        let steps = 15
+        let stepDuration = duration / Double(steps)
+
+        Task { @MainActor in
+            for step in 1...steps {
+                try? await Task.sleep(for: .milliseconds(Int(stepDuration * 1000)))
+                let progress = Float(step) / Float(steps)
+                self.playerNode?.volume = targetVolume * progress
+            }
+        }
     }
 
     // MARK: - Private Methods
