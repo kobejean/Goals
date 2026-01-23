@@ -1,6 +1,7 @@
 import SwiftUI
 import Charts
 import GoalsDomain
+import GoalsWidgetShared
 
 /// Sleep insights detail view with full charts and stage breakdown
 struct SleepInsightsDetailView: View {
@@ -203,13 +204,49 @@ struct SleepInsightsDetailView: View {
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
 
-            SleepRangeChart(
-                data: filteredRangeData,
-                showStages: false,
-                goalBedtime: viewModel.goalTarget(for: .bedtime),
-                goalWakeTime: viewModel.goalTarget(for: .wakeTime)
+            ScheduleChart(
+                data: sleepScheduleChartData,
+                style: .full,
+                configuration: sleepChartConfiguration
             )
         }
+    }
+
+    // MARK: - Sleep Schedule Chart Data
+
+    /// Convert filtered range data to InsightDurationRangeData for the schedule chart
+    private var sleepScheduleChartData: InsightDurationRangeData {
+        let dataPoints = filteredRangeData.compactMap { point -> DurationRangeDataPoint? in
+            point.toDurationRangeDataPoint(color: .indigo)
+        }
+
+        return InsightDurationRangeData(
+            dataPoints: dataPoints,
+            defaultColor: .indigo,
+            useSimpleHours: false  // Use overnight scale (-6 to +12)
+        )
+    }
+
+    /// Configuration with goal lines for sleep chart
+    private var sleepChartConfiguration: ScheduleChartConfiguration {
+        var goalLines: [ScheduleGoalLine] = []
+
+        // Add bedtime goal line
+        if let bedtime = viewModel.goalTarget(for: .bedtime) {
+            // Convert hour of day to chart value (PM hours become negative)
+            let chartValue = bedtime < 12 ? bedtime : bedtime - 24
+            goalLines.append(ScheduleGoalLine(value: chartValue, label: "Bedtime", color: .red))
+        }
+
+        // Add wake time goal line
+        if let wakeTime = viewModel.goalTarget(for: .wakeTime) {
+            goalLines.append(ScheduleGoalLine(value: wakeTime, label: "Wake", color: .orange))
+        }
+
+        return ScheduleChartConfiguration(
+            goalLines: goalLines,
+            chartHeight: 200
+        )
     }
 
     private var stageBreakdownSection: some View {

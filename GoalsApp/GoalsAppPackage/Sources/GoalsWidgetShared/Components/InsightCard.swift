@@ -121,7 +121,7 @@ public struct InsightCard: View {
             )
         case .durationRange:
             if let rangeData = summary.durationRangeData {
-                DurationRangeChart(data: rangeData)
+                ScheduleChart(data: rangeData, style: .compact)
             }
         case .scatterWithMovingAverage:
             ScatterMovingAverageChart(
