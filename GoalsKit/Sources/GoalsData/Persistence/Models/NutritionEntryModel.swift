@@ -163,6 +163,7 @@ public extension NutritionEntryModel {
     func update(from entry: NutritionEntry) {
         date = entry.date
         photoAssetId = entry.photoAssetId
+        thumbnailData = entry.thumbnailData
         name = entry.name
         portionMultiplier = entry.portionMultiplier
         calories = entry.baseNutrients.calories
