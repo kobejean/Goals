@@ -144,6 +144,33 @@ public final class AnkiInsightsViewModel: InsightsSectionViewModel {
 
     // MARK: - Data Loading
 
+    public func loadCachedData() async {
+        // Configure from saved settings if available
+        if let host = UserDefaults.standard.ankiHost, !host.isEmpty {
+            let port = UserDefaults.standard.ankiPort ?? "8765"
+            let decks = UserDefaults.standard.ankiDecks ?? ""
+            let settings = DataSourceSettings(
+                dataSourceType: .anki,
+                options: ["host": host, "port": port, "decks": decks]
+            )
+            try? await dataSource.configure(settings: settings)
+        }
+
+        guard await dataSource.isConfigured() else { return }
+
+        let endDate = Date()
+        let startDate = TimeRange.all.startDate(from: endDate)
+
+        // Load goals (needed for goal lines on charts)
+        goals = (try? await goalRepository.fetch(dataSource: .anki)) ?? []
+
+        // Load cached stats
+        if let cachedStats = try? await dataSource.fetchCachedDailyStats(from: startDate, to: endDate), !cachedStats.isEmpty {
+            stats = cachedStats
+            fetchStatus = .success
+        }
+    }
+
     public func loadData() async {
         errorMessage = nil
         fetchStatus = .loading

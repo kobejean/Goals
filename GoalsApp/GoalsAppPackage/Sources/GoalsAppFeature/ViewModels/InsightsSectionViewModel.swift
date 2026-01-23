@@ -23,6 +23,9 @@ public protocol InsightsSectionViewModel: AnyObject, Observable, Sendable {
     /// Current fetch status for the insight data
     var fetchStatus: InsightFetchStatus { get }
 
-    /// Load all data (always loads full range for overview)
+    /// Load cached data only (for instant display when throttled)
+    func loadCachedData() async
+
+    /// Load all data (cached first, then fetch fresh)
     func loadData() async
 }

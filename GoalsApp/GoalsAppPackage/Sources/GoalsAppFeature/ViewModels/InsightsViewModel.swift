@@ -172,24 +172,35 @@ public final class InsightsViewModel {
     /// Load all section data in parallel
     /// - Parameter force: If true, bypasses the throttle check (used for pull-to-refresh)
     public func loadAll(force: Bool = false) async {
-        // Throttle: skip if loaded recently (unless forced)
-        if !force, let last = lastLoadedAt,
-           Date().timeIntervalSince(last) < minRefreshInterval {
-            return
+        // Check throttle first
+        let shouldFetchFresh = force || lastLoadedAt == nil ||
+            Date().timeIntervalSince(lastLoadedAt!) >= minRefreshInterval
+
+        if shouldFetchFresh {
+            // Not throttled: loadData() handles both cached + fresh fetching
+            await withTaskGroup(of: Void.self) { group in
+                group.addTask { await self.typeQuicker.loadData() }
+                group.addTask { await self.atCoder.loadData() }
+                group.addTask { await self.sleep.loadData() }
+                group.addTask { await self.tasks.loadData() }
+                group.addTask { await self.anki.loadData() }
+                group.addTask { await self.zotero.loadData() }
+            }
+
+            lastLoadedAt = Date()
+
+            // Trigger widget refresh after all data is loaded
+            WidgetCenter.shared.reloadAllTimelines()
+        } else {
+            // Throttled: only load cached data for instant display
+            await withTaskGroup(of: Void.self) { group in
+                group.addTask { await self.typeQuicker.loadCachedData() }
+                group.addTask { await self.atCoder.loadCachedData() }
+                group.addTask { await self.sleep.loadCachedData() }
+                group.addTask { await self.tasks.loadCachedData() }
+                group.addTask { await self.anki.loadCachedData() }
+                group.addTask { await self.zotero.loadCachedData() }
+            }
         }
-
-        await withTaskGroup(of: Void.self) { group in
-            group.addTask { await self.typeQuicker.loadData() }
-            group.addTask { await self.atCoder.loadData() }
-            group.addTask { await self.sleep.loadData() }
-            group.addTask { await self.tasks.loadData() }
-            group.addTask { await self.anki.loadData() }
-            group.addTask { await self.zotero.loadData() }
-        }
-
-        lastLoadedAt = Date()
-
-        // Trigger widget refresh after all data is loaded
-        WidgetCenter.shared.reloadAllTimelines()
     }
 }

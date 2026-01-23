@@ -191,6 +191,31 @@ public final class TasksInsightsViewModel: InsightsSectionViewModel {
 
     // MARK: - Data Loading
 
+    public func loadCachedData() async {
+        let endDate = Date()
+        let startDate = TimeRange.all.startDate(from: endDate)
+
+        do {
+            // Load tasks and sessions in parallel (from local SwiftData store)
+            async let tasksResult = taskRepository.fetchActiveTasks()
+            async let sessionsResult = taskRepository.fetchSessions(from: startDate, to: endDate)
+            async let goalsResult = goalRepository.fetch(dataSource: .tasks)
+
+            tasks = try await tasksResult
+            sessions = try await sessionsResult
+            goals = try await goalsResult
+
+            // Update reference date after loading
+            referenceDate = Date()
+
+            if !sessions.isEmpty {
+                fetchStatus = .success
+            }
+        } catch {
+            // Silently fail for cached data loading
+        }
+    }
+
     public func loadData() async {
         errorMessage = nil
         fetchStatus = .loading

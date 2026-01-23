@@ -139,6 +139,43 @@ public final class ZoteroInsightsViewModel: InsightsSectionViewModel {
 
     // MARK: - Data Loading
 
+    public func loadCachedData() async {
+        // Configure from saved settings if available
+        if let apiKey = UserDefaults.standard.zoteroAPIKey, !apiKey.isEmpty,
+           let userID = UserDefaults.standard.zoteroUserID, !userID.isEmpty {
+            let toReadCollection = UserDefaults.standard.zoteroToReadCollection ?? ""
+            let inProgressCollection = UserDefaults.standard.zoteroInProgressCollection ?? ""
+            let readCollection = UserDefaults.standard.zoteroReadCollection ?? ""
+            let settings = DataSourceSettings(
+                dataSourceType: .zotero,
+                credentials: ["apiKey": apiKey, "userID": userID],
+                options: [
+                    "toReadCollection": toReadCollection,
+                    "inProgressCollection": inProgressCollection,
+                    "readCollection": readCollection
+                ]
+            )
+            try? await dataSource.configure(settings: settings)
+        }
+
+        guard await dataSource.isConfigured() else { return }
+
+        let endDate = Date()
+        let startDate = TimeRange.all.startDate(from: endDate)
+
+        // Load goals (needed for goal lines on charts)
+        goals = (try? await goalRepository.fetch(dataSource: .zotero)) ?? []
+
+        // Load cached data
+        if let cachedStats = try? await dataSource.fetchCachedDailyStats(from: startDate, to: endDate), !cachedStats.isEmpty {
+            stats = cachedStats
+            fetchStatus = .success
+        }
+        if let cachedStatus = try? await dataSource.fetchCachedReadingStatus() {
+            readingStatus = cachedStatus
+        }
+    }
+
     public func loadData() async {
         errorMessage = nil
         fetchStatus = .loading

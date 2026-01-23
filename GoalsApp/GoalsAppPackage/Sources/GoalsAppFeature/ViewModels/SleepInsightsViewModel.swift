@@ -121,6 +121,20 @@ public final class SleepInsightsViewModel: InsightsSectionViewModel {
 
     // MARK: - Data Loading
 
+    public func loadCachedData() async {
+        let endDate = Date()
+        let startDate = TimeRange.all.startDate(from: endDate)
+
+        // Load cached data (doesn't require HealthKit authorization)
+        if let cachedData = try? await dataSource.fetchCachedSleepData(from: startDate, to: endDate), !cachedData.isEmpty {
+            sleepData = cachedData
+            fetchStatus = .success
+        }
+
+        // Load goals (needed for goal lines on charts)
+        goals = (try? await goalRepository.fetch(dataSource: .healthKitSleep)) ?? []
+    }
+
     public func loadData() async {
         errorMessage = nil
         fetchStatus = .loading

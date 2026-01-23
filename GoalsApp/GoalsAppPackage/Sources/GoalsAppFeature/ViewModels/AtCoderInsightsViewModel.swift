@@ -68,6 +68,34 @@ public final class AtCoderInsightsViewModel: InsightsSectionViewModel {
 
     // MARK: - Data Loading
 
+    public func loadCachedData() async {
+        // Configure from saved settings if available
+        if let username = UserDefaults.standard.atCoderUsername, !username.isEmpty {
+            let settings = DataSourceSettings(
+                dataSourceType: .atCoder,
+                credentials: ["username": username]
+            )
+            try? await dataSource.configure(settings: settings)
+        }
+
+        guard await dataSource.isConfigured() else { return }
+
+        // Load goals
+        goals = (try? await goalRepository.fetch(dataSource: .atCoder)) ?? []
+
+        // Load cached data
+        if let cachedHistory = try? await dataSource.fetchCachedContestHistory(), !cachedHistory.isEmpty {
+            contestHistory = cachedHistory
+            if let lastContest = cachedHistory.last {
+                stats = AtCoderCurrentStats(from: lastContest)
+            }
+            fetchStatus = .success
+        }
+        if let cachedEffort = try? await dataSource.fetchCachedDailyEffort(from: nil), !cachedEffort.isEmpty {
+            dailyEffort = cachedEffort
+        }
+    }
+
     public func loadData() async {
         errorMessage = nil
         fetchStatus = .loading

@@ -138,6 +138,31 @@ public final class TypeQuickerInsightsViewModel: InsightsSectionViewModel {
 
     // MARK: - Data Loading
 
+    public func loadCachedData() async {
+        // Configure from saved settings if available
+        if let username = UserDefaults.standard.typeQuickerUsername, !username.isEmpty {
+            let settings = DataSourceSettings(
+                dataSourceType: .typeQuicker,
+                credentials: ["username": username]
+            )
+            try? await dataSource.configure(settings: settings)
+        }
+
+        guard await dataSource.isConfigured() else { return }
+
+        let endDate = Date()
+        let startDate = TimeRange.all.startDate(from: endDate)
+
+        // Load goals (needed for goal lines on charts)
+        goals = (try? await goalRepository.fetch(dataSource: .typeQuicker)) ?? []
+
+        // Load cached stats
+        if let cachedStats = try? await dataSource.fetchCachedStats(from: startDate, to: endDate), !cachedStats.isEmpty {
+            stats = cachedStats
+            fetchStatus = .success
+        }
+    }
+
     public func loadData() async {
         errorMessage = nil
         fetchStatus = .loading
