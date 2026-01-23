@@ -1,15 +1,6 @@
 import Foundation
 import GoalsDomain
 
-/// App Group identifier for sharing data between app and widgets
-private let appGroupIdentifier = "group.com.kobejean.goals"
-
-/// Key for cached task definitions in widget storage
-private let widgetTasksKey = "widget.tasks"
-
-/// Key for cached active session in widget storage
-private let widgetActiveSessionKey = "widget.activeSession"
-
 /// Service to sync task data from SwiftData to shared cache for widget access
 public actor TaskCachingService {
     private let taskRepository: TaskRepositoryProtocol
@@ -94,24 +85,7 @@ public actor TaskCachingService {
             )
         }
 
-        // Store in shared UserDefaults
-        guard let defaults = UserDefaults(suiteName: appGroupIdentifier) else {
-            return
-        }
-
-        let encoder = JSONEncoder()
-
-        // Store tasks
-        if let tasksData = try? encoder.encode(cachedTasks) {
-            defaults.set(tasksData, forKey: widgetTasksKey)
-        }
-
-        // Store active session (or nil)
-        if let session = cachedActiveSession,
-           let sessionData = try? encoder.encode(session) {
-            defaults.set(sessionData, forKey: widgetActiveSessionKey)
-        } else {
-            defaults.removeObject(forKey: widgetActiveSessionKey)
-        }
+        // Write to shared storage
+        WidgetCacheWriter.write(tasks: cachedTasks, activeSession: cachedActiveSession)
     }
 }

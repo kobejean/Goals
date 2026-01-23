@@ -105,8 +105,6 @@ struct ToggleTaskIntent: AppIntent {
 
     @MainActor
     private func syncWidgetCache(modelContext: ModelContext) async {
-        guard let defaults = SharedStorage.sharedDefaults else { return }
-
         // Fetch active tasks
         let taskDescriptor = FetchDescriptor<TaskDefinitionModel>(
             predicate: #Predicate { !$0.isArchived },
@@ -146,18 +144,7 @@ struct ToggleTaskIntent: AppIntent {
             )
         }
 
-        // Store in shared UserDefaults
-        let encoder = JSONEncoder()
-
-        if let tasksData = try? encoder.encode(cachedTasks) {
-            defaults.set(tasksData, forKey: SharedStorage.widgetTasksKey)
-        }
-
-        if let session = cachedActiveSession,
-           let sessionData = try? encoder.encode(session) {
-            defaults.set(sessionData, forKey: SharedStorage.widgetActiveSessionKey)
-        } else {
-            defaults.removeObject(forKey: SharedStorage.widgetActiveSessionKey)
-        }
+        // Write to shared storage
+        WidgetCacheWriter.write(tasks: cachedTasks, activeSession: cachedActiveSession)
     }
 }
