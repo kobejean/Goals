@@ -97,8 +97,7 @@ public actor DataRecoveryService {
         for record in sessionRecords {
             do {
                 let session = try TaskSession.from(record: record)
-                // Sessions need special handling - we create them directly
-                // This may require adding a createSession method to the repository
+                try await taskRepository.createSession(session)
                 result.sessionsRestored += 1
             } catch {
                 result.errors.append("Failed to restore session: \(error.localizedDescription)")

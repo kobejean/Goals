@@ -162,11 +162,18 @@ public final class AppContainer {
 
     public let badgeNotificationManager: BadgeNotificationManager
 
-    // MARK: - Cloud Backup (optional - nil if not configured)
+    // MARK: - Cloud Backup
 
-    public private(set) var cloudSyncQueue: CloudSyncQueue?
+    /// Sync queue for queueing CloudKit operations (always available)
+    public let cloudSyncQueue: CloudSyncQueue
+
+    /// CloudKit backup service (nil until configured)
     public private(set) var cloudBackupService: CloudKitBackupService?
+
+    /// Background sync scheduler (nil until configured)
     public private(set) var cloudSyncScheduler: BackgroundCloudSyncScheduler?
+
+    /// Data recovery service (nil until configured)
     public private(set) var dataRecoveryService: DataRecoveryService?
 
     // MARK: - Initialization
@@ -267,13 +274,25 @@ public final class AppContainer {
             configurations: [mainConfiguration]
         )
 
-        // Initialize repositories
-        let goalRepo = SwiftDataGoalRepository(modelContainer: modelContainer)
-        self.goalRepository = goalRepo
-        let badgeRepo = SwiftDataBadgeRepository(modelContainer: modelContainer)
-        self.badgeRepository = badgeRepo
-        let taskRepo = SwiftDataTaskRepository(modelContainer: modelContainer)
-        self.taskRepository = taskRepo
+        // Initialize cloud sync queue BEFORE repositories (so decorators can use it)
+        let queueURL: URL
+        if let containerURL = SharedStorage.sharedContainerURL {
+            queueURL = containerURL.appendingPathComponent("Library/Application Support/CloudSyncQueue.json")
+        } else {
+            queueURL = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
+                .appendingPathComponent("CloudSyncQueue.json")
+        }
+        self.cloudSyncQueue = CloudSyncQueue(storageURL: queueURL)
+
+        // Initialize repositories with cloud backup decorators
+        let localGoalRepo = SwiftDataGoalRepository(modelContainer: modelContainer)
+        self.goalRepository = CloudBackedGoalRepository(local: localGoalRepo, syncQueue: cloudSyncQueue)
+
+        let localBadgeRepo = SwiftDataBadgeRepository(modelContainer: modelContainer)
+        self.badgeRepository = CloudBackedBadgeRepository(local: localBadgeRepo, syncQueue: cloudSyncQueue)
+
+        let localTaskRepo = SwiftDataTaskRepository(modelContainer: modelContainer)
+        self.taskRepository = CloudBackedTaskRepository(local: localTaskRepo, syncQueue: cloudSyncQueue)
 
         // Initialize networking
         self.httpClient = HTTPClient()
@@ -291,7 +310,7 @@ public final class AppContainer {
             remote: HealthKitSleepDataSource(),
             cache: dataCache
         )
-        self.tasksDataSource = TasksDataSource(taskRepository: taskRepo)
+        self.tasksDataSource = TasksDataSource(taskRepository: taskRepository)
         self.ankiDataSource = CachedAnkiDataSource(
             remote: AnkiDataSource(),
             cache: dataCache
@@ -303,14 +322,14 @@ public final class AppContainer {
 
         // Initialize caching services
         self.taskCachingService = TaskCachingService(
-            taskRepository: taskRepo,
+            taskRepository: taskRepository,
             cache: dataCache
         )
 
         // Initialize use cases
-        self.createGoalUseCase = CreateGoalUseCase(goalRepository: goalRepo)
+        self.createGoalUseCase = CreateGoalUseCase(goalRepository: goalRepository)
         self.syncDataSourcesUseCase = SyncDataSourcesUseCase(
-            goalRepository: goalRepo,
+            goalRepository: goalRepository,
             dataSources: [
                 .typeQuicker: typeQuickerDataSource,
                 .atCoder: atCoderDataSource,
@@ -321,16 +340,14 @@ public final class AppContainer {
             ]
         )
         self.badgeEvaluationUseCase = BadgeEvaluationUseCase(
-            goalRepository: goalRepo,
-            badgeRepository: badgeRepo
+            goalRepository: goalRepository,
+            badgeRepository: badgeRepository
         )
 
         // Initialize managers
         self.badgeNotificationManager = BadgeNotificationManager()
 
-        // Initialize cloud backup components
-        // These are configured asynchronously after init
-        self.cloudSyncQueue = nil
+        // Cloud backup service is configured asynchronously after init
         self.cloudBackupService = nil
         self.cloudSyncScheduler = nil
         self.dataRecoveryService = nil
@@ -339,30 +356,21 @@ public final class AppContainer {
     /// Configure cloud backup services
     /// Call this after initialization to set up iCloud backup
     public func configureCloudBackup() async {
-        guard cloudSyncQueue == nil else { return } // Already configured
-
-        // Create sync queue with persistent storage
-        let queueURL: URL
-        if let containerURL = SharedStorage.sharedContainerURL {
-            queueURL = containerURL.appendingPathComponent("Library/Application Support/CloudSyncQueue.json")
-        } else {
-            queueURL = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
-                .appendingPathComponent("CloudSyncQueue.json")
-        }
-
-        let syncQueue = CloudSyncQueue(storageURL: queueURL)
-        self.cloudSyncQueue = syncQueue
+        guard cloudBackupService == nil else { return } // Already configured
 
         // Load any persisted queue operations
-        try? await syncQueue.loadFromDisk()
+        try? await cloudSyncQueue.loadFromDisk()
 
-        // Create backup service
+        // Create backup service and setup the CloudKit zone
         let backupService = CloudKitBackupService()
         self.cloudBackupService = backupService
 
+        // Setup CloudKit zone (creates if needed)
+        try? await backupService.setupZone()
+
         // Create sync scheduler
         let scheduler = BackgroundCloudSyncScheduler(
-            syncQueue: syncQueue,
+            syncQueue: cloudSyncQueue,
             backupService: backupService
         )
         self.cloudSyncScheduler = scheduler

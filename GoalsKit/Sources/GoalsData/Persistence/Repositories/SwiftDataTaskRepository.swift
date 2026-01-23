@@ -158,6 +158,24 @@ public final class SwiftDataTaskRepository: TaskRepositoryProtocol {
         try modelContext.save()
     }
 
+    @discardableResult
+    public func createSession(_ session: TaskSession) async throws -> TaskSession {
+        let model = TaskSessionModel.from(session)
+
+        // Link to task if it exists
+        let taskId = session.taskId
+        let taskDescriptor = FetchDescriptor<TaskDefinitionModel>(
+            predicate: #Predicate { $0.id == taskId }
+        )
+        if let taskModel = try modelContext.fetch(taskDescriptor).first {
+            model.task = taskModel
+        }
+
+        modelContext.insert(model)
+        try modelContext.save()
+        return model.toDomain()
+    }
+
     nonisolated public func hash(into hasher: inout Hasher) {
         hasher.combine(ObjectIdentifier(self))
     }

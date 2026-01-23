@@ -46,4 +46,9 @@ public protocol TaskRepositoryProtocol: Sendable {
 
     /// Deletes a session by its ID
     func deleteSession(id: UUID) async throws
+
+    /// Creates a session directly (for backup restoration)
+    /// Unlike startSession, this doesn't stop active sessions or set defaults
+    @discardableResult
+    func createSession(_ session: TaskSession) async throws -> TaskSession
 }

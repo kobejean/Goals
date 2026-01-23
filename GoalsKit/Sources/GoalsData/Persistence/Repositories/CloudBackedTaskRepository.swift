@@ -81,4 +81,11 @@ public final class CloudBackedTaskRepository: TaskRepositoryProtocol {
         try await local.deleteSession(id: id)
         await syncQueue.enqueueDelete(recordType: TaskSession.recordType, id: id)
     }
+
+    @discardableResult
+    public func createSession(_ session: TaskSession) async throws -> TaskSession {
+        let created = try await local.createSession(session)
+        await syncQueue.enqueueUpsert(created)
+        return created
+    }
 }
