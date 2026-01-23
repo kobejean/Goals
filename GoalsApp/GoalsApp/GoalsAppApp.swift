@@ -39,7 +39,7 @@ struct GoalsAppApp: App {
             // Resume BGM when app becomes active
             if container.bgmPlayer.state == .stopped {
                 do {
-                    try container.bgmPlayer.play(track: .konohaNoHiru)
+                    try container.bgmPlayer.play(track: .golfGameResults)
                     container.bgmPlayer.setVolume(0.3)  // Background music level
                 } catch {
                     print("Failed to play BGM: \(error)")

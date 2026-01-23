@@ -27,11 +27,13 @@ public final class BGMPlayer {
     /// Predefined BGM tracks
     public enum Track: Sendable {
         case konohaNoHiru
+        case golfGameResults
 
         /// The filename of the track (without extension)
         public var filename: String {
             switch self {
             case .konohaNoHiru: return "木ノ葉の昼"
+            case .golfGameResults: return "29 Golf (Game Results)"
             }
         }
 
@@ -39,6 +41,7 @@ public final class BGMPlayer {
         public var fileExtension: String {
             switch self {
             case .konohaNoHiru: return "m4a"
+            case .golfGameResults: return "flac"
             }
         }
 
@@ -47,6 +50,8 @@ public final class BGMPlayer {
             switch self {
             case .konohaNoHiru:
                 return LoopSection(start: 17.4410, end: 75.186030)
+            case .golfGameResults:
+                return LoopSection(start: 22.011780, end: 123.864908)
             }
         }
     }
