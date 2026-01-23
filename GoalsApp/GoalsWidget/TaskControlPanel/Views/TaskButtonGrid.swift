@@ -7,13 +7,14 @@ struct TaskButtonGrid: View {
     let activeTaskId: UUID?
 
     private let columns = [
-        GridItem(.flexible(), spacing: 8),
-        GridItem(.flexible(), spacing: 8),
-        GridItem(.flexible(), spacing: 8),
+        GridItem(.flexible(), spacing: 4),
+        GridItem(.flexible(), spacing: 4),
+        GridItem(.flexible(), spacing: 4),
+        GridItem(.flexible(), spacing: 4),
     ]
 
     var body: some View {
-        LazyVGrid(columns: columns, spacing: 8) {
+        LazyVGrid(columns: columns, spacing: 12) {
             ForEach(displayTasks) { task in
                 WidgetTaskButton(
                     task: task,
@@ -23,8 +24,8 @@ struct TaskButtonGrid: View {
         }
     }
 
-    /// Limit to max 6 tasks, sorted by sortOrder
+    /// Limit to max 8 tasks (2 rows of 4), sorted by sortOrder
     private var displayTasks: [CachedTaskInfo] {
-        Array(tasks.sorted { $0.sortOrder < $1.sortOrder }.prefix(6))
+        Array(tasks.sorted { $0.sortOrder < $1.sortOrder }.prefix(8))
     }
 }

@@ -10,6 +10,12 @@ struct ToggleTaskIntent: AppIntent {
     static var title: LocalizedStringResource = "Toggle Task"
     static var description = IntentDescription("Start or stop a task")
 
+    /// Prevent the app from opening when the intent runs
+    static var openAppWhenRun: Bool = false
+
+    /// Don't show in Shortcuts or Spotlight
+    static var isDiscoverable: Bool = false
+
     @Parameter(title: "Task ID")
     var taskId: String
 

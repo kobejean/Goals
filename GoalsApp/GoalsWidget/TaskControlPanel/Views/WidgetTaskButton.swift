@@ -8,26 +8,27 @@ struct WidgetTaskButton: View {
     let task: CachedTaskInfo
     let isActive: Bool
 
+    private let buttonSize: CGFloat = 48
+
     var body: some View {
         Button(intent: ToggleTaskIntent(taskId: task.id.uuidString)) {
-            VStack(spacing: 4) {
-                ZStack {
-                    // Background circle
-                    Circle()
-                        .fill(isActive ? task.taskColor.swiftUIColor : task.taskColor.swiftUIColor.opacity(0.2))
-                        .frame(width: 36, height: 36)
+            ZStack {
+                // Background circle
+                Circle()
+                    .fill(task.taskColor.swiftUIColor.opacity(isActive ? 1.0 : 0.15))
+                    .frame(width: buttonSize, height: buttonSize)
 
-                    // Icon
-                    Image(systemName: task.icon)
-                        .font(.system(size: 16, weight: .semibold))
-                        .foregroundStyle(isActive ? .white : task.taskColor.swiftUIColor)
+                // Active ring indicator
+                if isActive {
+                    Circle()
+                        .strokeBorder(task.taskColor.swiftUIColor, lineWidth: 3)
+                        .frame(width: buttonSize + 8, height: buttonSize + 8)
                 }
 
-                // Task name
-                Text(task.name)
-                    .font(.caption2)
-                    .lineLimit(1)
-                    .foregroundStyle(isActive ? task.taskColor.swiftUIColor : .primary)
+                // Icon
+                Image(systemName: task.icon)
+                    .font(.system(size: 20, weight: .semibold))
+                    .foregroundStyle(isActive ? .white : task.taskColor.swiftUIColor)
             }
             .frame(maxWidth: .infinity)
         }

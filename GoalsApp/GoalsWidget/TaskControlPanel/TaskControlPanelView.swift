@@ -7,7 +7,7 @@ struct TaskControlPanelView: View {
     let entry: TaskControlPanelEntry
 
     var body: some View {
-        VStack(spacing: 12) {
+        VStack(spacing: 8) {
             // Top section: Active task status
             ActiveTaskStatusView(activeSession: entry.activeSession)
 
@@ -21,7 +21,7 @@ struct TaskControlPanelView: View {
                 )
             }
         }
-        .padding(12)
+        .padding(.vertical, 8)
     }
 
     private var emptyStateView: some View {

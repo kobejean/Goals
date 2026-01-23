@@ -22,8 +22,7 @@ struct TaskControlPanelProvider: TimelineProvider {
 
         let entry = TaskControlPanelEntry(date: now, tasks: tasks, activeSession: activeSession)
 
-        // Text(date, style: .timer) updates live, so we only need periodic refreshes
-        // to check if the active session has changed
+        // Periodic refresh to check if active session has changed
         let refreshInterval: Int = activeSession != nil ? 5 : 15 // minutes
         let nextUpdate = Calendar.current.date(byAdding: .minute, value: refreshInterval, to: now) ?? now
 
