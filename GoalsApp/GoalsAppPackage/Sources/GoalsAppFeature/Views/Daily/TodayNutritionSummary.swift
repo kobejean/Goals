@@ -151,7 +151,7 @@ private struct NutritionEntryRow: View {
                 }
             } label: {
                 Image(systemName: "slider.horizontal.3")
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(.tint)
             }
 
             // Edit button
@@ -159,7 +159,7 @@ private struct NutritionEntryRow: View {
                 onEdit()
             } label: {
                 Image(systemName: "pencil")
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(.tint)
             }
         }
         .padding()
