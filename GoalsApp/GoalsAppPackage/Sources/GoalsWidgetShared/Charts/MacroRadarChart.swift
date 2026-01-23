@@ -97,10 +97,27 @@ public struct MacroRadarChart: View {
     public var body: some View {
         VStack(spacing: 0) {
             GeometryReader { geometry in
-                let size = min(geometry.size.width, geometry.size.height)
-                let center = CGPoint(x: geometry.size.width / 2, y: geometry.size.height / 2)
-                let padding: CGFloat = style == .compact ? 4 : 10
-                let radius = (size / 2) - labelOffset - padding
+                // Triangle geometry: top vertex at -radius, bottom vertices at +0.5*radius
+                // Total triangle height = 1.5 * radius
+                // To fill vertical space optimally, calculate radius from available height
+                let horizontalPadding: CGFloat = style == .compact ? 4 : 10
+                let verticalPadding: CGFloat = style == .compact ? 2 : 40
+
+                let availableWidth = geometry.size.width - 2 * (labelOffset + horizontalPadding)
+                let availableHeight = geometry.size.height - 2 * verticalPadding
+
+                // Radius limited by width (need 2*radius*cos(30°) = 1.732*radius horizontal)
+                let radiusFromWidth = availableWidth / 1.732
+                // Radius limited by height (triangle height = 1.5*radius)
+                let radiusFromHeight = availableHeight / 1.5
+
+                let radius = min(radiusFromWidth, radiusFromHeight)
+
+                // Position center so triangle fills vertical space
+                // Top of triangle at: center.y - radius = verticalPadding
+                // So: center.y = verticalPadding + radius
+                let centerY = verticalPadding + radius + labelOffset * 0.3
+                let center = CGPoint(x: geometry.size.width / 2, y: centerY)
 
                 Canvas { context, _ in
                     // Draw guide rings (concentric triangles)
@@ -162,6 +179,7 @@ public struct MacroRadarChart: View {
                     LegendItem(color: idealColor, label: "Target (\(targetLabel))", isDashed: true)
                 }
                 .font(.caption2)
+                .padding(.vertical, 8)
             }
         }
     }
