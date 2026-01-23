@@ -11,6 +11,11 @@ public final class InsightsViewModel {
     // MARK: - Section ViewModels (concrete types for proper observation)
 
     public let typeQuicker: TypeQuickerInsightsViewModel
+
+    // MARK: - Throttling
+
+    private var lastLoadedAt: Date?
+    private let minRefreshInterval: TimeInterval = 60 * 60  // 1 hour
     public let atCoder: AtCoderInsightsViewModel
     public let sleep: SleepInsightsViewModel
     public let tasks: TasksInsightsViewModel
@@ -152,7 +157,14 @@ public final class InsightsViewModel {
     // MARK: - Data Loading
 
     /// Load all section data in parallel
-    public func loadAll() async {
+    /// - Parameter force: If true, bypasses the throttle check (used for pull-to-refresh)
+    public func loadAll(force: Bool = false) async {
+        // Throttle: skip if loaded recently (unless forced)
+        if !force, let last = lastLoadedAt,
+           Date().timeIntervalSince(last) < minRefreshInterval {
+            return
+        }
+
         await withTaskGroup(of: Void.self) { group in
             group.addTask { await self.typeQuicker.loadData() }
             group.addTask { await self.atCoder.loadData() }
@@ -161,6 +173,8 @@ public final class InsightsViewModel {
             group.addTask { await self.anki.loadData() }
             group.addTask { await self.zotero.loadData() }
         }
+
+        lastLoadedAt = Date()
 
         // Trigger widget refresh after all data is loaded
         WidgetCenter.shared.reloadAllTimelines()

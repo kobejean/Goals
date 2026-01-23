@@ -48,6 +48,9 @@ public struct InsightsView: View {
                 await container.insightsViewModel.loadAll()
                 container.insightsViewModel.tasks.startLiveUpdates()
             }
+            .refreshable {
+                await container.insightsViewModel.loadAll(force: true)
+            }
             .onAppear {
                 container.insightsViewModel.tasks.startLiveUpdates()
             }
