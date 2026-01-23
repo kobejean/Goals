@@ -81,8 +81,8 @@ class AppDelegate: NSObject, UIApplicationDelegate {
 
     static func scheduleBackgroundRefresh() {
         let request = BGAppRefreshTaskRequest(identifier: backgroundTaskIdentifier)
-        // iOS determines actual refresh time; 15 min is minimum hint
-        request.earliestBeginDate = Date(timeIntervalSinceNow: 15 * 60)
+        // iOS determines actual refresh time; 1 hour is a reasonable hint
+        request.earliestBeginDate = Date(timeIntervalSinceNow: 60 * 60)
 
         do {
             try BGTaskScheduler.shared.submit(request)
