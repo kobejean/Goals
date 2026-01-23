@@ -46,6 +46,7 @@
     <key>BGTaskSchedulerPermittedIdentifiers</key>
     <array>
         <string>com.kobejean.goals.refresh</string>
+        <string>com.kobejean.goals.cloudsync</string>
     </array>
     <key>UILaunchScreen</key>
     <dict/>

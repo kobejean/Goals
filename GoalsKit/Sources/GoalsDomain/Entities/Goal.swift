@@ -2,7 +2,7 @@ import Foundation
 import GoalsCore
 
 /// Represents a user's goal linked to a data source metric
-public struct Goal: Sendable, Equatable, UUIDIdentifiable {
+public struct Goal: Sendable, Equatable, UUIDIdentifiable, Codable {
     public let id: UUID
     public var title: String
     public var description: String?

@@ -49,6 +49,7 @@ public struct SettingsView: View {
                 dataSourcesSection
                 ankiSection
                 zoteroSection
+                backupSection
                 aboutSection
             }
             .navigationTitle("Settings")
@@ -208,6 +209,18 @@ public struct SettingsView: View {
             Text("Zotero")
         } footer: {
             Text("Get your API key at zotero.org/settings/keys. Collection keys are found in collection URLs (e.g., zotero.org/users/123/collections/ABC).")
+        }
+    }
+
+    private var backupSection: some View {
+        Section {
+            NavigationLink {
+                BackupSettingsView()
+            } label: {
+                Label("Backup & Restore", systemImage: "icloud")
+            }
+        } header: {
+            Text("iCloud")
         }
     }
 

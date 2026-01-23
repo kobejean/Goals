@@ -2,22 +2,25 @@ import Foundation
 import GoalsCore
 
 /// Represents a time tracking entry for a task
-public struct TaskSession: Sendable, Equatable, UUIDIdentifiable {
+public struct TaskSession: Sendable, Equatable, UUIDIdentifiable, Codable {
     public let id: UUID
     public let taskId: UUID
     public let startDate: Date
     public var endDate: Date?
+    public var updatedAt: Date
 
     public init(
         id: UUID = UUID(),
         taskId: UUID,
         startDate: Date = Date(),
-        endDate: Date? = nil
+        endDate: Date? = nil,
+        updatedAt: Date = Date()
     ) {
         self.id = id
         self.taskId = taskId
         self.startDate = startDate
         self.endDate = endDate
+        self.updatedAt = updatedAt
     }
 
     /// Whether this session is currently active (no end date)

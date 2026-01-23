@@ -11,6 +11,7 @@ public final class TaskDefinitionModel {
     public var icon: String = "checkmark.circle"
     public var isArchived: Bool = false
     public var createdAt: Date = Date()
+    public var updatedAt: Date = Date()
     public var sortOrder: Int = 0
 
     @Relationship(deleteRule: .cascade, inverse: \TaskSessionModel.task)
@@ -23,6 +24,7 @@ public final class TaskDefinitionModel {
         icon: String = "checkmark.circle",
         isArchived: Bool = false,
         createdAt: Date = Date(),
+        updatedAt: Date = Date(),
         sortOrder: Int = 0
     ) {
         self.id = id
@@ -31,6 +33,7 @@ public final class TaskDefinitionModel {
         self.icon = icon
         self.isArchived = isArchived
         self.createdAt = createdAt
+        self.updatedAt = updatedAt
         self.sortOrder = sortOrder
     }
 }
@@ -47,6 +50,7 @@ public extension TaskDefinitionModel {
             icon: icon,
             isArchived: isArchived,
             createdAt: createdAt,
+            updatedAt: updatedAt,
             sortOrder: sortOrder
         )
     }
@@ -60,6 +64,7 @@ public extension TaskDefinitionModel {
             icon: task.icon,
             isArchived: task.isArchived,
             createdAt: task.createdAt,
+            updatedAt: task.updatedAt,
             sortOrder: task.sortOrder
         )
     }
@@ -70,6 +75,7 @@ public extension TaskDefinitionModel {
         colorRawValue = task.color.rawValue
         icon = task.icon
         isArchived = task.isArchived
+        updatedAt = Date()
         sortOrder = task.sortOrder
     }
 }

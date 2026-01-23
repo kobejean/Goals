@@ -9,6 +9,7 @@ public final class TaskSessionModel {
     public var taskId: UUID = UUID()
     public var startDate: Date = Date()
     public var endDate: Date?
+    public var updatedAt: Date = Date()
 
     public var task: TaskDefinitionModel?
 
@@ -16,12 +17,14 @@ public final class TaskSessionModel {
         id: UUID = UUID(),
         taskId: UUID,
         startDate: Date = Date(),
-        endDate: Date? = nil
+        endDate: Date? = nil,
+        updatedAt: Date = Date()
     ) {
         self.id = id
         self.taskId = taskId
         self.startDate = startDate
         self.endDate = endDate
+        self.updatedAt = updatedAt
     }
 }
 
@@ -34,7 +37,8 @@ public extension TaskSessionModel {
             id: id,
             taskId: taskId,
             startDate: startDate,
-            endDate: endDate
+            endDate: endDate,
+            updatedAt: updatedAt
         )
     }
 
@@ -44,7 +48,8 @@ public extension TaskSessionModel {
             id: session.id,
             taskId: session.taskId,
             startDate: session.startDate,
-            endDate: session.endDate
+            endDate: session.endDate,
+            updatedAt: session.updatedAt
         )
     }
 
@@ -53,5 +58,6 @@ public extension TaskSessionModel {
         taskId = session.taskId
         startDate = session.startDate
         endDate = session.endDate
+        updatedAt = Date()
     }
 }

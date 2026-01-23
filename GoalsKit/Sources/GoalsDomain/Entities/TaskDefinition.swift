@@ -2,13 +2,14 @@ import Foundation
 import GoalsCore
 
 /// Represents a user-created task template for time tracking
-public struct TaskDefinition: Sendable, Equatable, UUIDIdentifiable {
+public struct TaskDefinition: Sendable, Equatable, UUIDIdentifiable, Codable {
     public let id: UUID
     public var name: String
     public var color: TaskColor
     public var icon: String
     public var isArchived: Bool
     public let createdAt: Date
+    public var updatedAt: Date
     public var sortOrder: Int
 
     public init(
@@ -18,6 +19,7 @@ public struct TaskDefinition: Sendable, Equatable, UUIDIdentifiable {
         icon: String = "checkmark.circle",
         isArchived: Bool = false,
         createdAt: Date = Date(),
+        updatedAt: Date = Date(),
         sortOrder: Int = 0
     ) {
         self.id = id
@@ -26,6 +28,7 @@ public struct TaskDefinition: Sendable, Equatable, UUIDIdentifiable {
         self.icon = icon
         self.isArchived = isArchived
         self.createdAt = createdAt
+        self.updatedAt = updatedAt
         self.sortOrder = sortOrder
     }
 }

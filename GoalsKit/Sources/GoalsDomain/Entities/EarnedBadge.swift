@@ -2,7 +2,7 @@ import Foundation
 import GoalsCore
 
 /// Represents a badge that has been earned by the user
-public struct EarnedBadge: Sendable, Equatable, UUIDIdentifiable {
+public struct EarnedBadge: Sendable, Equatable, UUIDIdentifiable, Codable {
     public let id: UUID
     public var category: BadgeCategory
     public var tier: BadgeTier?
@@ -31,6 +31,9 @@ public struct EarnedBadge: Sendable, Equatable, UUIDIdentifiable {
         self.lastEarnedAt = lastEarnedAt
         self.relatedGoalId = relatedGoalId
     }
+
+    /// For CloudBackupable conformance - uses lastEarnedAt as the effective update timestamp
+    public var updatedAt: Date { lastEarnedAt }
 
     /// Returns the badge definition for this earned badge
     public var definition: BadgeDefinition? {

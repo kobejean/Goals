@@ -57,9 +57,17 @@ struct GoalsAppApp: App {
     @MainActor
     private func initializeApp() async {
         do {
-            container = try AppContainer()
+            let appContainer = try AppContainer()
+            container = appContainer
+
+            // Configure cloud backup (runs asynchronously)
+            await appContainer.configureCloudBackup()
+
             // Schedule background refresh for widget data
             AppDelegate.scheduleBackgroundRefresh()
+
+            // Schedule cloud sync
+            AppDelegate.scheduleCloudSync()
         } catch {
             initError = error
             print("Failed to initialize AppContainer: \(error)")

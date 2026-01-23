@@ -162,6 +162,13 @@ public final class AppContainer {
 
     public let badgeNotificationManager: BadgeNotificationManager
 
+    // MARK: - Cloud Backup (optional - nil if not configured)
+
+    public private(set) var cloudSyncQueue: CloudSyncQueue?
+    public private(set) var cloudBackupService: CloudKitBackupService?
+    public private(set) var cloudSyncScheduler: BackgroundCloudSyncScheduler?
+    public private(set) var dataRecoveryService: DataRecoveryService?
+
     // MARK: - Initialization
 
     public convenience init() throws {
@@ -320,5 +327,59 @@ public final class AppContainer {
 
         // Initialize managers
         self.badgeNotificationManager = BadgeNotificationManager()
+
+        // Initialize cloud backup components
+        // These are configured asynchronously after init
+        self.cloudSyncQueue = nil
+        self.cloudBackupService = nil
+        self.cloudSyncScheduler = nil
+        self.dataRecoveryService = nil
+    }
+
+    /// Configure cloud backup services
+    /// Call this after initialization to set up iCloud backup
+    public func configureCloudBackup() async {
+        guard cloudSyncQueue == nil else { return } // Already configured
+
+        // Create sync queue with persistent storage
+        let queueURL: URL
+        if let containerURL = SharedStorage.sharedContainerURL {
+            queueURL = containerURL.appendingPathComponent("Library/Application Support/CloudSyncQueue.json")
+        } else {
+            queueURL = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
+                .appendingPathComponent("CloudSyncQueue.json")
+        }
+
+        let syncQueue = CloudSyncQueue(storageURL: queueURL)
+        self.cloudSyncQueue = syncQueue
+
+        // Load any persisted queue operations
+        try? await syncQueue.loadFromDisk()
+
+        // Create backup service
+        let backupService = CloudKitBackupService()
+        self.cloudBackupService = backupService
+
+        // Create sync scheduler
+        let scheduler = BackgroundCloudSyncScheduler(
+            syncQueue: syncQueue,
+            backupService: backupService
+        )
+        self.cloudSyncScheduler = scheduler
+
+        // Set shared instance for background task handler
+        BackgroundCloudSyncScheduler.shared = scheduler
+
+        // Configure the sync queue handler
+        await scheduler.configure()
+
+        // Create recovery service
+        let recoveryService = DataRecoveryService(
+            backupService: backupService,
+            goalRepository: goalRepository,
+            taskRepository: taskRepository,
+            badgeRepository: badgeRepository
+        )
+        self.dataRecoveryService = recoveryService
     }
 }

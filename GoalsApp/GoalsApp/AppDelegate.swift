@@ -5,16 +5,18 @@ import GoalsAppFeature
 
 class AppDelegate: NSObject, UIApplicationDelegate {
     static let backgroundTaskIdentifier = "com.kobejean.goals.refresh"
+    static let cloudSyncTaskIdentifier = BackgroundCloudSyncScheduler.cloudSyncTaskIdentifier
 
     func application(
         _ application: UIApplication,
         didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?
     ) -> Bool {
-        registerBackgroundTask()
+        registerBackgroundTasks()
         return true
     }
 
-    private func registerBackgroundTask() {
+    private func registerBackgroundTasks() {
+        // Register data source refresh task
         BGTaskScheduler.shared.register(
             forTaskWithIdentifier: Self.backgroundTaskIdentifier,
             using: nil
@@ -24,6 +26,18 @@ class AppDelegate: NSObject, UIApplicationDelegate {
                 return
             }
             self.handleBackgroundRefresh(refreshTask)
+        }
+
+        // Register CloudKit sync task
+        BGTaskScheduler.shared.register(
+            forTaskWithIdentifier: Self.cloudSyncTaskIdentifier,
+            using: nil
+        ) { @Sendable task in
+            guard let processingTask = task as? BGProcessingTask else {
+                task.setTaskCompleted(success: false)
+                return
+            }
+            self.handleCloudSync(processingTask)
         }
     }
 
@@ -47,6 +61,24 @@ class AppDelegate: NSObject, UIApplicationDelegate {
         }
     }
 
+    private func handleCloudSync(_ task: BGProcessingTask) {
+        // Schedule next sync
+        Self.scheduleCloudSync()
+
+        let syncTask = Task {
+            if let scheduler = BackgroundCloudSyncScheduler.shared {
+                _ = await scheduler.performBackgroundSync()
+                task.setTaskCompleted(success: true)
+            } else {
+                task.setTaskCompleted(success: false)
+            }
+        }
+
+        task.expirationHandler = {
+            syncTask.cancel()
+        }
+    }
+
     static func scheduleBackgroundRefresh() {
         let request = BGAppRefreshTaskRequest(identifier: backgroundTaskIdentifier)
         // iOS determines actual refresh time; 15 min is minimum hint
@@ -56,6 +88,18 @@ class AppDelegate: NSObject, UIApplicationDelegate {
             try BGTaskScheduler.shared.submit(request)
         } catch {
             print("Failed to schedule background refresh: \(error)")
+        }
+    }
+
+    static func scheduleCloudSync() {
+        let request = BGProcessingTaskRequest(identifier: cloudSyncTaskIdentifier)
+        request.requiresNetworkConnectivity = true
+        request.requiresExternalPower = false
+
+        do {
+            try BGTaskScheduler.shared.submit(request)
+        } catch {
+            print("Failed to schedule cloud sync: \(error)")
         }
     }
 }
