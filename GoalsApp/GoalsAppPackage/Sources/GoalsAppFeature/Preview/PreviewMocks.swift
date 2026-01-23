@@ -50,4 +50,5 @@ actor PreviewTaskRepository: TaskRepositoryProtocol {
     func fetchSessions(from: Date, to: Date) async throws -> [TaskSession] { [] }
     func fetchSessions(taskId: UUID) async throws -> [TaskSession] { [] }
     func deleteSession(id: UUID) async throws {}
+    func createSession(_ session: TaskSession) async throws -> TaskSession { session }
 }

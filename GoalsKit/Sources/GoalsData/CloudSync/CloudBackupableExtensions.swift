@@ -1,4 +1,5 @@
 import CloudKit
+import CryptoKit
 import Foundation
 import GoalsDomain
 
@@ -126,8 +127,10 @@ extension CacheBackupRecord: CloudBackupable {
     public var updatedAt: Date { fetchedAt }
 
     public var cloudRecordID: CKRecord.ID {
-        // Use a hash of the cache key as the record ID
-        let hashString = String(cacheKey.hashValue)
+        // Use SHA256 hash of the cache key for stable, deterministic record ID
+        let data = Data(cacheKey.utf8)
+        let hash = SHA256.hash(data: data)
+        let hashString = hash.compactMap { String(format: "%02x", $0) }.joined()
         return CKRecord.ID(recordName: hashString)
     }
 
