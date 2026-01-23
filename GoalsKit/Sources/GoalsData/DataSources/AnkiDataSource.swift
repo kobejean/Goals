@@ -93,11 +93,19 @@ public actor AnkiDataSource: AnkiDataSourceProtocol {
             return []
         }
 
-        // Aggregate reviews from all decks
-        var allReviews: [AnkiCardReview] = []
-        for deck in decksToFetch {
-            let reviews = try await fetchCardReviews(deck: deck, host: host, port: port)
-            allReviews.append(contentsOf: reviews)
+        // Fetch reviews from all decks in parallel
+        let allReviews = try await withThrowingTaskGroup(of: [AnkiCardReview].self) { group in
+            for deck in decksToFetch {
+                group.addTask {
+                    try await self.fetchCardReviews(deck: deck, host: host, port: port)
+                }
+            }
+
+            var reviews: [AnkiCardReview] = []
+            for try await deckReviews in group {
+                reviews.append(contentsOf: deckReviews)
+            }
+            return reviews
         }
 
         // Filter reviews by date range and aggregate by day
