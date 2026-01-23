@@ -134,6 +134,18 @@ public struct InsightCard: View {
             if let wpmAccuracyData = summary.wpmAccuracyData {
                 WPMAccuracyChart(data: wpmAccuracyData, style: .compact)
             }
+        case .macroRadarWithSparkline:
+            // Side-by-side: radar chart (left) + sparkline (right)
+            HStack(spacing: 8) {
+                if let macroData = summary.macroRadarData {
+                    MacroRadarChart(data: macroData, style: .compact)
+                }
+                SparklineChart(
+                    dataPoints: summary.dataPoints,
+                    color: summary.color,
+                    goalValue: summary.goalValue
+                )
+            }
         }
     }
 

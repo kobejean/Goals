@@ -433,8 +433,11 @@ public enum InsightBuilders {
 
     // MARK: - Nutrition
 
+    // Daily macro targets in grams
+    private static let dailyMacroTargets = (protein: 150.0, carbs: 250.0, fat: 65.0)
+
     /// Build Nutrition insight from daily summaries
-    /// Shows calorie intake trend and macro ratio
+    /// Shows radar chart with macro breakdown + calorie sparkline
     /// - Parameters:
     ///   - summaries: Array of nutrition daily summaries
     ///   - goals: Optional array of goals for goal line display
@@ -457,6 +460,13 @@ public enum InsightBuilders {
         let today = calendar.startOfDay(for: Date())
         let todaySummary = summaries.first { calendar.startOfDay(for: $0.date) == today }
         let todayCalories = Int(todaySummary?.totalCalories ?? 0)
+        let todayNutrients = todaySummary?.totalNutrients ?? .zero
+
+        // Build macro radar data from today's values
+        let macroRadarData = MacroRadarData(
+            current: (todayNutrients.protein, todayNutrients.carbohydrates, todayNutrients.fat),
+            ideal: dailyMacroTargets
+        )
 
         let trend = calculateTrend(for: summaries.map { $0.totalCalories })
 
@@ -465,6 +475,7 @@ public enum InsightBuilders {
             systemImage: type.systemImage,
             color: type.color,
             dataPoints: dataPoints,
+            macroRadarData: macroRadarData,
             currentValueFormatted: "\(todayCalories) kcal",
             trend: trend
         )

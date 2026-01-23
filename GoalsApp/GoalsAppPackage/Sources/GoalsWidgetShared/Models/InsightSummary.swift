@@ -52,6 +52,7 @@ public struct InsightSummary: Sendable {
     public let chartType: InsightChartType
     public let durationRangeData: InsightDurationRangeData?
     public let wpmAccuracyData: InsightWPMAccuracyData?  // For WPM vs Accuracy charts
+    public let macroRadarData: MacroRadarData?  // For macro radar charts
 
     /// Initialize with sparkline chart type (default, backward compatible)
     public init(
@@ -74,6 +75,7 @@ public struct InsightSummary: Sendable {
         self.chartType = .sparkline
         self.durationRangeData = nil
         self.wpmAccuracyData = nil
+        self.macroRadarData = nil
     }
 
     /// Initialize with duration range chart type
@@ -96,6 +98,7 @@ public struct InsightSummary: Sendable {
         self.chartType = .durationRange
         self.durationRangeData = durationRangeData
         self.wpmAccuracyData = nil
+        self.macroRadarData = nil
     }
 
     /// Initialize with scatter + moving average chart type
@@ -120,6 +123,7 @@ public struct InsightSummary: Sendable {
         self.chartType = .scatterWithMovingAverage
         self.durationRangeData = nil
         self.wpmAccuracyData = nil
+        self.macroRadarData = nil
     }
 
     /// Initialize with WPM vs Accuracy chart type
@@ -142,5 +146,30 @@ public struct InsightSummary: Sendable {
         self.chartType = .wpmAccuracy
         self.durationRangeData = nil
         self.wpmAccuracyData = wpmAccuracyData
+        self.macroRadarData = nil
+    }
+
+    /// Initialize with macro radar + sparkline chart type (for nutrition)
+    public init(
+        title: String,
+        systemImage: String,
+        color: Color,
+        dataPoints: [InsightDataPoint],
+        macroRadarData: MacroRadarData,
+        currentValueFormatted: String,
+        trend: Double?
+    ) {
+        self.title = title
+        self.systemImage = systemImage
+        self.color = color
+        self.dataPoints = dataPoints
+        self.movingAveragePoints = nil
+        self.currentValueFormatted = currentValueFormatted
+        self.trend = trend
+        self.goalValue = nil
+        self.chartType = .macroRadarWithSparkline
+        self.durationRangeData = nil
+        self.wpmAccuracyData = nil
+        self.macroRadarData = macroRadarData
     }
 }

@@ -112,6 +112,7 @@ public final class AppContainer {
             ankiDataSource: ankiDataSource,
             zoteroDataSource: zoteroDataSource,
             nutritionRepository: nutritionRepository,
+            dataCache: dataCache,
             taskCachingService: taskCachingService
         )
         _insightsViewModel = vm

@@ -23,11 +23,13 @@ public final class NutritionInsightsViewModel: InsightsSectionViewModel {
     // MARK: - Dependencies
 
     private let nutritionRepository: NutritionRepositoryProtocol
+    private let dataCache: DataCache?
 
     // MARK: - Initialization
 
-    public init(nutritionRepository: NutritionRepositoryProtocol) {
+    public init(nutritionRepository: NutritionRepositoryProtocol, dataCache: DataCache? = nil) {
         self.nutritionRepository = nutritionRepository
+        self.dataCache = dataCache
     }
 
     // MARK: - Computed Properties
@@ -154,9 +156,24 @@ public final class NutritionInsightsViewModel: InsightsSectionViewModel {
         do {
             entries = try await nutritionRepository.fetchEntries(from: startDate, to: endDate)
             fetchStatus = .success
+
+            // Cache daily summaries for widget access
+            await cacheDataForWidget()
         } catch {
             errorMessage = "Failed to load nutrition data: \(error.localizedDescription)"
             fetchStatus = .error
+        }
+    }
+
+    /// Cache nutrition daily summaries to shared storage for widget access
+    private func cacheDataForWidget() async {
+        guard let cache = dataCache else { return }
+
+        do {
+            try await cache.store(dailySummaries)
+        } catch {
+            // Silently fail - widget will just not have nutrition data
+            print("NutritionInsightsViewModel: Failed to cache data for widget: \(error)")
         }
     }
 

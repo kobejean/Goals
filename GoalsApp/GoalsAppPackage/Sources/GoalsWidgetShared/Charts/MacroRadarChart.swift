@@ -1,10 +1,17 @@
 import SwiftUI
 
-/// A radar chart displaying macro nutrient data (protein, carbs, fat) with current values
-/// as a filled polygon and ideal/target values as a dashed outline.
-public struct MacroRadarChart: View {
-    let current: (protein: Double, carbs: Double, fat: Double)
-    let ideal: (protein: Double, carbs: Double, fat: Double)
+/// Style for MacroRadarChart display
+public enum MacroRadarChartStyle {
+    /// Full size with labels and legend (for detail views)
+    case full
+    /// Compact size without labels (for insight cards)
+    case compact
+}
+
+/// Data for macro radar chart
+public struct MacroRadarData: Sendable {
+    public let current: (protein: Double, carbs: Double, fat: Double)
+    public let ideal: (protein: Double, carbs: Double, fat: Double)
 
     public init(
         current: (protein: Double, carbs: Double, fat: Double),
@@ -13,12 +20,36 @@ public struct MacroRadarChart: View {
         self.current = current
         self.ideal = ideal
     }
+}
+
+/// A radar chart displaying macro nutrient data (protein, carbs, fat) with current values
+/// as a filled polygon and ideal/target values as a dashed outline.
+public struct MacroRadarChart: View {
+    let current: (protein: Double, carbs: Double, fat: Double)
+    let ideal: (protein: Double, carbs: Double, fat: Double)
+    let style: MacroRadarChartStyle
+
+    public init(
+        current: (protein: Double, carbs: Double, fat: Double),
+        ideal: (protein: Double, carbs: Double, fat: Double),
+        style: MacroRadarChartStyle = .full
+    ) {
+        self.current = current
+        self.ideal = ideal
+        self.style = style
+    }
+
+    public init(data: MacroRadarData, style: MacroRadarChartStyle = .full) {
+        self.current = data.current
+        self.ideal = data.ideal
+        self.style = style
+    }
 
     // MARK: - Constants
 
     private let axisCount = 3
-    private let guideRingCount = 4
-    private let labelOffset: CGFloat = 24
+    private var guideRingCount: Int { style == .compact ? 3 : 4 }
+    private var labelOffset: CGFloat { style == .compact ? 0 : 24 }
 
     // Colors
     private let currentColor = Color.teal
@@ -68,7 +99,8 @@ public struct MacroRadarChart: View {
             GeometryReader { geometry in
                 let size = min(geometry.size.width, geometry.size.height)
                 let center = CGPoint(x: geometry.size.width / 2, y: geometry.size.height / 2)
-                let radius = (size / 2) - labelOffset - 10
+                let padding: CGFloat = style == .compact ? 4 : 10
+                let radius = (size / 2) - labelOffset - padding
 
                 Canvas { context, _ in
                     // Draw guide rings (concentric triangles)
@@ -100,33 +132,37 @@ public struct MacroRadarChart: View {
                     )
                 }
 
-                // Axis labels
-                ForEach(0..<axisCount, id: \.self) { index in
-                    let angle = axisAngles[index]
-                    let labelInfo = axisLabels[index]
-                    let labelRadius = radius + labelOffset
+                // Axis labels (full mode only)
+                if style == .full {
+                    ForEach(0..<axisCount, id: \.self) { index in
+                        let angle = axisAngles[index]
+                        let labelInfo = axisLabels[index]
+                        let labelRadius = radius + labelOffset
 
-                    let x = center.x + labelRadius * CGFloat(cos(angle))
-                    let y = center.y + labelRadius * CGFloat(sin(angle))
+                        let x = center.x + labelRadius * CGFloat(cos(angle))
+                        let y = center.y + labelRadius * CGFloat(sin(angle))
 
-                    VStack(spacing: 2) {
-                        Text(labelInfo.name)
-                            .font(.caption.weight(.medium))
-                            .foregroundStyle(.secondary)
-                        Text("\(Int(labelInfo.value))g")
-                            .font(.caption2.monospacedDigit())
-                            .foregroundStyle(.primary)
+                        VStack(spacing: 2) {
+                            Text(labelInfo.name)
+                                .font(.caption.weight(.medium))
+                                .foregroundStyle(.secondary)
+                            Text("\(Int(labelInfo.value))g")
+                                .font(.caption2.monospacedDigit())
+                                .foregroundStyle(.primary)
+                        }
+                        .position(x: x, y: y)
                     }
-                    .position(x: x, y: y)
                 }
             }
 
-            // Legend with target values
-            HStack(spacing: 12) {
-                LegendItem(color: currentColor, label: "Current", isDashed: false)
-                LegendItem(color: idealColor, label: "Target (\(targetLabel))", isDashed: true)
+            // Legend with target values (full mode only)
+            if style == .full {
+                HStack(spacing: 12) {
+                    LegendItem(color: currentColor, label: "Current", isDashed: false)
+                    LegendItem(color: idealColor, label: "Target (\(targetLabel))", isDashed: true)
+                }
+                .font(.caption2)
             }
-            .font(.caption2)
         }
     }
 

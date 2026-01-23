@@ -31,6 +31,7 @@ public enum InsightChartType: String, Sendable {
     case durationRange          // Vertical bars showing time ranges
     case scatterWithMovingAverage  // Scatter plot with moving average line
     case wpmAccuracy            // 2D scatter: WPM (x) vs Accuracy (y) with mode colors
+    case macroRadarWithSparkline  // Radar chart (left) + sparkline (right) for nutrition
 }
 
 /// A single time segment within a day (e.g., sleep period, focus session)

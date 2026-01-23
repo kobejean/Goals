@@ -45,6 +45,7 @@ public final class InsightsViewModel {
         ankiDataSource: CachedAnkiDataSource,
         zoteroDataSource: CachedZoteroDataSource,
         nutritionRepository: NutritionRepositoryProtocol,
+        dataCache: DataCache? = nil,
         taskCachingService: TaskCachingService? = nil
     ) {
         self.typeQuicker = TypeQuickerInsightsViewModel(
@@ -73,7 +74,8 @@ public final class InsightsViewModel {
             goalRepository: goalRepository
         )
         self.nutrition = NutritionInsightsViewModel(
-            nutritionRepository: nutritionRepository
+            nutritionRepository: nutritionRepository,
+            dataCache: dataCache
         )
 
         // Load persisted card order or use default
