@@ -1,6 +1,7 @@
 import SwiftUI
 import Charts
 import GoalsDomain
+import GoalsWidgetShared
 
 /// Tasks insights detail view with charts and breakdown
 struct TasksInsightsDetailView: View {
@@ -111,12 +112,61 @@ struct TasksInsightsDetailView: View {
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
 
-            TaskScheduleChart(
-                summaries: filteredSummaries,
-                tasks: viewModel.tasks,
-                referenceDate: viewModel.referenceDate
+            ScheduleChart(
+                data: scheduleChartData,
+                style: .full,
+                configuration: ScheduleChartConfiguration(
+                    legendItems: tasksWithData.map { task in
+                        ScheduleLegendItem(name: task.name, color: task.color.swiftUIColor)
+                    },
+                    chartHeight: 220
+                )
             )
         }
+    }
+
+    // MARK: - Schedule Chart Data Conversion
+
+    /// Convert filtered summaries to InsightDurationRangeData for the schedule chart
+    private var scheduleChartData: InsightDurationRangeData {
+        let dataPoints = filteredSummaries.compactMap { summary -> DurationRangeDataPoint? in
+            let segments = summary.sessions.compactMap { session -> DurationSegment? in
+                // Use referenceDate for active sessions
+                let endDate = session.endDate ?? viewModel.referenceDate
+
+                // Skip if session started after reference date
+                guard session.startDate <= viewModel.referenceDate else { return nil }
+
+                return DurationSegment(
+                    startTime: session.startDate,
+                    endTime: endDate,
+                    color: session.taskColor.swiftUIColor,
+                    label: session.taskName
+                )
+            }
+            guard !segments.isEmpty else { return nil }
+            return DurationRangeDataPoint(date: summary.date, segments: segments)
+        }
+
+        // Calculate date range for last 7 days with padding
+        let calendar = Calendar.current
+        let today = calendar.startOfDay(for: Date())
+        let startDate = calendar.date(byAdding: .day, value: -6, to: today)!
+        let paddedStart = calendar.date(byAdding: .hour, value: -12, to: startDate)!
+        let paddedEnd = calendar.date(byAdding: .hour, value: 18, to: today)!
+
+        return InsightDurationRangeData(
+            dataPoints: dataPoints,
+            defaultColor: .orange,
+            dateRange: DateRange(start: paddedStart, end: paddedEnd),
+            useSimpleHours: true
+        )
+    }
+
+    /// Tasks that have data in the current filtered summaries
+    private var tasksWithData: [TaskDefinition] {
+        let taskIds = Set(filteredSummaries.flatMap { $0.sessions.map(\.taskId) })
+        return viewModel.tasks.filter { taskIds.contains($0.id) }
     }
 
     private var taskDistributionSection: some View {
