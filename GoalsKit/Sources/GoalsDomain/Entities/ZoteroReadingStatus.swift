@@ -49,5 +49,5 @@ extension ZoteroReadingStatus: CacheableRecord {
         return "zotero:readingStatus:\(dateFormatter.string(from: date))"
     }
 
-    public var recordDate: Date { date }
+    public var recordDate: Date { Calendar.current.startOfDay(for: date) }
 }

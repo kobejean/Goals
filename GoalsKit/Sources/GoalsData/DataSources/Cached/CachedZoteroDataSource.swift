@@ -96,7 +96,11 @@ public actor CachedZoteroDataSource: ZoteroDataSourceProtocol, CachingDataSource
         }
 
         // Fetch fresh reading status first so we have today's snapshot for progress calculation
-        _ = try? await fetchReadingStatus()
+        let freshStatus = try? await fetchReadingStatus()
+        let dateFormatter = DateFormatter()
+        dateFormatter.dateFormat = "yyyy-MM-dd HH:mm:ss"
+        print("[Zotero] Fresh reading status fetched: \(freshStatus != nil ? dateFormatter.string(from: freshStatus!.date) : "nil")")
+        print("[Zotero] Query date range: \(dateFormatter.string(from: startDate)) to \(dateFormatter.string(from: endDate))")
 
         // Compute reading progress scores from reading status snapshots and merge into stats
         let statsFromCache = try await fetchCached(ZoteroDailyStats.self, from: startDate, to: endDate)
@@ -115,14 +119,33 @@ public actor CachedZoteroDataSource: ZoteroDataSourceProtocol, CachingDataSource
     /// Returns the change in reading progress from the previous day (delta)
     /// Score formula: toRead×0.25 + inProgress×0.5 + read×1.0
     private func computeReadingProgressScores(from startDate: Date, to endDate: Date) async throws -> [Date: Double] {
+        // First log all cached snapshots (without date filter)
+        let allSnapshots = try await fetchCached(ZoteroReadingStatus.self)
+        let dateFormatter = DateFormatter()
+        dateFormatter.dateFormat = "yyyy-MM-dd HH:mm:ss"
+        print("[Zotero] All cached reading status snapshots: \(allSnapshots.count)")
+        for snapshot in allSnapshots.sorted(by: { $0.date < $1.date }) {
+            print("[Zotero]   - \(dateFormatter.string(from: snapshot.date))")
+        }
+
         let snapshots = try await fetchCached(ZoteroReadingStatus.self, from: startDate, to: endDate)
-        guard !snapshots.isEmpty else { return [:] }
+        guard !snapshots.isEmpty else {
+            print("[Zotero] No reading status snapshots found in date range")
+            return [:]
+        }
 
         let calendar = Calendar.current
+        dateFormatter.dateFormat = "yyyy-MM-dd"
+
         var scores: [Date: Double] = [:]
 
         // Sort snapshots by date to compute deltas
         let sortedSnapshots = snapshots.sorted { $0.date < $1.date }
+
+        print("[Zotero] === Raw Daily Snapshot Data ===")
+        for snapshot in sortedSnapshots {
+            print("[Zotero] \(dateFormatter.string(from: snapshot.date)): toRead=\(snapshot.toReadCount), inProgress=\(snapshot.inProgressCount), read=\(snapshot.readCount)")
+        }
 
         // Compute absolute score for each snapshot
         func absoluteScore(for snapshot: ZoteroReadingStatus) -> Double {
@@ -133,19 +156,19 @@ public actor CachedZoteroDataSource: ZoteroDataSourceProtocol, CachingDataSource
 
         var previousScore: Double? = nil
 
+        print("[Zotero] === Reading Progress Score Calculation ===")
         for snapshot in sortedSnapshots {
             let day = calendar.startOfDay(for: snapshot.date)
             let currentScore = absoluteScore(for: snapshot)
 
-            if let prevScore = previousScore {
-                // Delta = current - previous (how much progress made today)
-                let delta = currentScore - prevScore
-                // Only record positive deltas (progress), ignore negative (items removed)
-                scores[day] = max(0, delta)
-            } else {
-                // First snapshot - no previous to compare, so delta is 0
-                scores[day] = 0
-            }
+            // Delta = current - previous (how much progress made today)
+            // For first snapshot, assume previous score was 0 (empty state)
+            let prevScore = previousScore ?? 0
+            let delta = currentScore - prevScore
+            // Only record positive deltas (progress), ignore negative (items removed)
+            let finalDelta = max(0, delta)
+            scores[day] = finalDelta
+            print("[Zotero] \(dateFormatter.string(from: day)): absoluteScore=\(currentScore), prevScore=\(prevScore), delta=\(delta), finalDelta=\(finalDelta)")
 
             previousScore = currentScore
         }
