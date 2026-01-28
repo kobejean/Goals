@@ -6,41 +6,19 @@ public struct BackupSettingsView: View {
     @Environment(AppContainer.self) private var container
 
     @State private var syncStatus: SyncStatus = .idle
-    @State private var backupStats: BackupStats?
     @State private var isCloudKitAvailable = false
     @State private var isSyncing = false
-    @State private var isLoadingStats = true
-    @State private var showRestoreConfirmation = false
-    @State private var isRestoring = false
-    @State private var restoreResult: RestoreResult?
-    @State private var showRestoreResult = false
 
     public init() {}
 
     public var body: some View {
         Form {
             statusSection
-            backupContentsSection
             actionsSection
         }
-        .navigationTitle("Backup & Restore")
+        .navigationTitle("Backup")
         .task {
             await loadBackupInfo()
-        }
-        .alert("Restore from Backup", isPresented: $showRestoreConfirmation) {
-            Button("Cancel", role: .cancel) {}
-            Button("Restore", role: .destructive) {
-                Task { await performRestore() }
-            }
-        } message: {
-            Text("This will replace all local data with data from iCloud backup. This action cannot be undone.")
-        }
-        .alert("Restore Complete", isPresented: $showRestoreResult) {
-            Button("OK") {}
-        } message: {
-            if let result = restoreResult {
-                Text("Restored \(result.totalRestored) items.\(result.hasErrors ? " Some items failed to restore." : "")")
-            }
         }
     }
 
@@ -96,56 +74,6 @@ public struct BackupSettingsView: View {
         }
     }
 
-    private var backupContentsSection: some View {
-        Section {
-            if isLoadingStats {
-                HStack {
-                    Spacer()
-                    ProgressView()
-                    Spacer()
-                }
-            } else if let stats = backupStats, stats.hasData {
-                if stats.goalCount > 0 {
-                    HStack {
-                        Label("Goals", systemImage: "target")
-                        Spacer()
-                        Text("\(stats.goalCount)")
-                            .foregroundStyle(.secondary)
-                    }
-                }
-                if stats.taskCount > 0 {
-                    HStack {
-                        Label("Tasks", systemImage: "checkmark.circle")
-                        Spacer()
-                        Text("\(stats.taskCount)")
-                            .foregroundStyle(.secondary)
-                    }
-                }
-                if stats.sessionCount > 0 {
-                    HStack {
-                        Label("Sessions", systemImage: "clock")
-                        Spacer()
-                        Text("\(stats.sessionCount)")
-                            .foregroundStyle(.secondary)
-                    }
-                }
-                if stats.badgeCount > 0 {
-                    HStack {
-                        Label("Badges", systemImage: "star")
-                        Spacer()
-                        Text("\(stats.badgeCount)")
-                            .foregroundStyle(.secondary)
-                    }
-                }
-            } else {
-                Text("No backup data found")
-                    .foregroundStyle(.secondary)
-            }
-        } header: {
-            Text("Backup Contents")
-        }
-    }
-
     private var actionsSection: some View {
         Section {
             Button {
@@ -162,25 +90,10 @@ public struct BackupSettingsView: View {
                 }
             }
             .disabled(!isCloudKitAvailable || isSyncing)
-
-            Button {
-                showRestoreConfirmation = true
-            } label: {
-                HStack {
-                    Spacer()
-                    if isRestoring {
-                        ProgressView()
-                            .padding(.trailing, 8)
-                    }
-                    Text("Restore from Backup")
-                    Spacer()
-                }
-            }
-            .disabled(!isCloudKitAvailable || backupStats?.hasData != true || isRestoring)
         } header: {
             Text("Actions")
         } footer: {
-            Text("Backup automatically syncs your goals, tasks, sessions, and badges to iCloud. Restore will replace local data with backup data.")
+            Text("Backup automatically syncs your goals, tasks, sessions, and badges to iCloud.")
         }
     }
 
@@ -200,7 +113,7 @@ public struct BackupSettingsView: View {
                 Text("Pending")
                     .foregroundStyle(.orange)
             }
-        } else if let error = syncStatus.lastError {
+        } else if syncStatus.lastError != nil {
             HStack(spacing: 4) {
                 Image(systemName: "xmark.circle.fill")
                     .foregroundStyle(.red)
@@ -220,20 +133,11 @@ public struct BackupSettingsView: View {
     // MARK: - Actions
 
     private func loadBackupInfo() async {
-        isLoadingStats = true
-
         // Check CloudKit availability
         if let scheduler = container.cloudSyncScheduler {
             isCloudKitAvailable = await container.cloudBackupService?.isAvailable() ?? false
             syncStatus = await scheduler.getStatus()
         }
-
-        // Load backup stats
-        if let recoveryService = container.dataRecoveryService {
-            backupStats = await recoveryService.getBackupStats()
-        }
-
-        isLoadingStats = false
     }
 
     private func syncNow() async {
@@ -242,22 +146,7 @@ public struct BackupSettingsView: View {
             await scheduler.syncNow()
             syncStatus = await scheduler.getStatus()
         }
-        await loadBackupInfo()
         isSyncing = false
-    }
-
-    private func performRestore() async {
-        isRestoring = true
-        if let recoveryService = container.dataRecoveryService {
-            do {
-                restoreResult = try await recoveryService.restoreFromBackup()
-                showRestoreResult = true
-            } catch {
-                restoreResult = RestoreResult(errors: [error.localizedDescription])
-                showRestoreResult = true
-            }
-        }
-        isRestoring = false
     }
 }
 

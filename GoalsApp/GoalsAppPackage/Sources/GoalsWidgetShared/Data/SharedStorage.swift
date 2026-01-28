@@ -15,12 +15,7 @@ public enum SharedStorage {
         FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: appGroupIdentifier)
     }
 
-    /// URL for the shared SwiftData cache store
-    public static var sharedCacheStoreURL: URL? {
-        sharedContainerURL?.appendingPathComponent("Library/Application Support/CacheStore.sqlite")
-    }
-
-    /// URL for the shared SwiftData main store (tasks, goals, badges)
+    /// URL for the shared SwiftData store (unified schema)
     public static var sharedMainStoreURL: URL? {
         sharedContainerURL?.appendingPathComponent("Library/Application Support/default.store")
     }

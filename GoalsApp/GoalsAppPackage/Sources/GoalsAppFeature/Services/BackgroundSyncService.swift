@@ -16,41 +16,33 @@ public final class BackgroundSyncService: Sendable {
     private let healthKitSleepDataSource: CachedHealthKitSleepDataSource
 
     /// Creates a BackgroundSyncService with its own dependencies
-    /// Uses the shared App Group container for cache storage
+    /// Uses the shared App Group container with unified schema
     public init() throws {
-        // Create cache using shared App Group container
-        let cacheSchema = Schema([CachedDataEntry.self])
-        let cacheConfiguration: ModelConfiguration
+        // Create container using unified schema (same as main app)
+        let unifiedSchema = UnifiedSchema.createSchema()
+        let configuration: ModelConfiguration
 
-        if let containerURL = SharedStorage.sharedContainerURL {
-            let storeURL = containerURL.appendingPathComponent("Library/Application Support/CacheStore.sqlite")
-            // Ensure directory exists
-            try? FileManager.default.createDirectory(
-                at: containerURL.appendingPathComponent("Library/Application Support"),
-                withIntermediateDirectories: true
-            )
-            cacheConfiguration = ModelConfiguration(
-                "CacheStore",
-                schema: cacheSchema,
+        if let storeURL = SharedStorage.sharedMainStoreURL {
+            configuration = ModelConfiguration(
+                schema: unifiedSchema,
                 url: storeURL,
                 cloudKitDatabase: .none
             )
         } else {
             // Fallback - shouldn't happen in production
-            cacheConfiguration = ModelConfiguration(
-                "CacheStore",
-                schema: cacheSchema,
+            configuration = ModelConfiguration(
+                schema: unifiedSchema,
                 isStoredInMemoryOnly: false,
                 cloudKitDatabase: .none
             )
         }
 
-        let cacheContainer = try ModelContainer(
-            for: cacheSchema,
-            configurations: [cacheConfiguration]
+        let container = try ModelContainer(
+            for: unifiedSchema,
+            configurations: [configuration]
         )
 
-        self.dataCache = DataCache(modelContainer: cacheContainer)
+        self.dataCache = DataCache(modelContainer: container)
         self.httpClient = HTTPClient()
 
         // Create data sources with caching

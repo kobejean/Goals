@@ -33,15 +33,9 @@ struct ToggleTaskIntent: AppIntent {
             return .result()
         }
 
-        // Create ModelContainer with same schema as main app
-        // Must use the same shared store URL as AppContainer
-        // IMPORTANT: Must include ALL models to match app's schema
-        let schema = Schema([
-            GoalModel.self,
-            EarnedBadgeModel.self,
-            TaskDefinitionModel.self,
-            TaskSessionModel.self,
-        ])
+        // Create ModelContainer with unified schema (same as main app)
+        // IMPORTANT: Uses UnifiedSchema to ensure schema consistency across all container sites
+        let schema = UnifiedSchema.createSchema()
 
         guard let storeURL = SharedStorage.sharedMainStoreURL else {
             return .result()

@@ -88,9 +88,6 @@ public final class AppContainer {
         if let apiKey = UserDefaults.standard.geminiAPIKey, !apiKey.isEmpty {
             await geminiDataSource.configure(apiKey: apiKey)
         }
-
-        // Backfill thumbnails for existing nutrition entries (one-time migration)
-        await thumbnailBackfillService.backfillIfNeeded()
     }
 
     // MARK: - ViewModels (lazily created, persist for app lifetime)
@@ -164,7 +161,6 @@ public final class AppContainer {
     // MARK: - Caching Services
 
     public let taskCachingService: TaskCachingService
-    public let thumbnailBackfillService: ThumbnailBackfillService
 
     // MARK: - Use Cases
 
@@ -191,9 +187,6 @@ public final class AppContainer {
     /// Background sync scheduler (nil until configured)
     public private(set) var cloudSyncScheduler: BackgroundCloudSyncScheduler?
 
-    /// Data recovery service (nil until configured)
-    public private(set) var dataRecoveryService: DataRecoveryService?
-
     // MARK: - Initialization
 
     public convenience init() throws {
@@ -206,87 +199,40 @@ public final class AppContainer {
     }
 
     private init(inMemory: Bool) throws {
-        // Create LOCAL-ONLY cache container FIRST for fast startup
-        // Use shared App Group container so widgets can read the cache
-        let cacheSchema = Schema([CachedDataEntry.self])
-        let cacheConfiguration: ModelConfiguration
-
-        if inMemory {
-            cacheConfiguration = ModelConfiguration(
-                "CacheStore",
-                schema: cacheSchema,
-                isStoredInMemoryOnly: true,
-                cloudKitDatabase: .none
-            )
-        } else if let containerURL = SharedStorage.sharedContainerURL {
-            // Use shared container for widget access
-            let storeURL = containerURL.appendingPathComponent("Library/Application Support/CacheStore.sqlite")
-            // Ensure directory exists
-            try? FileManager.default.createDirectory(
-                at: containerURL.appendingPathComponent("Library/Application Support"),
-                withIntermediateDirectories: true
-            )
-            cacheConfiguration = ModelConfiguration(
-                "CacheStore",
-                schema: cacheSchema,
-                url: storeURL,
-                cloudKitDatabase: .none
-            )
-        } else {
-            // Fallback to default location
-            cacheConfiguration = ModelConfiguration(
-                "CacheStore",
-                schema: cacheSchema,
-                isStoredInMemoryOnly: false,
-                cloudKitDatabase: .none
-            )
-        }
-
-        let cacheContainer = try ModelContainer(
-            for: cacheSchema,
-            configurations: [cacheConfiguration]
-        )
-
-        // Initialize caching EARLY so data sources can use it
-        self.dataCache = DataCache(modelContainer: cacheContainer)
-
-        // Configure SwiftData for Goals, Badges, and Tasks
+        // Create SINGLE unified ModelContainer with all models
         // NOTE: CloudKit temporarily disabled to fix slow startup from migration
         // Re-enable with .automatic once migration completes
-        let mainSchema = Schema([
-            GoalModel.self,
-            EarnedBadgeModel.self,
-            TaskDefinitionModel.self,
-            TaskSessionModel.self,
-            NutritionEntryModel.self,
-        ])
+        let unifiedSchema = UnifiedSchema.createSchema()
 
         let mainConfiguration: ModelConfiguration
         if inMemory {
             mainConfiguration = ModelConfiguration(
-                schema: mainSchema,
+                schema: unifiedSchema,
                 isStoredInMemoryOnly: true,
                 cloudKitDatabase: .none
             )
         } else if let storeURL = SharedStorage.sharedMainStoreURL {
-            // Use shared container for widget access to tasks
+            // Use shared container for widget access
             mainConfiguration = ModelConfiguration(
-                schema: mainSchema,
+                schema: unifiedSchema,
                 url: storeURL,
                 cloudKitDatabase: .none  // Temporarily disabled - was causing 30+ second startup
             )
         } else {
             mainConfiguration = ModelConfiguration(
-                schema: mainSchema,
+                schema: unifiedSchema,
                 isStoredInMemoryOnly: false,
                 cloudKitDatabase: .none
             )
         }
 
         self.modelContainer = try ModelContainer(
-            for: mainSchema,
+            for: unifiedSchema,
             configurations: [mainConfiguration]
         )
+
+        // Initialize caching with the unified container
+        self.dataCache = DataCache(modelContainer: modelContainer)
 
         // Initialize cloud sync queue BEFORE repositories (so decorators can use it)
         let queueURL: URL
@@ -342,9 +288,6 @@ public final class AppContainer {
             taskRepository: taskRepository,
             cache: dataCache
         )
-        self.thumbnailBackfillService = ThumbnailBackfillService(
-            nutritionRepository: nutritionRepository
-        )
 
         // Initialize use cases
         self.createGoalUseCase = CreateGoalUseCase(goalRepository: goalRepository)
@@ -373,7 +316,6 @@ public final class AppContainer {
         // Cloud backup service is configured asynchronously after init
         self.cloudBackupService = nil
         self.cloudSyncScheduler = nil
-        self.dataRecoveryService = nil
     }
 
     /// Configure cloud backup services
@@ -403,14 +345,5 @@ public final class AppContainer {
 
         // Configure the sync queue handler
         await scheduler.configure()
-
-        // Create recovery service
-        let recoveryService = DataRecoveryService(
-            backupService: backupService,
-            goalRepository: goalRepository,
-            taskRepository: taskRepository,
-            badgeRepository: badgeRepository
-        )
-        self.dataRecoveryService = recoveryService
     }
 }
