@@ -200,8 +200,7 @@ public final class AppContainer {
 
     private init(inMemory: Bool) throws {
         // Create SINGLE unified ModelContainer with all models
-        // NOTE: CloudKit temporarily disabled to fix slow startup from migration
-        // Re-enable with .automatic once migration completes
+        // NOTE: CloudKit temporarily disabled to fix slow startup
         let unifiedSchema = UnifiedSchema.createSchema()
 
         let mainConfiguration: ModelConfiguration

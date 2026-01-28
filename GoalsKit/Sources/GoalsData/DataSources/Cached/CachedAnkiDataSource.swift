@@ -14,28 +14,9 @@ public actor CachedAnkiDataSource: AnkiDataSourceProtocol, CachingDataSourceWrap
         volatileWindowDays: 1
     )
 
-    /// Old UserDefaults key for migration
-    private static let legacyLastFetchKey = "ankiLastSuccessfulFetchDate"
-
     public init(remote: AnkiDataSource, cache: DataCache) {
         self.remote = remote
         self.cache = cache
-    }
-
-    /// Migrate old UserDefaults-based lastFetchDate to new strategy metadata
-    private func migrateFromLegacyMetadataIfNeeded() async {
-        // Check if new metadata already exists
-        if let _ = try? await cache.fetchStrategyMetadata(for: incrementalStrategy) {
-            return // Already migrated
-        }
-
-        // Check for legacy metadata
-        if let legacyDate = UserDefaults.standard.object(forKey: Self.legacyLastFetchKey) as? Date {
-            let metadata = DateBasedStrategy.Metadata(lastFetchDate: legacyDate)
-            try? await cache.storeStrategyMetadata(metadata, for: incrementalStrategy)
-            // Remove legacy key after migration
-            UserDefaults.standard.removeObject(forKey: Self.legacyLastFetchKey)
-        }
     }
 
     // MARK: - Configuration passthrough provided by CachingDataSourceWrapper
@@ -48,9 +29,6 @@ public actor CachedAnkiDataSource: AnkiDataSourceProtocol, CachingDataSourceWrap
     // MARK: - AnkiDataSourceProtocol
 
     public func fetchDailyStats(from startDate: Date, to endDate: Date) async throws -> [AnkiDailyStats] {
-        // Migrate legacy metadata if needed (one-time operation)
-        await migrateFromLegacyMetadataIfNeeded()
-
         // Calculate what we need to fetch based on strategy
         let fetchRange = try await calculateIncrementalFetchRange(for: (startDate, endDate))
 
