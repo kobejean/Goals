@@ -5,25 +5,15 @@ import GoalsData
 import GoalsDomain
 
 /// Provides Sleep insight data from cache
-public final class SleepInsightProvider: InsightProvider, @unchecked Sendable {
-    public static let insightType: InsightType = .sleep
+public final class SleepInsightProvider: BaseInsightProvider<SleepDailySummary> {
+    public override class var insightType: InsightType { .sleep }
 
-    private let container: ModelContainer
-    private var _summary: InsightSummary?
-    private var _activityData: InsightActivityData?
-
-    public init(container: ModelContainer) {
-        self.container = container
-    }
-
-    public func load() {
+    public override func load() {
         let (start, end) = Self.dateRange
         let sleepData = (try? SleepDailySummaryModel.fetch(from: start, to: end, in: container)) ?? []
-        (_summary, _activityData) = Self.build(from: sleepData)
+        let (summary, activityData) = Self.build(from: sleepData)
+        setInsight(summary: summary, activityData: activityData)
     }
-
-    public var summary: InsightSummary? { _summary }
-    public var activityData: InsightActivityData? { _activityData }
 
     // MARK: - Build Logic (Public for ViewModel use)
 

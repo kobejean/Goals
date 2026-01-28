@@ -394,3 +394,36 @@ private enum AnkiReviewParser {
         )
     }
 }
+
+// MARK: - DataSourceConfigurable
+
+extension AnkiDataSource: DataSourceConfigurable {
+    public static var dataSourceType: DataSourceType { .anki }
+    public static var optionMappings: [ConfigKeyMapping] {
+        [
+            ConfigKeyMapping("ankiHost", as: "host"),
+            ConfigKeyMapping("ankiPort", as: "port"),
+            ConfigKeyMapping("ankiDecks", as: "decks")
+        ]
+    }
+
+    /// Custom implementation that validates host is non-empty.
+    /// Anki requires a host to connect to AnkiConnect.
+    public static func loadSettingsFromUserDefaults() -> DataSourceSettings? {
+        var options: [String: String] = [:]
+        for mapping in optionMappings {
+            options[mapping.settingsKey] = UserDefaults.standard.string(forKey: mapping.userDefaultsKey) ?? ""
+        }
+
+        // Anki requires host to be configured
+        guard let host = options["host"], !host.isEmpty else {
+            return nil
+        }
+
+        return DataSourceSettings(
+            dataSourceType: dataSourceType,
+            credentials: [:],
+            options: options
+        )
+    }
+}

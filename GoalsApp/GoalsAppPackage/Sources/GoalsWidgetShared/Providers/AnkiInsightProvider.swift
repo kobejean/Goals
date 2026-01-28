@@ -5,25 +5,15 @@ import GoalsData
 import GoalsDomain
 
 /// Provides Anki insight data from cache
-public final class AnkiInsightProvider: InsightProvider, @unchecked Sendable {
-    public static let insightType: InsightType = .anki
+public final class AnkiInsightProvider: BaseInsightProvider<AnkiDailyStats> {
+    public override class var insightType: InsightType { .anki }
 
-    private let container: ModelContainer
-    private var _summary: InsightSummary?
-    private var _activityData: InsightActivityData?
-
-    public init(container: ModelContainer) {
-        self.container = container
-    }
-
-    public func load() {
+    public override func load() {
         let (start, end) = Self.dateRange
         let stats = (try? AnkiDailyStatsModel.fetch(from: start, to: end, in: container)) ?? []
-        (_summary, _activityData) = Self.build(from: stats)
+        let (summary, activityData) = Self.build(from: stats)
+        setInsight(summary: summary, activityData: activityData)
     }
-
-    public var summary: InsightSummary? { _summary }
-    public var activityData: InsightActivityData? { _activityData }
 
     // MARK: - Build Logic (Public for ViewModel use)
 

@@ -270,3 +270,12 @@ private struct TypeQuickerAPIResponse: Codable {
         }.sorted { $0.practiceTimeMinutes > $1.practiceTimeMinutes } // Sort by most practiced
     }
 }
+
+// MARK: - DataSourceConfigurable
+
+extension TypeQuickerDataSource: DataSourceConfigurable {
+    public static var dataSourceType: DataSourceType { .typeQuicker }
+    public static var credentialMappings: [ConfigKeyMapping] {
+        [ConfigKeyMapping("typeQuickerUsername", as: "username")]
+    }
+}

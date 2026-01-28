@@ -147,20 +147,7 @@ public final class ZoteroInsightsViewModel: InsightsSectionViewModel {
 
     public func loadCachedData() async {
         // Configure from saved settings if available
-        if let apiKey = UserDefaults.standard.zoteroAPIKey, !apiKey.isEmpty,
-           let userID = UserDefaults.standard.zoteroUserID, !userID.isEmpty {
-            let toReadCollection = UserDefaults.standard.zoteroToReadCollection ?? ""
-            let inProgressCollection = UserDefaults.standard.zoteroInProgressCollection ?? ""
-            let readCollection = UserDefaults.standard.zoteroReadCollection ?? ""
-            let settings = DataSourceSettings(
-                dataSourceType: .zotero,
-                credentials: ["apiKey": apiKey, "userID": userID],
-                options: [
-                    "toReadCollection": toReadCollection,
-                    "inProgressCollection": inProgressCollection,
-                    "readCollection": readCollection
-                ]
-            )
+        if let settings = ZoteroDataSource.loadSettingsFromUserDefaults() {
             try? await dataSource.configure(settings: settings)
         }
 
@@ -188,20 +175,7 @@ public final class ZoteroInsightsViewModel: InsightsSectionViewModel {
         fetchStatus = .loading
 
         // Configure from saved settings if available
-        if let apiKey = UserDefaults.standard.zoteroAPIKey, !apiKey.isEmpty,
-           let userID = UserDefaults.standard.zoteroUserID, !userID.isEmpty {
-            let toReadCollection = UserDefaults.standard.zoteroToReadCollection ?? ""
-            let inProgressCollection = UserDefaults.standard.zoteroInProgressCollection ?? ""
-            let readCollection = UserDefaults.standard.zoteroReadCollection ?? ""
-            let settings = DataSourceSettings(
-                dataSourceType: .zotero,
-                credentials: ["apiKey": apiKey, "userID": userID],
-                options: [
-                    "toReadCollection": toReadCollection,
-                    "inProgressCollection": inProgressCollection,
-                    "readCollection": readCollection
-                ]
-            )
+        if let settings = ZoteroDataSource.loadSettingsFromUserDefaults() {
             try? await dataSource.configure(settings: settings)
         }
 

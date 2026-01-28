@@ -5,25 +5,15 @@ import GoalsData
 import GoalsDomain
 
 /// Provides TypeQuicker insight data from cache
-public final class TypeQuickerInsightProvider: InsightProvider, @unchecked Sendable {
-    public static let insightType: InsightType = .typeQuicker
+public final class TypeQuickerInsightProvider: BaseInsightProvider<TypeQuickerStats> {
+    public override class var insightType: InsightType { .typeQuicker }
 
-    private let container: ModelContainer
-    private var _summary: InsightSummary?
-    private var _activityData: InsightActivityData?
-
-    public init(container: ModelContainer) {
-        self.container = container
-    }
-
-    public func load() {
+    public override func load() {
         let (start, end) = Self.dateRange
         let stats = (try? TypeQuickerStatsModel.fetch(from: start, to: end, in: container)) ?? []
-        (_summary, _activityData) = Self.build(from: stats)
+        let (summary, activityData) = Self.build(from: stats)
+        setInsight(summary: summary, activityData: activityData)
     }
-
-    public var summary: InsightSummary? { _summary }
-    public var activityData: InsightActivityData? { _activityData }
 
     // MARK: - Build Logic (Public for ViewModel use)
 

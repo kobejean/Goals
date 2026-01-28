@@ -1,4 +1,6 @@
 import Foundation
+import SwiftData
+import GoalsData
 
 /// Provides access to shared storage between the main app and widgets
 public enum SharedStorage {
@@ -18,6 +20,26 @@ public enum SharedStorage {
     /// URL for the shared SwiftData store (unified schema)
     public static var sharedMainStoreURL: URL? {
         sharedContainerURL?.appendingPathComponent("Library/Application Support/default.store")
+    }
+
+    /// Creates a ModelContainer for widget use with the shared App Group storage
+    public static func createWidgetModelContainer() -> ModelContainer? {
+        guard let storeURL = sharedMainStoreURL else {
+            return nil
+        }
+
+        do {
+            let schema = UnifiedSchema.createSchema()
+            let configuration = ModelConfiguration(
+                schema: schema,
+                url: storeURL,
+                cloudKitDatabase: .none
+            )
+            return try ModelContainer(for: schema, configurations: [configuration])
+        } catch {
+            print("SharedStorage: Failed to create ModelContainer: \(error)")
+            return nil
+        }
     }
 
     // MARK: - Task Control Panel Widget Cache Keys

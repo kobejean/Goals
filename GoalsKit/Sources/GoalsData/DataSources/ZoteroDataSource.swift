@@ -681,3 +681,22 @@ private struct ZoteroItemData: Decodable {
         }
     }
 }
+
+// MARK: - DataSourceConfigurable
+
+extension ZoteroDataSource: DataSourceConfigurable {
+    public static var dataSourceType: DataSourceType { .zotero }
+    public static var credentialMappings: [ConfigKeyMapping] {
+        [
+            ConfigKeyMapping("zoteroAPIKey", as: "apiKey"),
+            ConfigKeyMapping("zoteroUserID", as: "userID")
+        ]
+    }
+    public static var optionMappings: [ConfigKeyMapping] {
+        [
+            ConfigKeyMapping("zoteroToReadCollection", as: "toReadCollection"),
+            ConfigKeyMapping("zoteroInProgressCollection", as: "inProgressCollection"),
+            ConfigKeyMapping("zoteroReadCollection", as: "readCollection")
+        ]
+    }
+}

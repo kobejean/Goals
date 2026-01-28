@@ -19,72 +19,50 @@ public final class AppContainer {
         settingsRevision += 1
     }
 
+    // MARK: - Data Source Registry
+
+    /// Registry mapping data source types to their implementations.
+    /// Used for dynamic lookup of data sources by type.
+    private var dataSourceRegistry: [DataSourceType: any DataSourceRepositoryProtocol] {
+        [
+            .typeQuicker: typeQuickerDataSource,
+            .atCoder: atCoderDataSource,
+            .healthKitSleep: healthKitSleepDataSource,
+            .tasks: tasksDataSource,
+            .anki: ankiDataSource,
+            .zotero: zoteroDataSource
+            // Note: nutrition is excluded - it doesn't expose metrics for goals
+        ]
+    }
+
     /// Get available metrics for a data source type
     public func availableMetrics(for dataSource: DataSourceType) -> [MetricInfo] {
-        switch dataSource {
-        case .typeQuicker: return typeQuickerDataSource.availableMetrics
-        case .atCoder: return atCoderDataSource.availableMetrics
-        case .healthKitSleep: return healthKitSleepDataSource.availableMetrics
-        case .tasks: return tasksDataSource.availableMetrics
-        case .anki: return ankiDataSource.availableMetrics
-        case .zotero: return zoteroDataSource.availableMetrics
-        case .nutrition: return [] // Nutrition doesn't expose metrics for goals
-        }
+        dataSourceRegistry[dataSource]?.availableMetrics ?? []
     }
 
     /// Configure all data sources from stored settings
     /// Call this before syncing to ensure data sources are ready
     public func configureDataSources() async {
-        // Configure TypeQuicker
-        if let username = UserDefaults.standard.typeQuickerUsername, !username.isEmpty {
-            let settings = DataSourceSettings(
-                dataSourceType: .typeQuicker,
-                credentials: ["username": username]
-            )
+        // Configure data sources using DataSourceConfigurable protocol
+        if let settings = TypeQuickerDataSource.loadSettingsFromUserDefaults() {
             try? await typeQuickerDataSource.configure(settings: settings)
         }
 
-        // Configure AtCoder
-        if let username = UserDefaults.standard.atCoderUsername, !username.isEmpty {
-            let settings = DataSourceSettings(
-                dataSourceType: .atCoder,
-                credentials: ["username": username]
-            )
+        if let settings = AtCoderDataSource.loadSettingsFromUserDefaults() {
             try? await atCoderDataSource.configure(settings: settings)
         }
 
-        // Configure Anki
-        if let host = UserDefaults.standard.ankiHost, !host.isEmpty {
-            let port = UserDefaults.standard.ankiPort ?? "8765"
-            let decks = UserDefaults.standard.ankiDecks ?? ""
-            let settings = DataSourceSettings(
-                dataSourceType: .anki,
-                options: ["host": host, "port": port, "decks": decks]
-            )
+        if let settings = AnkiDataSource.loadSettingsFromUserDefaults() {
             try? await ankiDataSource.configure(settings: settings)
         }
 
-        // Configure Zotero
-        if let apiKey = UserDefaults.standard.zoteroAPIKey, !apiKey.isEmpty,
-           let userID = UserDefaults.standard.zoteroUserID, !userID.isEmpty {
-            let toReadCollection = UserDefaults.standard.zoteroToReadCollection ?? ""
-            let inProgressCollection = UserDefaults.standard.zoteroInProgressCollection ?? ""
-            let readCollection = UserDefaults.standard.zoteroReadCollection ?? ""
-            let settings = DataSourceSettings(
-                dataSourceType: .zotero,
-                credentials: ["apiKey": apiKey, "userID": userID],
-                options: [
-                    "toReadCollection": toReadCollection,
-                    "inProgressCollection": inProgressCollection,
-                    "readCollection": readCollection
-                ]
-            )
+        if let settings = ZoteroDataSource.loadSettingsFromUserDefaults() {
             try? await zoteroDataSource.configure(settings: settings)
         }
 
         // HealthKit doesn't need configuration - it uses system authorization
 
-        // Configure Gemini
+        // Configure Gemini (not using DataSourceConfigurable - different pattern)
         if let apiKey = UserDefaults.standard.geminiAPIKey, !apiKey.isEmpty {
             await geminiDataSource.configure(apiKey: apiKey)
         }

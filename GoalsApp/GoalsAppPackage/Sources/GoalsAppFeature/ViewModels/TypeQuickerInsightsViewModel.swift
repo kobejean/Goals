@@ -143,11 +143,7 @@ public final class TypeQuickerInsightsViewModel: InsightsSectionViewModel {
 
     public func loadCachedData() async {
         // Configure from saved settings if available
-        if let username = UserDefaults.standard.typeQuickerUsername, !username.isEmpty {
-            let settings = DataSourceSettings(
-                dataSourceType: .typeQuicker,
-                credentials: ["username": username]
-            )
+        if let settings = TypeQuickerDataSource.loadSettingsFromUserDefaults() {
             try? await dataSource.configure(settings: settings)
         }
 
@@ -172,11 +168,7 @@ public final class TypeQuickerInsightsViewModel: InsightsSectionViewModel {
         fetchStatus = .loading
 
         // Configure from saved settings if available
-        if let username = UserDefaults.standard.typeQuickerUsername, !username.isEmpty {
-            let settings = DataSourceSettings(
-                dataSourceType: .typeQuicker,
-                credentials: ["username": username]
-            )
+        if let settings = TypeQuickerDataSource.loadSettingsFromUserDefaults() {
             try? await dataSource.configure(settings: settings)
         }
 

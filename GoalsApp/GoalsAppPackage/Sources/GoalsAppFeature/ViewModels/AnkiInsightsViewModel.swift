@@ -149,13 +149,7 @@ public final class AnkiInsightsViewModel: InsightsSectionViewModel {
 
     public func loadCachedData() async {
         // Configure from saved settings if available
-        if let host = UserDefaults.standard.ankiHost, !host.isEmpty {
-            let port = UserDefaults.standard.ankiPort ?? "8765"
-            let decks = UserDefaults.standard.ankiDecks ?? ""
-            let settings = DataSourceSettings(
-                dataSourceType: .anki,
-                options: ["host": host, "port": port, "decks": decks]
-            )
+        if let settings = AnkiDataSource.loadSettingsFromUserDefaults() {
             try? await dataSource.configure(settings: settings)
         }
 
@@ -180,13 +174,7 @@ public final class AnkiInsightsViewModel: InsightsSectionViewModel {
         fetchStatus = .loading
 
         // Configure from saved settings if available
-        if let host = UserDefaults.standard.ankiHost, !host.isEmpty {
-            let port = UserDefaults.standard.ankiPort ?? "8765"
-            let decks = UserDefaults.standard.ankiDecks ?? ""
-            let settings = DataSourceSettings(
-                dataSourceType: .anki,
-                options: ["host": host, "port": port, "decks": decks]
-            )
+        if let settings = AnkiDataSource.loadSettingsFromUserDefaults() {
             try? await dataSource.configure(settings: settings)
         }
 

@@ -5,27 +5,17 @@ import GoalsData
 import GoalsDomain
 
 /// Provides AtCoder insight data from cache
-public final class AtCoderInsightProvider: InsightProvider, @unchecked Sendable {
-    public static let insightType: InsightType = .atCoder
+public final class AtCoderInsightProvider: BaseInsightProvider<AtCoderContestResult> {
+    public override class var insightType: InsightType { .atCoder }
 
-    private let container: ModelContainer
-    private var _summary: InsightSummary?
-    private var _activityData: InsightActivityData?
-
-    public init(container: ModelContainer) {
-        self.container = container
-    }
-
-    public func load() {
+    public override func load() {
         let (start, end) = Self.dateRange
         // Fetch all contest history (no date range - we want all contests for rating trend)
         let contestHistory = (try? AtCoderContestResultModel.fetch(in: container)) ?? []
         let dailyEffort = (try? AtCoderDailyEffortModel.fetch(from: start, to: end, in: container)) ?? []
-        (_summary, _activityData) = Self.build(from: contestHistory, dailyEffort: dailyEffort)
+        let (summary, activityData) = Self.build(from: contestHistory, dailyEffort: dailyEffort)
+        setInsight(summary: summary, activityData: activityData)
     }
-
-    public var summary: InsightSummary? { _summary }
-    public var activityData: InsightActivityData? { _activityData }
 
     // MARK: - Build Logic (Public for ViewModel use)
 

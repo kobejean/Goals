@@ -73,11 +73,7 @@ public final class AtCoderInsightsViewModel: InsightsSectionViewModel {
 
     public func loadCachedData() async {
         // Configure from saved settings if available
-        if let username = UserDefaults.standard.atCoderUsername, !username.isEmpty {
-            let settings = DataSourceSettings(
-                dataSourceType: .atCoder,
-                credentials: ["username": username]
-            )
+        if let settings = AtCoderDataSource.loadSettingsFromUserDefaults() {
             try? await dataSource.configure(settings: settings)
         }
 
@@ -105,11 +101,7 @@ public final class AtCoderInsightsViewModel: InsightsSectionViewModel {
         fetchStatus = .loading
 
         // Configure from saved settings if available
-        if let username = UserDefaults.standard.atCoderUsername, !username.isEmpty {
-            let settings = DataSourceSettings(
-                dataSourceType: .atCoder,
-                credentials: ["username": username]
-            )
+        if let settings = AtCoderDataSource.loadSettingsFromUserDefaults() {
             try? await dataSource.configure(settings: settings)
         }
 

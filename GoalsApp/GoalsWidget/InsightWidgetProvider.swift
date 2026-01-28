@@ -7,8 +7,6 @@ struct InsightWidgetProvider: AppIntentTimelineProvider {
     typealias Entry = InsightWidgetEntry
     typealias Intent = SelectInsightIntent
 
-    private let dataProvider = WidgetDataProvider()
-
     func placeholder(in context: Context) -> InsightWidgetEntry {
         InsightWidgetEntry.placeholder(for: .typeQuicker)
     }
@@ -25,7 +23,7 @@ struct InsightWidgetProvider: AppIntentTimelineProvider {
         let mode = configuration.displayMode ?? .chart
 
         // Fetch data from shared cache
-        let (summary, activityData) = await dataProvider.fetchInsightData(for: type)
+        let (summary, activityData) = type.fetchInsight()
 
         let entry = InsightWidgetEntry(
             date: Date(),

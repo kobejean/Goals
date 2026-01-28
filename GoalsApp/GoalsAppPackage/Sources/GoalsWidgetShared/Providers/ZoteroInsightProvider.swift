@@ -5,27 +5,17 @@ import GoalsData
 import GoalsDomain
 
 /// Provides Zotero insight data from cache
-public final class ZoteroInsightProvider: InsightProvider, @unchecked Sendable {
-    public static let insightType: InsightType = .zotero
+public final class ZoteroInsightProvider: BaseInsightProvider<ZoteroDailyStats> {
+    public override class var insightType: InsightType { .zotero }
 
-    private let container: ModelContainer
-    private var _summary: InsightSummary?
-    private var _activityData: InsightActivityData?
-
-    public init(container: ModelContainer) {
-        self.container = container
-    }
-
-    public func load() {
+    public override func load() {
         let (start, end) = Self.dateRange
         let stats = (try? ZoteroDailyStatsModel.fetch(from: start, to: end, in: container)) ?? []
         let readingStatuses = (try? ZoteroReadingStatusModel.fetch(in: container)) ?? []
         let readingStatus = readingStatuses.max { $0.date < $1.date }
-        (_summary, _activityData) = Self.build(from: stats, readingStatus: readingStatus)
+        let (summary, activityData) = Self.build(from: stats, readingStatus: readingStatus)
+        setInsight(summary: summary, activityData: activityData)
     }
-
-    public var summary: InsightSummary? { _summary }
-    public var activityData: InsightActivityData? { _activityData }
 
     // MARK: - Build Logic (Public for ViewModel use)
 

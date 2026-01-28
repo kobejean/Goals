@@ -5,28 +5,18 @@ import GoalsData
 import GoalsDomain
 
 /// Provides Nutrition insight data from cache
-public final class NutritionInsightProvider: InsightProvider, @unchecked Sendable {
-    public static let insightType: InsightType = .nutrition
-
-    private let container: ModelContainer
-    private var _summary: InsightSummary?
-    private var _activityData: InsightActivityData?
+public final class NutritionInsightProvider: BaseInsightProvider<NutritionDailySummary> {
+    public override class var insightType: InsightType { .nutrition }
 
     // Daily macro targets in grams
     private static let dailyMacroTargets = (protein: 150.0, carbs: 250.0, fat: 65.0)
 
-    public init(container: ModelContainer) {
-        self.container = container
-    }
-
-    public func load() {
+    public override func load() {
         let (start, end) = Self.dateRange
         let summaries = (try? NutritionDailySummaryModel.fetch(from: start, to: end, in: container)) ?? []
-        (_summary, _activityData) = Self.build(from: summaries)
+        let (summary, activityData) = Self.build(from: summaries)
+        setInsight(summary: summary, activityData: activityData)
     }
-
-    public var summary: InsightSummary? { _summary }
-    public var activityData: InsightActivityData? { _activityData }
 
     // MARK: - Build Logic (Public for ViewModel use)
 

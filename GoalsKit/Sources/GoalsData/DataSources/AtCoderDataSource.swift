@@ -527,3 +527,12 @@ private struct ProblemModel: Codable {
         case isExperimental = "is_experimental"
     }
 }
+
+// MARK: - DataSourceConfigurable
+
+extension AtCoderDataSource: DataSourceConfigurable {
+    public static var dataSourceType: DataSourceType { .atCoder }
+    public static var credentialMappings: [ConfigKeyMapping] {
+        [ConfigKeyMapping("atCoderUsername", as: "username")]
+    }
+}
