@@ -4,9 +4,8 @@ import Foundation
 /// Forces developers to explicitly choose how to handle incremental data fetching.
 ///
 /// Built-in strategies:
-/// - `DateBasedStrategy`: For immutable historical data (TypeQuicker, Anki, AtCoder, HealthKit)
+/// - `DateBasedStrategy`: For immutable historical data (TypeQuicker, Anki, HealthKit)
 /// - `VersionBasedStrategy`: For mutable data with version tracking (Zotero)
-/// - `AlwaysFetchRecentStrategy`: For simple cases that always fetch recent data
 public protocol IncrementalFetchStrategy: Sendable {
     associatedtype Metadata: Codable & Sendable
 
