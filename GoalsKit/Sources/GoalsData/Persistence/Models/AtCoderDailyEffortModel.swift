@@ -35,6 +35,12 @@ public final class AtCoderDailyEffortModel {
     }
 }
 
+// MARK: - CacheableModel Conformance
+
+extension AtCoderDailyEffortModel: CacheableModel {
+    public typealias DomainType = AtCoderDailyEffort
+}
+
 // MARK: - Domain Conversion
 
 public extension AtCoderDailyEffortModel {

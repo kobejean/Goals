@@ -1,9 +1,10 @@
 import Foundation
+import SwiftData
 import GoalsDomain
 
 /// Data source implementation for AtCoder competitive programming statistics.
 /// Uses official AtCoder API for contest history and kenkoooo's AtCoder Problems API for solve counts.
-/// Supports optional caching via DataCache - uses custom count-based validation for submissions.
+/// Supports optional caching via ModelContainer - uses custom count-based validation for submissions.
 public actor AtCoderDataSource: AtCoderDataSourceProtocol, CacheableDataSource {
     public let dataSourceType: DataSourceType = .atCoder
 
@@ -32,7 +33,7 @@ public actor AtCoderDataSource: AtCoderDataSourceProtocol, CacheableDataSource {
 
     // MARK: - CacheableDataSource
 
-    public let cache: DataCache?
+    public let modelContainer: ModelContainer?
 
     /// Time interval to always re-fetch (in seconds) - 2 days
     /// Recent submissions within this window are always fetched fresh
@@ -50,13 +51,13 @@ public actor AtCoderDataSource: AtCoderDataSourceProtocol, CacheableDataSource {
 
     /// Creates an AtCoderDataSource without caching (for testing).
     public init(httpClient: HTTPClient = HTTPClient()) {
-        self.cache = nil
+        self.modelContainer = nil
         self.httpClient = httpClient
     }
 
     /// Creates an AtCoderDataSource with caching enabled (for production).
-    public init(cache: DataCache, httpClient: HTTPClient = HTTPClient()) {
-        self.cache = cache
+    public init(modelContainer: ModelContainer, httpClient: HTTPClient = HTTPClient()) {
+        self.modelContainer = modelContainer
         self.httpClient = httpClient
     }
 
@@ -131,7 +132,7 @@ public actor AtCoderDataSource: AtCoderDataSourceProtocol, CacheableDataSource {
         }
 
         // Store contest history in cache if available
-        try await storeInCache(history)
+        try storeInCache(history, modelType: AtCoderContestResultModel.self)
 
         // Build current stats
         let stats: AtCoderCurrentStats?
@@ -159,7 +160,7 @@ public actor AtCoderDataSource: AtCoderDataSourceProtocol, CacheableDataSource {
         }
 
         // Single source of truth for history: always return from cache if available
-        let cachedHistory = try await fetchCached(AtCoderContestResult.self)
+        let cachedHistory = try fetchCached(AtCoderContestResult.self, modelType: AtCoderContestResultModel.self)
         return (stats, cachedHistory.isEmpty ? history : cachedHistory)
     }
 
@@ -170,14 +171,14 @@ public actor AtCoderDataSource: AtCoderDataSourceProtocol, CacheableDataSource {
     /// - Parameter fromDate: Start date (nil means all time)
     /// - Returns: Array of submissions
     public func fetchSubmissions(from fromDate: Date?) async throws -> [AtCoderSubmission] {
-        guard cache != nil else {
+        guard modelContainer != nil else {
             // No caching - just fetch from remote
             let fromSecond = fromDate.map { Int($0.timeIntervalSince1970) } ?? 0
             return try await fetchSubmissionsFromRemote(fromSecond: fromSecond)
         }
 
         // Load cached submissions (all of them for validation)
-        let cachedSubmissions = try await fetchCached(AtCoderSubmission.self)
+        let cachedSubmissions = try fetchCached(AtCoderSubmission.self, modelType: AtCoderSubmissionModel.self)
 
         // Sort by epoch second to find latest
         let sortedCache = cachedSubmissions.sorted { $0.epochSecond < $1.epochSecond }
@@ -217,11 +218,11 @@ public actor AtCoderDataSource: AtCoderDataSourceProtocol, CacheableDataSource {
         let newSubmissions = try await fetchSubmissionsFromRemote(fromSecond: fetchFromSecond)
 
         // Store in cache
-        try await storeInCache(newSubmissions)
+        try storeInCache(newSubmissions, modelType: AtCoderSubmissionModel.self)
 
         // Single source of truth: always return from cache
         // If fromDate is nil, return all submissions; otherwise filter by date
-        return try await fetchCached(AtCoderSubmission.self, from: fromDate)
+        return try fetchCached(AtCoderSubmission.self, modelType: AtCoderSubmissionModel.self, from: fromDate)
             .sorted { $0.date < $1.date }
     }
 
@@ -296,7 +297,7 @@ public actor AtCoderDataSource: AtCoderDataSourceProtocol, CacheableDataSource {
         }.sorted { $0.date < $1.date }
 
         // Store computed effort in cache
-        try await storeInCache(effort)
+        try storeInCache(effort, modelType: AtCoderDailyEffortModel.self)
 
         return effort
     }
@@ -432,24 +433,24 @@ public actor AtCoderDataSource: AtCoderDataSourceProtocol, CacheableDataSource {
 
     // MARK: - Cache-Only Methods (for instant display)
 
-    public func fetchCachedContestHistory() async throws -> [AtCoderContestResult] {
-        try await fetchCached(AtCoderContestResult.self)
+    public func fetchCachedContestHistory() throws -> [AtCoderContestResult] {
+        try fetchCached(AtCoderContestResult.self, modelType: AtCoderContestResultModel.self)
     }
 
-    public func fetchCachedDailyEffort(from startDate: Date?) async throws -> [AtCoderDailyEffort] {
-        try await fetchCached(AtCoderDailyEffort.self, from: startDate)
+    public func fetchCachedDailyEffort(from startDate: Date?) throws -> [AtCoderDailyEffort] {
+        try fetchCached(AtCoderDailyEffort.self, modelType: AtCoderDailyEffortModel.self, from: startDate)
     }
 
-    public func fetchCachedSubmissions(from startDate: Date) async throws -> [AtCoderSubmission] {
-        try await fetchCached(AtCoderSubmission.self, from: startDate)
+    public func fetchCachedSubmissions(from startDate: Date) throws -> [AtCoderSubmission] {
+        try fetchCached(AtCoderSubmission.self, modelType: AtCoderSubmissionModel.self, from: startDate)
     }
 
-    public func hasCachedContestHistory() async throws -> Bool {
-        try await hasCached(AtCoderContestResult.self)
+    public func hasCachedContestHistory() throws -> Bool {
+        try hasCached(AtCoderContestResult.self, modelType: AtCoderContestResultModel.self)
     }
 
-    public func hasCachedDailyEffort() async throws -> Bool {
-        try await hasCached(AtCoderDailyEffort.self)
+    public func hasCachedDailyEffort() throws -> Bool {
+        try hasCached(AtCoderDailyEffort.self, modelType: AtCoderDailyEffortModel.self)
     }
 }
 

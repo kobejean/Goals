@@ -1,9 +1,10 @@
 import Foundation
 import HealthKit
+import SwiftData
 import GoalsDomain
 
 /// Data source implementation for HealthKit sleep data.
-/// Supports optional caching via DataCache - uses DateBasedStrategy since sleep records are immutable.
+/// Supports optional caching via ModelContainer - uses DateBasedStrategy since sleep records are immutable.
 public actor HealthKitSleepDataSource: HealthKitSleepDataSourceProtocol, IncrementalCacheableDataSource {
     public let dataSourceType: DataSourceType = .healthKitSleep
 
@@ -35,7 +36,7 @@ public actor HealthKitSleepDataSource: HealthKitSleepDataSourceProtocol, Increme
 
     // MARK: - IncrementalCacheableDataSource
 
-    public let cache: DataCache?
+    public let modelContainer: ModelContainer?
     public nonisolated let cacheStrategyKey = "healthkit.sleep"
 
     // MARK: - Configuration
@@ -45,14 +46,14 @@ public actor HealthKitSleepDataSource: HealthKitSleepDataSourceProtocol, Increme
 
     /// Creates a HealthKitSleepDataSource without caching (for testing).
     public init() {
-        self.cache = nil
+        self.modelContainer = nil
         self.healthStore = HKHealthStore()
         self.sleepType = HKCategoryType(.sleepAnalysis)
     }
 
     /// Creates a HealthKitSleepDataSource with caching enabled (for production).
-    public init(cache: DataCache) {
-        self.cache = cache
+    public init(modelContainer: ModelContainer) {
+        self.modelContainer = modelContainer
         self.healthStore = HKHealthStore()
         self.sleepType = HKCategoryType(.sleepAnalysis)
     }
@@ -108,7 +109,12 @@ public actor HealthKitSleepDataSource: HealthKitSleepDataSourceProtocol, Increme
     }
 
     public func fetchSleepData(from startDate: Date, to endDate: Date) async throws -> [SleepDailySummary] {
-        try await cachedFetch(fetcher: fetchSleepDataFromHealthKit, from: startDate, to: endDate)
+        try await cachedFetch(
+            modelType: SleepDailySummaryModel.self,
+            fetcher: fetchSleepDataFromHealthKit,
+            from: startDate,
+            to: endDate
+        )
     }
 
     /// Internal method that fetches sleep data directly from HealthKit.
@@ -127,12 +133,12 @@ public actor HealthKitSleepDataSource: HealthKitSleepDataSourceProtocol, Increme
 
     // MARK: - Cache-Only Methods (for instant display)
 
-    public func fetchCachedSleepData(from startDate: Date, to endDate: Date) async throws -> [SleepDailySummary] {
-        try await fetchCached(SleepDailySummary.self, from: startDate, to: endDate)
+    public func fetchCachedSleepData(from startDate: Date, to endDate: Date) throws -> [SleepDailySummary] {
+        try fetchCached(SleepDailySummary.self, modelType: SleepDailySummaryModel.self, from: startDate, to: endDate)
     }
 
-    public func hasCachedData() async throws -> Bool {
-        try await hasCached(SleepDailySummary.self)
+    public func hasCachedData() throws -> Bool {
+        try hasCached(SleepDailySummary.self, modelType: SleepDailySummaryModel.self)
     }
 
     // MARK: - Private Helpers

@@ -1,4 +1,5 @@
 import SwiftUI
+import SwiftData
 import GoalsDomain
 import GoalsCore
 import GoalsData
@@ -23,13 +24,13 @@ public final class NutritionInsightsViewModel: InsightsSectionViewModel {
     // MARK: - Dependencies
 
     private let nutritionRepository: NutritionRepositoryProtocol
-    private let dataCache: DataCache?
+    private let modelContainer: ModelContainer?
 
     // MARK: - Initialization
 
-    public init(nutritionRepository: NutritionRepositoryProtocol, dataCache: DataCache? = nil) {
+    public init(nutritionRepository: NutritionRepositoryProtocol, modelContainer: ModelContainer? = nil) {
         self.nutritionRepository = nutritionRepository
-        self.dataCache = dataCache
+        self.modelContainer = modelContainer
     }
 
     // MARK: - Computed Properties
@@ -167,10 +168,10 @@ public final class NutritionInsightsViewModel: InsightsSectionViewModel {
 
     /// Cache nutrition daily summaries to shared storage for widget access
     private func cacheDataForWidget() async {
-        guard let cache = dataCache else { return }
+        guard let container = modelContainer else { return }
 
         do {
-            try await cache.store(dailySummaries)
+            try NutritionDailySummaryModel.store(dailySummaries, in: container)
         } catch {
             // Silently fail - widget will just not have nutrition data
             print("NutritionInsightsViewModel: Failed to cache data for widget: \(error)")

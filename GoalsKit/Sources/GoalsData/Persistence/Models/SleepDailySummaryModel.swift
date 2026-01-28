@@ -35,6 +35,12 @@ public final class SleepDailySummaryModel {
     }
 }
 
+// MARK: - CacheableModel Conformance
+
+extension SleepDailySummaryModel: CacheableModel {
+    public typealias DomainType = SleepDailySummary
+}
+
 // MARK: - Domain Conversion
 
 public extension SleepDailySummaryModel {

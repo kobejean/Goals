@@ -1,8 +1,9 @@
 import Foundation
+import SwiftData
 import GoalsDomain
 
 /// Data source implementation for Zotero reading and annotation statistics via Zotero API.
-/// Supports optional caching via DataCache - uses VersionBasedStrategy since annotations can be edited.
+/// Supports optional caching via ModelContainer - uses VersionBasedStrategy since annotations can be edited.
 public actor ZoteroDataSource: ZoteroDataSourceProtocol, CacheableDataSource {
     public let dataSourceType: DataSourceType = .zotero
 
@@ -36,7 +37,7 @@ public actor ZoteroDataSource: ZoteroDataSourceProtocol, CacheableDataSource {
 
     // MARK: - CacheableDataSource
 
-    public let cache: DataCache?
+    public let modelContainer: ModelContainer?
 
     /// Strategy for version-based incremental fetching.
     /// Zotero annotations are mutable and the API supports version-based sync.
@@ -56,13 +57,13 @@ public actor ZoteroDataSource: ZoteroDataSourceProtocol, CacheableDataSource {
 
     /// Creates a ZoteroDataSource without caching (for testing).
     public init(urlSession: URLSession = .shared) {
-        self.cache = nil
+        self.modelContainer = nil
         self.urlSession = urlSession
     }
 
     /// Creates a ZoteroDataSource with caching enabled (for production).
-    public init(cache: DataCache, urlSession: URLSession = .shared) {
-        self.cache = cache
+    public init(modelContainer: ModelContainer, urlSession: URLSession = .shared) {
+        self.modelContainer = modelContainer
         self.urlSession = urlSession
     }
 
@@ -119,17 +120,17 @@ public actor ZoteroDataSource: ZoteroDataSourceProtocol, CacheableDataSource {
     // MARK: - ZoteroDataSourceProtocol
 
     public func fetchDailyStats(from startDate: Date, to endDate: Date) async throws -> [ZoteroDailyStats] {
-        guard let cache = cache else {
+        guard let container = modelContainer else {
             // No caching - just fetch and return
             let (stats, _) = try await fetchDailyStatsWithVersion(from: startDate, to: endDate, sinceVersion: nil)
             return stats
         }
 
         // Get current cached data
-        let cachedStats = try await fetchCached(ZoteroDailyStats.self, from: startDate, to: endDate)
+        let cachedStats = try fetchCached(ZoteroDailyStats.self, modelType: ZoteroDailyStatsModel.self, from: startDate, to: endDate)
 
         // Get version for incremental fetch
-        let metadata = try? await cache.fetchStrategyMetadata(for: versionStrategy)
+        let metadata = try? fetchStrategyMetadata(for: versionStrategy)
         let sinceVersion = versionStrategy.versionForIncrementalFetch(metadata: metadata)
 
         do {
@@ -146,7 +147,7 @@ public actor ZoteroDataSource: ZoteroDataSourceProtocol, CacheableDataSource {
                 // Merge new stats with existing cached data
                 // For incremental sync, we need to combine counts for the same day
                 let mergedStats = mergeStats(existing: cachedStats, new: remoteStats)
-                try await storeInCache(mergedStats)
+                try storeInCache(mergedStats, modelType: ZoteroDailyStatsModel.self)
             }
 
             // Update library version on success
@@ -157,7 +158,7 @@ public actor ZoteroDataSource: ZoteroDataSourceProtocol, CacheableDataSource {
                     fetchedAt: Date(),
                     newVersion: newLibraryVersion
                 )
-                try await cache.storeStrategyMetadata(updatedMetadata, for: versionStrategy)
+                try storeStrategyMetadata(updatedMetadata, for: versionStrategy)
             }
         } catch {
             // Don't fail if we already have cached data - use what we have
@@ -171,13 +172,13 @@ public actor ZoteroDataSource: ZoteroDataSourceProtocol, CacheableDataSource {
         _ = try? await fetchReadingStatus()
 
         // Compute reading progress scores from reading status snapshots and merge into stats
-        let statsFromCache = try await fetchCached(ZoteroDailyStats.self, from: startDate, to: endDate)
-        let progressScores = try await computeReadingProgressScores(from: startDate, to: endDate)
+        let statsFromCache = try fetchCached(ZoteroDailyStats.self, modelType: ZoteroDailyStatsModel.self, from: startDate, to: endDate)
+        let progressScores = try computeReadingProgressScores(from: startDate, to: endDate, container: container)
         let statsWithProgress = mergeReadingProgress(stats: statsFromCache, progressScores: progressScores)
 
         // Store the merged stats back to cache
         if !progressScores.isEmpty {
-            try await storeInCache(statsWithProgress)
+            try storeInCache(statsWithProgress, modelType: ZoteroDailyStatsModel.self)
         }
 
         return statsWithProgress
@@ -252,7 +253,7 @@ public actor ZoteroDataSource: ZoteroDataSourceProtocol, CacheableDataSource {
             )
 
             // Cache the reading status
-            try await storeInCache([status])
+            try storeInCache([status], modelType: ZoteroReadingStatusModel.self)
 
             return status
         } catch {
@@ -286,18 +287,18 @@ public actor ZoteroDataSource: ZoteroDataSourceProtocol, CacheableDataSource {
 
     // MARK: - Cache-Only Methods (for instant display)
 
-    public func fetchCachedDailyStats(from startDate: Date, to endDate: Date) async throws -> [ZoteroDailyStats] {
-        try await fetchCached(ZoteroDailyStats.self, from: startDate, to: endDate)
+    public func fetchCachedDailyStats(from startDate: Date, to endDate: Date) throws -> [ZoteroDailyStats] {
+        try fetchCached(ZoteroDailyStats.self, modelType: ZoteroDailyStatsModel.self, from: startDate, to: endDate)
     }
 
     public func fetchCachedReadingStatus() async throws -> ZoteroReadingStatus? {
         // Get the most recent reading status from cache
-        let cachedStatuses = try await fetchCached(ZoteroReadingStatus.self)
+        let cachedStatuses = try fetchCached(ZoteroReadingStatus.self, modelType: ZoteroReadingStatusModel.self)
         return cachedStatuses.max { $0.date < $1.date }
     }
 
-    public func hasCachedData() async throws -> Bool {
-        try await hasCached(ZoteroDailyStats.self)
+    public func hasCachedData() throws -> Bool {
+        try hasCached(ZoteroDailyStats.self, modelType: ZoteroDailyStatsModel.self)
     }
 
     // MARK: - Merge Helpers
@@ -305,8 +306,8 @@ public actor ZoteroDataSource: ZoteroDataSourceProtocol, CacheableDataSource {
     /// Compute reading progress delta scores from cached reading status snapshots.
     /// Returns the change in reading progress from the previous day (delta).
     /// Score formula: toRead×0.25 + inProgress×0.5 + read×1.0
-    private func computeReadingProgressScores(from startDate: Date, to endDate: Date) async throws -> [Date: Double] {
-        let snapshots = try await fetchCached(ZoteroReadingStatus.self, from: startDate, to: endDate)
+    private func computeReadingProgressScores(from startDate: Date, to endDate: Date, container: ModelContainer) throws -> [Date: Double] {
+        let snapshots = try ZoteroReadingStatusModel.fetch(from: startDate, to: endDate, in: container)
         guard !snapshots.isEmpty else {
             return [:]
         }

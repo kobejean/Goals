@@ -43,6 +43,12 @@ public final class ZoteroReadingStatusModel {
     }
 }
 
+// MARK: - CacheableModel Conformance
+
+extension ZoteroReadingStatusModel: CacheableModel {
+    public typealias DomainType = ZoteroReadingStatus
+}
+
 // MARK: - Domain Conversion
 
 public extension ZoteroReadingStatusModel {

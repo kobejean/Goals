@@ -78,6 +78,12 @@ public final class AtCoderSubmissionModel {
     }
 }
 
+// MARK: - CacheableModel Conformance
+
+extension AtCoderSubmissionModel: CacheableModel {
+    public typealias DomainType = AtCoderSubmission
+}
+
 // MARK: - Domain Conversion
 
 public extension AtCoderSubmissionModel {

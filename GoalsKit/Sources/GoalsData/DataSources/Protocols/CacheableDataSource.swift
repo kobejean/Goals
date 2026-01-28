@@ -1,4 +1,5 @@
 import Foundation
+import SwiftData
 import GoalsDomain
 
 /// Protocol for data sources that support optional caching.
@@ -14,9 +15,47 @@ import GoalsDomain
 /// - **CacheableDataSource**: For custom caching logic (count-based validation, version-based sync).
 ///   Use individual helpers (`fetchCached`, `storeInCache`, etc.).
 public protocol CacheableDataSource: DataSourceRepositoryProtocol {
-    /// The cache to use for storing and retrieving data.
+    /// The model container to use for storing and retrieving cached data.
     /// When nil, data source operates without caching.
-    var cache: DataCache? { get }
+    var modelContainer: ModelContainer? { get }
+}
+
+// MARK: - Strategy Metadata Storage
+
+/// UserDefaults key prefix for strategy metadata
+private let metadataKeyPrefix = "cache.strategy."
+
+public extension CacheableDataSource {
+    /// Store metadata for an incremental fetch strategy.
+    /// Metadata is stored in UserDefaults as JSON for simplicity and persistence.
+    func storeStrategyMetadata<S: IncrementalFetchStrategy>(
+        _ metadata: S.Metadata,
+        for strategy: S
+    ) throws {
+        let key = metadataKeyPrefix + strategy.strategyKey
+        let data = try JSONEncoder().encode(metadata)
+        UserDefaults.standard.set(data, forKey: key)
+    }
+
+    /// Fetch stored metadata for an incremental fetch strategy.
+    /// Returns nil if no metadata has been stored yet.
+    func fetchStrategyMetadata<S: IncrementalFetchStrategy>(
+        for strategy: S
+    ) throws -> S.Metadata? {
+        let key = metadataKeyPrefix + strategy.strategyKey
+        guard let data = UserDefaults.standard.data(forKey: key) else {
+            return nil
+        }
+        return try JSONDecoder().decode(S.Metadata.self, from: data)
+    }
+
+    /// Clear stored metadata for an incremental fetch strategy.
+    func clearStrategyMetadata<S: IncrementalFetchStrategy>(
+        for strategy: S
+    ) {
+        let key = metadataKeyPrefix + strategy.strategyKey
+        UserDefaults.standard.removeObject(forKey: key)
+    }
 }
 
 // MARK: - Cached Fetch Helper
@@ -31,30 +70,32 @@ public extension CacheableDataSource {
     /// 6. Return from cache (single source of truth)
     ///
     /// - Parameters:
+    ///   - modelType: The SwiftData model type that stores this record type
     ///   - strategy: The incremental fetch strategy to use
     ///   - fetcher: Function to fetch data from remote
     ///   - from: Start date of requested range
     ///   - to: End date of requested range
     /// - Returns: Array of cached records (may include previously cached data)
-    func cachedFetch<T: CacheableRecord, S: IncrementalFetchStrategy>(
+    func cachedFetch<T: CacheableRecord, M: CacheableModel, S: IncrementalFetchStrategy>(
+        modelType: M.Type,
         strategy: S,
         fetcher: (Date, Date) async throws -> [T],
         from: Date,
         to: Date
-    ) async throws -> [T] {
-        guard let cache = cache else {
+    ) async throws -> [T] where M.DomainType == T {
+        guard let container = modelContainer else {
             // No caching - just fetch and return
             return try await fetcher(from, to)
         }
 
         // Calculate what we need to fetch based on strategy
-        let metadata = try await cache.fetchStrategyMetadata(for: strategy)
+        let metadata = try fetchStrategyMetadata(for: strategy)
         let fetchRange = strategy.calculateFetchRange(requested: (from, to), metadata: metadata)
 
         do {
             let remoteData = try await fetcher(fetchRange.start, fetchRange.end)
             if !remoteData.isEmpty {
-                try await cache.store(remoteData)
+                try M.store(remoteData, in: container)
             }
 
             // Record successful fetch
@@ -63,10 +104,10 @@ public extension CacheableDataSource {
                 fetchedRange: (fetchRange.start, fetchRange.end),
                 fetchedAt: Date()
             )
-            try await cache.storeStrategyMetadata(updatedMetadata, for: strategy)
+            try storeStrategyMetadata(updatedMetadata, for: strategy)
         } catch {
             // On error, check if we have cached data to fall back on
-            let cachedData = try await cache.fetch(T.self, from: from, to: to)
+            let cachedData = try M.fetch(from: from, to: to, in: container)
             if cachedData.isEmpty {
                 throw error
             }
@@ -74,7 +115,7 @@ public extension CacheableDataSource {
         }
 
         // Single source of truth: always return from cache
-        return try await cache.fetch(T.self, from: from, to: to)
+        return try M.fetch(from: from, to: to, in: container)
     }
 }
 
@@ -83,42 +124,50 @@ public extension CacheableDataSource {
 public extension CacheableDataSource {
     /// Fetch cached records without hitting remote.
     /// Returns empty array if no cache is configured.
-    func fetchCached<T: CacheableRecord>(
+    func fetchCached<T: CacheableRecord, M: CacheableModel>(
         _ type: T.Type,
+        modelType: M.Type,
         from: Date? = nil,
         to: Date? = nil
-    ) async throws -> [T] {
-        guard let cache = cache else { return [] }
-        return try await cache.fetch(type, from: from, to: to)
+    ) throws -> [T] where M.DomainType == T {
+        guard let container = modelContainer else { return [] }
+        return try M.fetch(from: from, to: to, in: container)
     }
 
     /// Check if any cached data exists for a record type.
     /// Returns false if no cache is configured.
-    func hasCached<T: CacheableRecord>(_ type: T.Type) async throws -> Bool {
-        guard let cache = cache else { return false }
-        return try await cache.hasCachedData(for: type)
+    func hasCached<T: CacheableRecord, M: CacheableModel>(
+        _ type: T.Type,
+        modelType: M.Type
+    ) throws -> Bool where M.DomainType == T {
+        guard let container = modelContainer else { return false }
+        return try M.hasData(in: container)
     }
 
     /// Store records in cache.
     /// No-op if no cache is configured.
-    func storeInCache<T: CacheableRecord>(_ records: [T]) async throws {
-        guard let cache = cache, !records.isEmpty else { return }
-        try await cache.store(records)
+    func storeInCache<T: CacheableRecord, M: CacheableModel>(
+        _ records: [T],
+        modelType: M.Type
+    ) throws where M.DomainType == T {
+        guard let container = modelContainer, !records.isEmpty else { return }
+        try M.store(records, in: container)
     }
 
     /// Store records and return from cache (single source of truth pattern).
     /// If no cache is configured, returns the records directly.
-    func storeAndFetch<T: CacheableRecord>(
+    func storeAndFetch<T: CacheableRecord, M: CacheableModel>(
         _ records: [T],
+        modelType: M.Type,
         from: Date? = nil,
         to: Date? = nil
-    ) async throws -> [T] {
-        guard let cache = cache else { return records }
+    ) throws -> [T] where M.DomainType == T {
+        guard let container = modelContainer else { return records }
 
         if !records.isEmpty {
-            try await cache.store(records)
+            try M.store(records, in: container)
         }
-        return try await cache.fetch(T.self, from: from, to: to)
+        return try M.fetch(from: from, to: to, in: container)
     }
 }
 
@@ -130,11 +179,11 @@ public extension CacheableDataSource {
     func calculateIncrementalFetchRange<S: IncrementalFetchStrategy>(
         strategy: S,
         for requested: (start: Date, end: Date)
-    ) async throws -> (start: Date, end: Date) {
-        guard let cache = cache else {
+    ) throws -> (start: Date, end: Date) {
+        guard modelContainer != nil else {
             return requested
         }
-        let metadata = try await cache.fetchStrategyMetadata(for: strategy)
+        let metadata = try fetchStrategyMetadata(for: strategy)
         return strategy.calculateFetchRange(requested: requested, metadata: metadata)
     }
 
@@ -142,14 +191,14 @@ public extension CacheableDataSource {
     func recordSuccessfulFetch<S: IncrementalFetchStrategy>(
         strategy: S,
         range: (start: Date, end: Date)
-    ) async throws {
-        guard let cache = cache else { return }
-        let previous = try await cache.fetchStrategyMetadata(for: strategy)
+    ) throws {
+        guard modelContainer != nil else { return }
+        let previous = try fetchStrategyMetadata(for: strategy)
         let updated = strategy.updateMetadata(
             previous: previous,
             fetchedRange: range,
             fetchedAt: Date()
         )
-        try await cache.storeStrategyMetadata(updated, for: strategy)
+        try storeStrategyMetadata(updated, for: strategy)
     }
 }

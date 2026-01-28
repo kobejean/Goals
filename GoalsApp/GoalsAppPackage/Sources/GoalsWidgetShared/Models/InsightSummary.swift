@@ -149,25 +149,27 @@ public struct InsightSummary: Sendable {
         self.macroRadarData = nil
     }
 
-    /// Initialize with macro radar + sparkline chart type (for nutrition)
+    /// Initialize with macro radar + scatter/moving average chart type (for nutrition)
     public init(
         title: String,
         systemImage: String,
         color: Color,
-        dataPoints: [InsightDataPoint],
+        scatterPoints: [InsightDataPoint],
+        movingAveragePoints: [InsightDataPoint],
         macroRadarData: MacroRadarData,
         currentValueFormatted: String,
-        trend: Double?
+        trend: Double?,
+        goalValue: Double? = nil
     ) {
         self.title = title
         self.systemImage = systemImage
         self.color = color
-        self.dataPoints = dataPoints
-        self.movingAveragePoints = nil
+        self.dataPoints = scatterPoints
+        self.movingAveragePoints = movingAveragePoints
         self.currentValueFormatted = currentValueFormatted
         self.trend = trend
-        self.goalValue = nil
-        self.chartType = .macroRadarWithSparkline
+        self.goalValue = goalValue
+        self.chartType = .macroRadarWithScatter
         self.durationRangeData = nil
         self.wpmAccuracyData = nil
         self.macroRadarData = macroRadarData

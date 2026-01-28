@@ -35,6 +35,12 @@ public final class NutritionDailySummaryModel {
     }
 }
 
+// MARK: - CacheableModel Conformance
+
+extension NutritionDailySummaryModel: CacheableModel {
+    public typealias DomainType = NutritionDailySummary
+}
+
 // MARK: - Domain Conversion
 
 public extension NutritionDailySummaryModel {

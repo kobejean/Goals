@@ -8,7 +8,6 @@ import GoalsWidgetShared
 /// Service for performing background data sync to keep widget data fresh.
 /// This service is non-MainActor to allow execution in background tasks.
 public final class BackgroundSyncService: Sendable {
-    private let dataCache: DataCache
     private let httpClient: HTTPClient
     private let typeQuickerDataSource: TypeQuickerDataSource
     private let atCoderDataSource: AtCoderDataSource
@@ -42,14 +41,13 @@ public final class BackgroundSyncService: Sendable {
             configurations: [configuration]
         )
 
-        self.dataCache = DataCache(modelContainer: container)
         self.httpClient = HTTPClient()
 
         // Create data sources with caching enabled
-        self.typeQuickerDataSource = TypeQuickerDataSource(cache: dataCache, httpClient: httpClient)
-        self.atCoderDataSource = AtCoderDataSource(cache: dataCache, httpClient: httpClient)
-        self.ankiDataSource = AnkiDataSource(cache: dataCache)
-        self.healthKitSleepDataSource = HealthKitSleepDataSource(cache: dataCache)
+        self.typeQuickerDataSource = TypeQuickerDataSource(modelContainer: container, httpClient: httpClient)
+        self.atCoderDataSource = AtCoderDataSource(modelContainer: container, httpClient: httpClient)
+        self.ankiDataSource = AnkiDataSource(modelContainer: container)
+        self.healthKitSleepDataSource = HealthKitSleepDataSource(modelContainer: container)
     }
 
     /// Performs the background sync operation

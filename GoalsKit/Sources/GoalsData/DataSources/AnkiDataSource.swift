@@ -1,8 +1,9 @@
 import Foundation
+import SwiftData
 import GoalsDomain
 
 /// Data source implementation for Anki learning statistics via AnkiConnect.
-/// Supports optional caching via DataCache - uses DateBasedStrategy since review stats are immutable.
+/// Supports optional caching via ModelContainer - uses DateBasedStrategy since review stats are immutable.
 public actor AnkiDataSource: AnkiDataSourceProtocol, IncrementalCacheableDataSource {
     public let dataSourceType: DataSourceType = .anki
 
@@ -28,7 +29,7 @@ public actor AnkiDataSource: AnkiDataSourceProtocol, IncrementalCacheableDataSou
 
     // MARK: - IncrementalCacheableDataSource
 
-    public let cache: DataCache?
+    public let modelContainer: ModelContainer?
     public nonisolated let cacheStrategyKey = "anki.dailyStats"
 
     // MARK: - Configuration
@@ -40,13 +41,13 @@ public actor AnkiDataSource: AnkiDataSourceProtocol, IncrementalCacheableDataSou
 
     /// Creates an AnkiDataSource without caching (for testing).
     public init(urlSession: URLSession? = nil) {
-        self.cache = nil
+        self.modelContainer = nil
         self.urlSession = Self.createURLSession(urlSession)
     }
 
     /// Creates an AnkiDataSource with caching enabled (for production).
-    public init(cache: DataCache, urlSession: URLSession? = nil) {
-        self.cache = cache
+    public init(modelContainer: ModelContainer, urlSession: URLSession? = nil) {
+        self.modelContainer = modelContainer
         self.urlSession = Self.createURLSession(urlSession)
     }
 
@@ -106,7 +107,12 @@ public actor AnkiDataSource: AnkiDataSourceProtocol, IncrementalCacheableDataSou
     // MARK: - AnkiDataSourceProtocol
 
     public func fetchDailyStats(from startDate: Date, to endDate: Date) async throws -> [AnkiDailyStats] {
-        try await cachedFetch(fetcher: fetchDailyStatsFromRemote, from: startDate, to: endDate)
+        try await cachedFetch(
+            modelType: AnkiDailyStatsModel.self,
+            fetcher: fetchDailyStatsFromRemote,
+            from: startDate,
+            to: endDate
+        )
     }
 
     /// Internal method that fetches stats directly from AnkiConnect.
@@ -294,12 +300,12 @@ public actor AnkiDataSource: AnkiDataSourceProtocol, IncrementalCacheableDataSou
 
     // MARK: - Cache-Only Methods (for instant display)
 
-    public func fetchCachedDailyStats(from startDate: Date, to endDate: Date) async throws -> [AnkiDailyStats] {
-        try await fetchCached(AnkiDailyStats.self, from: startDate, to: endDate)
+    public func fetchCachedDailyStats(from startDate: Date, to endDate: Date) throws -> [AnkiDailyStats] {
+        try fetchCached(AnkiDailyStats.self, modelType: AnkiDailyStatsModel.self, from: startDate, to: endDate)
     }
 
-    public func hasCachedData() async throws -> Bool {
-        try await hasCached(AnkiDailyStats.self)
+    public func hasCachedData() throws -> Bool {
+        try hasCached(AnkiDailyStats.self, modelType: AnkiDailyStatsModel.self)
     }
 }
 

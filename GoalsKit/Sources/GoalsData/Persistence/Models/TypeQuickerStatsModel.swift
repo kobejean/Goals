@@ -54,6 +54,12 @@ public final class TypeQuickerStatsModel {
     }
 }
 
+// MARK: - CacheableModel Conformance
+
+extension TypeQuickerStatsModel: CacheableModel {
+    public typealias DomainType = TypeQuickerStats
+}
+
 // MARK: - Domain Conversion
 
 public extension TypeQuickerStatsModel {

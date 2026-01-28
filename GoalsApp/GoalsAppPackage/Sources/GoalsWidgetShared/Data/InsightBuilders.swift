@@ -333,12 +333,12 @@ public enum InsightBuilders {
             InsightDataPoint(date: stat.date, value: Double(stat.reviewCount))
         }
 
-        // Calculate 30-day moving average for all stats, then filter to last 30 days
-        let allMovingAverage = calculateMovingAverage(
-            for: stats.map { (date: $0.date, value: Double($0.reviewCount)) },
+        // Calculate moving average from filtered data only (matches in-app chart behavior)
+        let movingAverageData = calculateMovingAverage(
+            for: last30DaysStats.map { (date: $0.date, value: Double($0.reviewCount)) },
             window: 30
         )
-        let movingAveragePoints = allMovingAverage.filter { $0.date >= cutoffDate }.map {
+        let movingAveragePoints = movingAverageData.map {
             InsightDataPoint(date: $0.date, value: $0.value)
         }
 
@@ -392,12 +392,12 @@ public enum InsightBuilders {
             InsightDataPoint(date: stat.date, value: stat.weightedPoints)
         }
 
-        // Calculate 30-day moving average for weighted activity, then filter to last 30 days
-        let allMovingAverage = calculateMovingAverage(
-            for: stats.map { (date: $0.date, value: $0.weightedPoints) },
+        // Calculate moving average from filtered data only (matches in-app chart behavior)
+        let movingAverageData = calculateMovingAverage(
+            for: last30DaysStats.map { (date: $0.date, value: $0.weightedPoints) },
             window: 30
         )
-        let movingAveragePoints = allMovingAverage.filter { $0.date >= cutoffDate }.map {
+        let movingAveragePoints = movingAverageData.map {
             InsightDataPoint(date: $0.date, value: $0.value)
         }
 
@@ -449,14 +449,27 @@ public enum InsightBuilders {
         guard !summaries.isEmpty else { return (nil, nil) }
 
         let type = InsightType.nutrition
+        let calendar = Calendar.current
 
-        // Build data points showing calories over time
-        let dataPoints = summaries.map { summary in
+        // Filter to last 30 days for the card
+        let cutoffDate = calendar.date(byAdding: .day, value: -30, to: Date()) ?? Date()
+        let last30DaysSummaries = summaries.filter { $0.date >= cutoffDate }
+
+        // Raw scatter points (last 30 days)
+        let scatterPoints = last30DaysSummaries.map { summary in
             InsightDataPoint(date: summary.date, value: summary.totalCalories)
         }
 
+        // Calculate moving average from filtered data only (matches in-app chart behavior)
+        let movingAverageData = calculateMovingAverage(
+            for: last30DaysSummaries.map { (date: $0.date, value: $0.totalCalories) },
+            window: 7
+        )
+        let movingAveragePoints = movingAverageData.map {
+            InsightDataPoint(date: $0.date, value: $0.value)
+        }
+
         // Calculate today's totals
-        let calendar = Calendar.current
         let today = calendar.startOfDay(for: Date())
         let todaySummary = summaries.first { calendar.startOfDay(for: $0.date) == today }
         let todayCalories = Int(todaySummary?.totalCalories ?? 0)
@@ -469,15 +482,18 @@ public enum InsightBuilders {
         )
 
         let trend = calculateTrend(for: summaries.map { $0.totalCalories })
+        let goalValue = goals.targetValue(for: "calories")
 
         let summary = InsightSummary(
             title: type.displayTitle,
             systemImage: type.systemImage,
             color: type.color,
-            dataPoints: dataPoints,
+            scatterPoints: scatterPoints,
+            movingAveragePoints: movingAveragePoints,
             macroRadarData: macroRadarData,
             currentValueFormatted: "\(todayCalories) kcal",
-            trend: trend
+            trend: trend,
+            goalValue: goalValue
         )
 
         // Build activity data (calories as intensity relative to max)

@@ -1,8 +1,9 @@
 import Foundation
+import SwiftData
 import GoalsDomain
 
 /// Data source implementation for TypeQuicker typing statistics.
-/// Supports optional caching via DataCache - uses DateBasedStrategy since typing stats are immutable.
+/// Supports optional caching via ModelContainer - uses DateBasedStrategy since typing stats are immutable.
 public actor TypeQuickerDataSource: TypeQuickerDataSourceProtocol, IncrementalCacheableDataSource {
     public let dataSourceType: DataSourceType = .typeQuicker
 
@@ -33,7 +34,7 @@ public actor TypeQuickerDataSource: TypeQuickerDataSourceProtocol, IncrementalCa
 
     // MARK: - IncrementalCacheableDataSource
 
-    public let cache: DataCache?
+    public let modelContainer: ModelContainer?
     public nonisolated let cacheStrategyKey = "typeQuicker.stats"
 
     // MARK: - Configuration
@@ -44,13 +45,13 @@ public actor TypeQuickerDataSource: TypeQuickerDataSourceProtocol, IncrementalCa
 
     /// Creates a TypeQuickerDataSource without caching (for testing).
     public init(httpClient: HTTPClient = HTTPClient()) {
-        self.cache = nil
+        self.modelContainer = nil
         self.httpClient = httpClient
     }
 
     /// Creates a TypeQuickerDataSource with caching enabled (for production).
-    public init(cache: DataCache, httpClient: HTTPClient = HTTPClient()) {
-        self.cache = cache
+    public init(modelContainer: ModelContainer, httpClient: HTTPClient = HTTPClient()) {
+        self.modelContainer = modelContainer
         self.httpClient = httpClient
     }
 
@@ -82,7 +83,12 @@ public actor TypeQuickerDataSource: TypeQuickerDataSourceProtocol, IncrementalCa
     }
 
     public func fetchStats(from startDate: Date, to endDate: Date) async throws -> [TypeQuickerStats] {
-        try await cachedFetch(fetcher: fetchStatsFromRemote, from: startDate, to: endDate)
+        try await cachedFetch(
+            modelType: TypeQuickerStatsModel.self,
+            fetcher: fetchStatsFromRemote,
+            from: startDate,
+            to: endDate
+        )
     }
 
     /// Internal method that fetches stats directly from TypeQuicker API.
@@ -161,12 +167,12 @@ public actor TypeQuickerDataSource: TypeQuickerDataSourceProtocol, IncrementalCa
 
     // MARK: - Cache-Only Methods (for instant display)
 
-    public func fetchCachedStats(from startDate: Date, to endDate: Date) async throws -> [TypeQuickerStats] {
-        try await fetchCached(TypeQuickerStats.self, from: startDate, to: endDate)
+    public func fetchCachedStats(from startDate: Date, to endDate: Date) throws -> [TypeQuickerStats] {
+        try fetchCached(TypeQuickerStats.self, modelType: TypeQuickerStatsModel.self, from: startDate, to: endDate)
     }
 
-    public func hasCachedData() async throws -> Bool {
-        try await hasCached(TypeQuickerStats.self)
+    public func hasCachedData() throws -> Bool {
+        try hasCached(TypeQuickerStats.self, modelType: TypeQuickerStatsModel.self)
     }
 }
 

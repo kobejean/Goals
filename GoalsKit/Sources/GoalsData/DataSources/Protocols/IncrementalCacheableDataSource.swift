@@ -1,4 +1,5 @@
 import Foundation
+import SwiftData
 import GoalsDomain
 
 /// Protocol for data sources using the standard incremental caching pattern.
@@ -7,14 +8,14 @@ import GoalsDomain
 /// **Usage:**
 /// ```swift
 /// public actor MyDataSource: MyDataSourceProtocol, IncrementalCacheableDataSource {
-///     public let cache: DataCache?
+///     public let modelContainer: ModelContainer?
 ///     public nonisolated let cacheStrategyKey = "my.stats"
 ///
-///     public init() { self.cache = nil }  // For testing
-///     public init(cache: DataCache) { self.cache = cache }  // For production
+///     public init() { self.modelContainer = nil }  // For testing
+///     public init(modelContainer: ModelContainer) { self.modelContainer = modelContainer }  // For production
 ///
 ///     public func fetchData(from: Date, to: Date) async throws -> [MyData] {
-///         try await cachedFetch(fetcher: fetchFromRemote, from: from, to: to)
+///         try await cachedFetch(modelType: MyDataModel.self, fetcher: fetchFromRemote, from: from, to: to)
 ///     }
 ///
 ///     private func fetchFromRemote(from: Date, to: Date) async throws -> [MyData] {
@@ -41,19 +42,21 @@ public extension IncrementalCacheableDataSource {
     /// This is the recommended method for most data sources with immutable historical data.
     ///
     /// - Parameters:
+    ///   - modelType: The SwiftData model type that stores this record type
     ///   - fetcher: Function to fetch data from remote
     ///   - from: Start date of requested range
     ///   - to: End date of requested range
     /// - Returns: Array of cached records (may include previously cached data)
-    func cachedFetch<T: CacheableRecord>(
+    func cachedFetch<T: CacheableRecord, M: CacheableModel>(
+        modelType: M.Type,
         fetcher: (Date, Date) async throws -> [T],
         from: Date,
         to: Date
-    ) async throws -> [T] {
+    ) async throws -> [T] where M.DomainType == T {
         let strategy = DateBasedStrategy(
             strategyKey: cacheStrategyKey,
             volatileWindowDays: volatileWindowDays
         )
-        return try await cachedFetch(strategy: strategy, fetcher: fetcher, from: from, to: to)
+        return try await cachedFetch(modelType: modelType, strategy: strategy, fetcher: fetcher, from: from, to: to)
     }
 }

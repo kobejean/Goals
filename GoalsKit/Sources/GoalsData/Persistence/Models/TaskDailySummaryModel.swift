@@ -35,6 +35,12 @@ public final class TaskDailySummaryModel {
     }
 }
 
+// MARK: - CacheableModel Conformance
+
+extension TaskDailySummaryModel: CacheableModel {
+    public typealias DomainType = TaskDailySummary
+}
+
 // MARK: - Domain Conversion
 
 public extension TaskDailySummaryModel {

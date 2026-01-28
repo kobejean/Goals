@@ -58,6 +58,12 @@ public final class AtCoderContestResultModel {
     }
 }
 
+// MARK: - CacheableModel Conformance
+
+extension AtCoderContestResultModel: CacheableModel {
+    public typealias DomainType = AtCoderContestResult
+}
+
 // MARK: - Domain Conversion
 
 public extension AtCoderContestResultModel {

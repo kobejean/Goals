@@ -1,17 +1,18 @@
 import Foundation
+import SwiftData
 import GoalsDomain
 
 /// Service to sync task data from SwiftData to shared cache for widget access
 public actor TaskCachingService {
     private let taskRepository: TaskRepositoryProtocol
-    private let cache: DataCache
+    private let modelContainer: ModelContainer
 
     public init(
         taskRepository: TaskRepositoryProtocol,
-        cache: DataCache
+        modelContainer: ModelContainer
     ) {
         self.taskRepository = taskRepository
-        self.cache = cache
+        self.modelContainer = modelContainer
     }
 
     /// Sync daily summaries for a date range to cache
@@ -26,8 +27,8 @@ public actor TaskCachingService {
         // Group sessions by day and build summaries
         let dailySummaries = buildDailySummaries(sessions: sessions, tasks: tasks)
 
-        // Store all summaries in the cache
-        try await cache.store(dailySummaries)
+        // Store all summaries in the cache using the model's static method
+        try TaskDailySummaryModel.store(dailySummaries, in: modelContainer)
     }
 
     /// Sync today's summary to cache (called after session start/stop)

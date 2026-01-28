@@ -109,7 +109,6 @@ public final class AppContainer {
             ankiDataSource: ankiDataSource,
             zoteroDataSource: zoteroDataSource,
             nutritionRepository: nutritionRepository,
-            dataCache: dataCache,
             taskCachingService: taskCachingService
         )
         _insightsViewModel = vm
@@ -139,10 +138,6 @@ public final class AppContainer {
     public let badgeRepository: BadgeRepositoryProtocol
     public let taskRepository: TaskRepositoryProtocol
     public let nutritionRepository: NutritionRepositoryProtocol
-
-    // MARK: - Caching
-
-    public let dataCache: DataCache
 
     // MARK: - Networking
 
@@ -230,9 +225,6 @@ public final class AppContainer {
             configurations: [mainConfiguration]
         )
 
-        // Initialize caching with the unified container
-        self.dataCache = DataCache(modelContainer: modelContainer)
-
         // Initialize cloud sync queue BEFORE repositories (so decorators can use it)
         let queueURL: URL
         if let containerURL = SharedStorage.sharedContainerURL {
@@ -259,18 +251,18 @@ public final class AppContainer {
         self.httpClient = HTTPClient()
 
         // Initialize data sources with caching enabled
-        self.typeQuickerDataSource = TypeQuickerDataSource(cache: dataCache, httpClient: httpClient)
-        self.atCoderDataSource = AtCoderDataSource(cache: dataCache, httpClient: httpClient)
-        self.healthKitSleepDataSource = HealthKitSleepDataSource(cache: dataCache)
+        self.typeQuickerDataSource = TypeQuickerDataSource(modelContainer: modelContainer, httpClient: httpClient)
+        self.atCoderDataSource = AtCoderDataSource(modelContainer: modelContainer, httpClient: httpClient)
+        self.healthKitSleepDataSource = HealthKitSleepDataSource(modelContainer: modelContainer)
         self.tasksDataSource = TasksDataSource(taskRepository: taskRepository)
-        self.ankiDataSource = AnkiDataSource(cache: dataCache)
-        self.zoteroDataSource = ZoteroDataSource(cache: dataCache)
+        self.ankiDataSource = AnkiDataSource(modelContainer: modelContainer)
+        self.zoteroDataSource = ZoteroDataSource(modelContainer: modelContainer)
         self.geminiDataSource = GeminiDataSource()
 
         // Initialize caching services
         self.taskCachingService = TaskCachingService(
             taskRepository: taskRepository,
-            cache: dataCache
+            modelContainer: modelContainer
         )
 
         // Initialize use cases

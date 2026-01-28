@@ -44,6 +44,12 @@ public final class ZoteroDailyStatsModel {
     }
 }
 
+// MARK: - CacheableModel Conformance
+
+extension ZoteroDailyStatsModel: CacheableModel {
+    public typealias DomainType = ZoteroDailyStats
+}
+
 // MARK: - Domain Conversion
 
 public extension ZoteroDailyStatsModel {

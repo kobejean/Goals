@@ -48,6 +48,12 @@ public final class AnkiDailyStatsModel {
     }
 }
 
+// MARK: - CacheableModel Conformance
+
+extension AnkiDailyStatsModel: CacheableModel {
+    public typealias DomainType = AnkiDailyStats
+}
+
 // MARK: - Domain Conversion
 
 public extension AnkiDailyStatsModel {
