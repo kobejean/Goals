@@ -34,13 +34,6 @@ public actor AtCoderDataSource: AtCoderDataSourceProtocol, CacheableDataSource {
 
     public let cache: DataCache?
 
-    /// Strategy property to satisfy CacheableDataSource protocol.
-    /// AtCoder uses custom count-based validation instead of date-based incremental,
-    /// so this strategy is not used for submissions but satisfies the protocol.
-    public nonisolated var incrementalStrategy: (any IncrementalFetchStrategy)? {
-        cache != nil ? AlwaysFetchRecentStrategy(strategyKey: "atcoder.unused", recentDays: 2) : nil
-    }
-
     /// Time interval to always re-fetch (in seconds) - 2 days
     /// Recent submissions within this window are always fetched fresh
     /// Older data is validated by comparing local vs server counts

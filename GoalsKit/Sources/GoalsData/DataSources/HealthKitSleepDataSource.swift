@@ -39,11 +39,7 @@ public actor HealthKitSleepDataSource: HealthKitSleepDataSourceProtocol, Cacheab
 
     /// Strategy for incremental fetching.
     /// Sleep records are immutable once recorded, so we only need to fetch recent data.
-    public nonisolated var incrementalStrategy: (any IncrementalFetchStrategy)? {
-        cache != nil ? DateBasedStrategy(strategyKey: "healthkit.sleep", volatileWindowDays: 1) : nil
-    }
-
-    private let dateBasedStrategy = DateBasedStrategy(strategyKey: "healthkit.sleep", volatileWindowDays: 1)
+    private let strategy = DateBasedStrategy(strategyKey: "healthkit.sleep", volatileWindowDays: 1)
 
     // MARK: - Configuration
 
@@ -117,7 +113,7 @@ public actor HealthKitSleepDataSource: HealthKitSleepDataSourceProtocol, Cacheab
     public func fetchSleepData(from startDate: Date, to endDate: Date) async throws -> [SleepDailySummary] {
         // Use cached fetch if caching is enabled
         try await cachedFetch(
-            strategy: dateBasedStrategy,
+            strategy: strategy,
             fetcher: fetchSleepDataFromHealthKit,
             from: startDate,
             to: endDate

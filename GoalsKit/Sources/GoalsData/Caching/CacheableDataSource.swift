@@ -7,37 +7,33 @@ import GoalsDomain
 /// **Design Goals:**
 /// - Single data source class handles both cached and non-cached scenarios
 /// - Caching logic is encapsulated in protocol extension helpers
-/// - Data sources declare their caching strategy, protocol provides the implementation
+/// - Data sources can use `cachedFetch()` for standard patterns or custom logic for complex cases
 ///
 /// **Usage:**
 /// ```swift
 /// public actor MyDataSource: MyDataSourceProtocol, CacheableDataSource {
 ///     public let cache: DataCache?
-///     public nonisolated var incrementalStrategy: (any IncrementalFetchStrategy)? {
-///         cache != nil ? dateBasedStrategy : nil
-///     }
-///     private let dateBasedStrategy = DateBasedStrategy(strategyKey: "my.stats", volatileWindowDays: 1)
+///     private let strategy = DateBasedStrategy(strategyKey: "my.stats", volatileWindowDays: 1)
 ///
 ///     public init() { self.cache = nil }  // For testing
 ///     public init(cache: DataCache) { self.cache = cache }  // For production
 ///
 ///     public func fetchData(from: Date, to: Date) async throws -> [MyData] {
 ///         try await cachedFetch(
-///             strategy: dateBasedStrategy,
+///             strategy: strategy,
 ///             fetcher: fetchFromRemote,
 ///             from: from, to: to
 ///         )
 ///     }
 /// }
 /// ```
+///
+/// For data sources with custom caching logic (e.g., count-based validation, version-based sync),
+/// use the individual helpers (`fetchCached`, `storeInCache`, etc.) instead of `cachedFetch()`.
 public protocol CacheableDataSource: DataSourceRepositoryProtocol {
     /// The cache to use for storing and retrieving data.
     /// When nil, data source operates without caching.
     var cache: DataCache? { get }
-
-    /// The incremental fetch strategy to use when caching is enabled.
-    /// Return nil when cache is nil (no caching).
-    var incrementalStrategy: (any IncrementalFetchStrategy)? { get }
 }
 
 // MARK: - Cached Fetch Helper

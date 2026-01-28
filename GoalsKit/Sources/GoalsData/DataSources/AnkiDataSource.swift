@@ -32,11 +32,7 @@ public actor AnkiDataSource: AnkiDataSourceProtocol, CacheableDataSource {
 
     /// Strategy for incremental fetching.
     /// Anki review stats are immutable once recorded, so we only need to fetch recent data.
-    public nonisolated var incrementalStrategy: (any IncrementalFetchStrategy)? {
-        cache != nil ? DateBasedStrategy(strategyKey: "anki.dailyStats", volatileWindowDays: 1) : nil
-    }
-
-    private let dateBasedStrategy = DateBasedStrategy(strategyKey: "anki.dailyStats", volatileWindowDays: 1)
+    private let strategy = DateBasedStrategy(strategyKey: "anki.dailyStats", volatileWindowDays: 1)
 
     // MARK: - Configuration
 
@@ -115,7 +111,7 @@ public actor AnkiDataSource: AnkiDataSourceProtocol, CacheableDataSource {
     public func fetchDailyStats(from startDate: Date, to endDate: Date) async throws -> [AnkiDailyStats] {
         // Use cached fetch if caching is enabled
         try await cachedFetch(
-            strategy: dateBasedStrategy,
+            strategy: strategy,
             fetcher: fetchDailyStatsFromRemote,
             from: startDate,
             to: endDate

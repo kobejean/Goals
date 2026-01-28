@@ -38,13 +38,9 @@ public actor ZoteroDataSource: ZoteroDataSourceProtocol, CacheableDataSource {
 
     public let cache: DataCache?
 
-    /// Strategy for incremental fetching.
+    /// Strategy for version-based incremental fetching.
     /// Zotero annotations are mutable and the API supports version-based sync.
-    public nonisolated var incrementalStrategy: (any IncrementalFetchStrategy)? {
-        cache != nil ? versionBasedStrategy : nil
-    }
-
-    private let versionBasedStrategy = VersionBasedStrategy(strategyKey: "zotero.dailyStats")
+    private let versionStrategy = VersionBasedStrategy(strategyKey: "zotero.dailyStats")
 
     // MARK: - Configuration
 
@@ -133,8 +129,8 @@ public actor ZoteroDataSource: ZoteroDataSourceProtocol, CacheableDataSource {
         let cachedStats = try await fetchCached(ZoteroDailyStats.self, from: startDate, to: endDate)
 
         // Get version for incremental fetch
-        let metadata = try? await cache.fetchStrategyMetadata(for: versionBasedStrategy)
-        let sinceVersion = versionBasedStrategy.versionForIncrementalFetch(metadata: metadata)
+        let metadata = try? await cache.fetchStrategyMetadata(for: versionStrategy)
+        let sinceVersion = versionStrategy.versionForIncrementalFetch(metadata: metadata)
 
         do {
             // Use version-based incremental sync
@@ -155,13 +151,13 @@ public actor ZoteroDataSource: ZoteroDataSourceProtocol, CacheableDataSource {
 
             // Update library version on success
             if newLibraryVersion > 0 {
-                let updatedMetadata = versionBasedStrategy.updateMetadata(
+                let updatedMetadata = versionStrategy.updateMetadata(
                     previous: metadata,
                     fetchedRange: (startDate, endDate),
                     fetchedAt: Date(),
                     newVersion: newLibraryVersion
                 )
-                try await cache.storeStrategyMetadata(updatedMetadata, for: versionBasedStrategy)
+                try await cache.storeStrategyMetadata(updatedMetadata, for: versionStrategy)
             }
         } catch {
             // Don't fail if we already have cached data - use what we have

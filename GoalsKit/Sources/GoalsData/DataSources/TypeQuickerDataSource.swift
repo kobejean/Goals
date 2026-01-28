@@ -30,11 +30,7 @@ public actor TypeQuickerDataSource: TypeQuickerDataSourceProtocol, CacheableData
 
     /// Strategy for incremental fetching.
     /// TypeQuicker stats are immutable once recorded, so we only need to fetch recent data.
-    public nonisolated var incrementalStrategy: (any IncrementalFetchStrategy)? {
-        cache != nil ? DateBasedStrategy(strategyKey: "typeQuicker.stats", volatileWindowDays: 1) : nil
-    }
-
-    private let dateBasedStrategy = DateBasedStrategy(strategyKey: "typeQuicker.stats", volatileWindowDays: 1)
+    private let strategy = DateBasedStrategy(strategyKey: "typeQuicker.stats", volatileWindowDays: 1)
 
     // MARK: - Configuration
 
@@ -84,7 +80,7 @@ public actor TypeQuickerDataSource: TypeQuickerDataSourceProtocol, CacheableData
     public func fetchStats(from startDate: Date, to endDate: Date) async throws -> [TypeQuickerStats] {
         // Use cached fetch if caching is enabled
         try await cachedFetch(
-            strategy: dateBasedStrategy,
+            strategy: strategy,
             fetcher: fetchStatsFromRemote,
             from: startDate,
             to: endDate
