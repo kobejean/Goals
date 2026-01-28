@@ -245,3 +245,100 @@ public extension ZoteroDataSourceProtocol {
         false
     }
 }
+
+/// Protocol for Wii Fit data source
+public protocol WiiFitDataSourceProtocol: DataSourceRepositoryProtocol {
+    /// Syncs data from a Wii running the homebrew app
+    /// - Parameter ipAddress: IP address of the Wii
+    /// - Returns: Sync result with measurements and activities
+    func sync(ipAddress: String) async throws -> WiiFitSyncResult
+
+    /// Fetches measurements for a date range (from cache or remote)
+    func fetchMeasurements(from startDate: Date, to endDate: Date) async throws -> [WiiFitMeasurement]
+
+    /// Fetches activities for a date range (from cache or remote)
+    func fetchActivities(from startDate: Date, to endDate: Date) async throws -> [WiiFitActivity]
+
+    /// Tests connection to a Wii at the given IP
+    func testConnection(ipAddress: String) async throws -> Bool
+
+    /// Fetches available profiles from the last sync
+    func fetchAvailableProfiles() async throws -> [WiiFitProfileInfo]
+
+    // MARK: - Cache Methods
+
+    /// Returns cached measurements without network access
+    func fetchCachedMeasurements(from startDate: Date, to endDate: Date) async throws -> [WiiFitMeasurement]
+
+    /// Returns cached activities without network access
+    func fetchCachedActivities(from startDate: Date, to endDate: Date) async throws -> [WiiFitActivity]
+
+    /// Returns true if there's any cached data available
+    func hasCachedData() async throws -> Bool
+}
+
+// Default implementations for non-cached Wii Fit data sources
+public extension WiiFitDataSourceProtocol {
+    func fetchCachedMeasurements(from startDate: Date, to endDate: Date) async throws -> [WiiFitMeasurement] {
+        []
+    }
+
+    func fetchCachedActivities(from startDate: Date, to endDate: Date) async throws -> [WiiFitActivity] {
+        []
+    }
+
+    func hasCachedData() async throws -> Bool {
+        false
+    }
+}
+
+/// Result of a Wii Fit sync operation
+public struct WiiFitSyncResult: Sendable {
+    /// Measurements synced
+    public let measurements: [WiiFitMeasurement]
+
+    /// Activities synced
+    public let activities: [WiiFitActivity]
+
+    /// Profiles found on the Wii
+    public let profilesFound: [WiiFitProfileInfo]
+
+    public init(
+        measurements: [WiiFitMeasurement],
+        activities: [WiiFitActivity],
+        profilesFound: [WiiFitProfileInfo]
+    ) {
+        self.measurements = measurements
+        self.activities = activities
+        self.profilesFound = profilesFound
+    }
+}
+
+/// Information about a Wii Fit profile
+public struct WiiFitProfileInfo: Codable, Sendable, Identifiable, Equatable {
+    public var id: String { name }
+
+    /// Profile/Mii name
+    public let name: String
+
+    /// Height in centimeters
+    public let heightCm: Int
+
+    /// Number of measurements available
+    public let measurementCount: Int
+
+    /// Number of activities available
+    public let activityCount: Int
+
+    public init(
+        name: String,
+        heightCm: Int,
+        measurementCount: Int,
+        activityCount: Int
+    ) {
+        self.name = name
+        self.heightCm = heightCm
+        self.measurementCount = measurementCount
+        self.activityCount = activityCount
+    }
+}

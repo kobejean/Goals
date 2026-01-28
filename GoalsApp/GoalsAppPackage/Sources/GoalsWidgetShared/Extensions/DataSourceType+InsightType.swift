@@ -15,6 +15,7 @@ extension DataSourceType {
         case .anki: return .anki
         case .zotero: return .zotero
         case .nutrition: return .nutrition
+        case .wiiFit: return .wiiFit
         }
     }
 }
@@ -31,6 +32,7 @@ extension InsightType {
         case .anki: return .anki
         case .zotero: return .zotero
         case .nutrition: return .nutrition
+        case .wiiFit: return .wiiFit
         }
     }
 }

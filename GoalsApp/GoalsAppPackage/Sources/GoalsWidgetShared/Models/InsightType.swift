@@ -11,9 +11,10 @@ public enum InsightType: String, CaseIterable, Codable, Sendable {
     case anki
     case zotero
     case nutrition
+    case wiiFit
 
     /// Default order for insight cards
-    public static let defaultOrder: [InsightType] = [.typeQuicker, .atCoder, .sleep, .tasks, .anki, .zotero, .nutrition]
+    public static let defaultOrder: [InsightType] = [.typeQuicker, .atCoder, .sleep, .tasks, .anki, .zotero, .nutrition, .wiiFit]
 
     /// Display title for the insight type
     public var displayTitle: String {
@@ -25,6 +26,7 @@ public enum InsightType: String, CaseIterable, Codable, Sendable {
         case .anki: return "Anki"
         case .zotero: return "Zotero"
         case .nutrition: return "Nutrition"
+        case .wiiFit: return "Wii Fit"
         }
     }
 
@@ -38,6 +40,7 @@ public enum InsightType: String, CaseIterable, Codable, Sendable {
         case .anki: return "rectangle.stack"
         case .zotero: return "books.vertical"
         case .nutrition: return "fork.knife"
+        case .wiiFit: return "scalemass.fill"
         }
     }
 
@@ -52,6 +55,7 @@ public enum InsightType: String, CaseIterable, Codable, Sendable {
         case .anki: return .red
         case .zotero: return .purple
         case .nutrition: return .teal
+        case .wiiFit: return .cyan
         }
     }
 
@@ -83,7 +87,8 @@ extension InsightType: AppEnum {
             .tasks: DisplayRepresentation(title: "Tasks"),
             .anki: DisplayRepresentation(title: "Anki"),
             .zotero: DisplayRepresentation(title: "Zotero"),
-            .nutrition: DisplayRepresentation(title: "Nutrition")
+            .nutrition: DisplayRepresentation(title: "Nutrition"),
+            .wiiFit: DisplayRepresentation(title: "Wii Fit")
         ]
     }
 }

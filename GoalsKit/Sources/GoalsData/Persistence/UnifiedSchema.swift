@@ -24,6 +24,8 @@ public enum UnifiedSchema {
         SleepDailySummaryModel.self,
         TaskDailySummaryModel.self,
         NutritionDailySummaryModel.self,
+        WiiFitMeasurementModel.self,
+        WiiFitActivityModel.self,
     ]
 
     /// Creates the unified schema containing all models

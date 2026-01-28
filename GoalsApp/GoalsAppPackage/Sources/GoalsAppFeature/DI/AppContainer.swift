@@ -30,7 +30,8 @@ public final class AppContainer {
             .healthKitSleep: healthKitSleepDataSource,
             .tasks: tasksDataSource,
             .anki: ankiDataSource,
-            .zotero: zoteroDataSource
+            .zotero: zoteroDataSource,
+            .wiiFit: wiiFitDataSource
             // Note: nutrition is excluded - it doesn't expose metrics for goals
         ]
     }
@@ -58,6 +59,10 @@ public final class AppContainer {
 
         if let settings = ZoteroDataSource.loadSettingsFromUserDefaults() {
             try? await zoteroDataSource.configure(settings: settings)
+        }
+
+        if let settings = WiiFitDataSource.loadSettingsFromUserDefaults() {
+            try? await wiiFitDataSource.configure(settings: settings)
         }
 
         // HealthKit doesn't need configuration - it uses system authorization
@@ -129,6 +134,7 @@ public final class AppContainer {
     public let tasksDataSource: TasksDataSource
     public let ankiDataSource: AnkiDataSource
     public let zoteroDataSource: ZoteroDataSource
+    public let wiiFitDataSource: WiiFitDataSource
     public let geminiDataSource: GeminiDataSource
 
     // MARK: - Caching Services
@@ -235,6 +241,7 @@ public final class AppContainer {
         self.tasksDataSource = TasksDataSource(taskRepository: taskRepository)
         self.ankiDataSource = AnkiDataSource(modelContainer: modelContainer)
         self.zoteroDataSource = ZoteroDataSource(modelContainer: modelContainer)
+        self.wiiFitDataSource = WiiFitDataSource(modelContainer: modelContainer)
         self.geminiDataSource = GeminiDataSource()
 
         // Initialize caching services
@@ -253,7 +260,8 @@ public final class AppContainer {
                 .healthKitSleep: healthKitSleepDataSource,
                 .tasks: tasksDataSource,
                 .anki: ankiDataSource,
-                .zotero: zoteroDataSource
+                .zotero: zoteroDataSource,
+                .wiiFit: wiiFitDataSource
             ]
         )
         self.badgeEvaluationUseCase = BadgeEvaluationUseCase(

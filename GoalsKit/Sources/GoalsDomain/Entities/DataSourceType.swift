@@ -23,6 +23,9 @@ public enum DataSourceType: String, Codable, Sendable, CaseIterable {
     /// Photo-based nutrition tracking with AI analysis
     case nutrition
 
+    /// Wii Fit body measurements and exercise data
+    case wiiFit
+
     /// Display name for the data source
     public var displayName: String {
         switch self {
@@ -40,6 +43,8 @@ public enum DataSourceType: String, Codable, Sendable, CaseIterable {
             return "Zotero"
         case .nutrition:
             return "Nutrition"
+        case .wiiFit:
+            return "Wii Fit"
         }
     }
 
@@ -60,6 +65,8 @@ public enum DataSourceType: String, Codable, Sendable, CaseIterable {
             return "books.vertical"
         case .nutrition:
             return "fork.knife"
+        case .wiiFit:
+            return "scalemass.fill"
         }
     }
 
@@ -80,6 +87,8 @@ public enum DataSourceType: String, Codable, Sendable, CaseIterable {
             return "Reading progress and annotations from Zotero"
         case .nutrition:
             return "Photo-based nutrition tracking with AI analysis"
+        case .wiiFit:
+            return "Body measurements and exercise data from Nintendo Wii Fit"
         }
     }
 }

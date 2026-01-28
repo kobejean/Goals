@@ -32,6 +32,11 @@ public enum UserDefaultsKeys {
     public static let ankiInsightsTimeRange = "ankiInsightsTimeRange"
     public static let atCoderInsightsTimeRange = "atCoderInsightsTimeRange"
     public static let zoteroInsightsTimeRange = "zoteroInsightsTimeRange"
+    public static let wiiFitInsightsTimeRange = "wiiFitInsightsTimeRange"
+
+    // Wii Fit settings
+    public static let wiiFitIPAddress = "wiiFitIPAddress"
+    public static let wiiFitSelectedProfile = "wiiFitSelectedProfile"
 
     /// Returns the shared UserDefaults if available, otherwise standard
     public static var shared: UserDefaults {
@@ -133,6 +138,22 @@ public extension UserDefaults {
         set {
             set(newValue, forKey: UserDefaultsKeys.geminiAPIKey)
             UserDefaults.shared.set(newValue, forKey: UserDefaultsKeys.geminiAPIKey)
+        }
+    }
+
+    var wiiFitIPAddress: String? {
+        get { string(forKey: UserDefaultsKeys.wiiFitIPAddress) }
+        set {
+            set(newValue, forKey: UserDefaultsKeys.wiiFitIPAddress)
+            UserDefaults.shared.set(newValue, forKey: UserDefaultsKeys.wiiFitIPAddress)
+        }
+    }
+
+    var wiiFitSelectedProfile: String? {
+        get { string(forKey: UserDefaultsKeys.wiiFitSelectedProfile) }
+        set {
+            set(newValue, forKey: UserDefaultsKeys.wiiFitSelectedProfile)
+            UserDefaults.shared.set(newValue, forKey: UserDefaultsKeys.wiiFitSelectedProfile)
         }
     }
 }

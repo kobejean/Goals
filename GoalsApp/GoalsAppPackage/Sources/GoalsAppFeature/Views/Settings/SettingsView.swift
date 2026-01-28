@@ -18,10 +18,14 @@ public struct SettingsView: View {
     @State private var zoteroReadCollection = ""
     @State private var zoteroConnectionStatus: ZoteroConnectionStatus = .unknown
     @State private var geminiAPIKey = ""
+    @State private var wiiFitIPAddress = ""
+    @State private var wiiFitSelectedProfile = ""
+    @State private var wiiFitConnectionStatus: WiiFitConnectionStatus = .unknown
     @State private var typeQuickerSaveState: SaveState = .idle
     @State private var atCoderSaveState: SaveState = .idle
     @State private var ankiSaveState: SaveState = .idle
     @State private var zoteroSaveState: SaveState = .idle
+    @State private var wiiFitSaveState: SaveState = .idle
 
     enum SaveState {
         case idle
@@ -44,36 +48,60 @@ public struct SettingsView: View {
         case unauthorized  // Invalid API key or permissions
     }
 
+    enum WiiFitConnectionStatus {
+        case unknown
+        case testing
+        case connected
+        case disconnected
+    }
+
     public var body: some View {
         NavigationStack {
-            Form {
-                dataSourcesSection
-                ankiSection
-                zoteroSection
-                geminiSection
-                backupSection
-                aboutSection
-            }
-            .navigationTitle("Settings")
-            .task {
-                await loadSettings()
-            }
-            .onChange(of: typeQuickerUsername) { _, newValue in
-                Task { await saveTypeQuickerSettings(username: newValue) }
-            }
-            .onChange(of: atCoderUsername) { _, newValue in
-                Task { await saveAtCoderSettings(username: newValue) }
-            }
-            .onChange(of: ankiHost) { _, _ in Task { await saveAnkiSettings() } }
-            .onChange(of: ankiPort) { _, _ in Task { await saveAnkiSettings() } }
-            .onChange(of: ankiDecks) { _, _ in Task { await saveAnkiSettings() } }
-            .onChange(of: zoteroAPIKey) { _, _ in Task { await saveZoteroSettings() } }
-            .onChange(of: zoteroUserID) { _, _ in Task { await saveZoteroSettings() } }
-            .onChange(of: zoteroToReadCollection) { _, _ in Task { await saveZoteroSettings() } }
-            .onChange(of: zoteroInProgressCollection) { _, _ in Task { await saveZoteroSettings() } }
-            .onChange(of: zoteroReadCollection) { _, _ in Task { await saveZoteroSettings() } }
-            .onChange(of: geminiAPIKey) { _, newValue in Task { await saveGeminiSettings(apiKey: newValue) } }
+            settingsForm
         }
+    }
+
+    private var settingsForm: some View {
+        Form {
+            dataSourcesSection
+            ankiSection
+            zoteroSection
+            wiiFitSection
+            geminiSection
+            backupSection
+            aboutSection
+        }
+        .navigationTitle("Settings")
+        .task {
+            await loadSettings()
+        }
+        .modifier(DataSourceChangeHandlers(
+            typeQuickerUsername: $typeQuickerUsername,
+            atCoderUsername: $atCoderUsername,
+            saveTypeQuickerSettings: saveTypeQuickerSettings,
+            saveAtCoderSettings: saveAtCoderSettings
+        ))
+        .modifier(AnkiChangeHandlers(
+            ankiHost: $ankiHost,
+            ankiPort: $ankiPort,
+            ankiDecks: $ankiDecks,
+            saveAnkiSettings: saveAnkiSettings
+        ))
+        .modifier(ZoteroChangeHandlers(
+            zoteroAPIKey: $zoteroAPIKey,
+            zoteroUserID: $zoteroUserID,
+            zoteroToReadCollection: $zoteroToReadCollection,
+            zoteroInProgressCollection: $zoteroInProgressCollection,
+            zoteroReadCollection: $zoteroReadCollection,
+            saveZoteroSettings: saveZoteroSettings
+        ))
+        .modifier(OtherChangeHandlers(
+            geminiAPIKey: $geminiAPIKey,
+            wiiFitIPAddress: $wiiFitIPAddress,
+            wiiFitSelectedProfile: $wiiFitSelectedProfile,
+            saveGeminiSettings: saveGeminiSettings,
+            saveWiiFitSettings: saveWiiFitSettings
+        ))
     }
 
     // MARK: - Section Views
@@ -215,6 +243,33 @@ public struct SettingsView: View {
         }
     }
 
+    @ViewBuilder
+    private var wiiFitSection: some View {
+        Section {
+            WiiFitIPAddressRow(ipAddress: $wiiFitIPAddress)
+            WiiFitProfileRow(selectedProfile: $wiiFitSelectedProfile)
+            HStack {
+                Text("Status")
+                Spacer()
+                wiiFitStatusView
+            }
+            Button {
+                Task { await testWiiFitConnection() }
+            } label: {
+                HStack {
+                    Spacer()
+                    Text("Test Connection")
+                    Spacer()
+                }
+            }
+            .disabled(wiiFitIPAddress.isEmpty)
+        } header: {
+            Text("Wii Fit")
+        } footer: {
+            Text("Enter the IP address shown on your Wii running Wii Fit Sync. Leave profile empty to sync all profiles.")
+        }
+    }
+
     private var geminiSection: some View {
         Section {
             HStack {
@@ -331,6 +386,36 @@ public struct SettingsView: View {
         }
     }
 
+    @ViewBuilder
+    private var wiiFitStatusView: some View {
+        switch wiiFitConnectionStatus {
+        case .unknown:
+            Text("Not tested")
+                .foregroundStyle(.secondary)
+        case .testing:
+            HStack(spacing: 4) {
+                ProgressView()
+                    .scaleEffect(0.8)
+                Text("Testing...")
+                    .foregroundStyle(.secondary)
+            }
+        case .connected:
+            HStack(spacing: 4) {
+                Image(systemName: "checkmark.circle.fill")
+                    .foregroundStyle(.green)
+                Text("Connected")
+                    .foregroundStyle(.green)
+            }
+        case .disconnected:
+            HStack(spacing: 4) {
+                Image(systemName: "xmark.circle.fill")
+                    .foregroundStyle(.red)
+                Text("Disconnected")
+                    .foregroundStyle(.red)
+            }
+        }
+    }
+
     private func loadSettings() async {
         typeQuickerUsername = UserDefaults.standard.typeQuickerUsername ?? ""
         atCoderUsername = UserDefaults.standard.atCoderUsername ?? ""
@@ -343,6 +428,8 @@ public struct SettingsView: View {
         zoteroInProgressCollection = UserDefaults.standard.zoteroInProgressCollection ?? ""
         zoteroReadCollection = UserDefaults.standard.zoteroReadCollection ?? ""
         geminiAPIKey = UserDefaults.standard.geminiAPIKey ?? ""
+        wiiFitIPAddress = UserDefaults.standard.wiiFitIPAddress ?? ""
+        wiiFitSelectedProfile = UserDefaults.standard.wiiFitSelectedProfile ?? ""
     }
 
     private func saveTypeQuickerSettings(username: String) async {
@@ -489,6 +576,46 @@ public struct SettingsView: View {
         container.notifySettingsChanged()
     }
 
+    private func saveWiiFitSettings() async {
+        wiiFitSaveState = .saving
+        UserDefaults.standard.wiiFitIPAddress = wiiFitIPAddress
+        UserDefaults.standard.wiiFitSelectedProfile = wiiFitSelectedProfile
+
+        if !wiiFitIPAddress.isEmpty {
+            let settings = DataSourceSettings(
+                dataSourceType: .wiiFit,
+                options: ["ipAddress": wiiFitIPAddress, "selectedProfile": wiiFitSelectedProfile]
+            )
+            try? await container.wiiFitDataSource.configure(settings: settings)
+        }
+
+        container.notifySettingsChanged()
+        wiiFitSaveState = .saved
+        try? await Task.sleep(for: .seconds(1.5))
+        wiiFitSaveState = .idle
+    }
+
+    private func testWiiFitConnection() async {
+        wiiFitConnectionStatus = .testing
+
+        // Configure first if not already
+        if !wiiFitIPAddress.isEmpty {
+            let settings = DataSourceSettings(
+                dataSourceType: .wiiFit,
+                options: ["ipAddress": wiiFitIPAddress, "selectedProfile": wiiFitSelectedProfile]
+            )
+            try? await container.wiiFitDataSource.configure(settings: settings)
+        }
+
+        // Test connection
+        do {
+            let connected = try await container.wiiFitDataSource.testConnection(ipAddress: wiiFitIPAddress)
+            wiiFitConnectionStatus = connected ? .connected : .disconnected
+        } catch {
+            wiiFitConnectionStatus = .disconnected
+        }
+    }
+
     public init() {}
 }
 
@@ -512,6 +639,109 @@ struct DataSourceRow: View {
                 .foregroundStyle(.secondary)
 
         }
+    }
+}
+
+/// Row for Wii Fit IP address input
+struct WiiFitIPAddressRow: View {
+    @Binding var ipAddress: String
+
+    var body: some View {
+        HStack {
+            Label("IP Address", systemImage: "network")
+            Spacer()
+            TextField("192.168.1.xxx", text: $ipAddress)
+                .multilineTextAlignment(.trailing)
+                .textInputAutocapitalization(.never)
+                .autocorrectionDisabled()
+                .keyboardType(.decimalPad)
+                .foregroundStyle(.secondary)
+        }
+    }
+}
+
+/// Row for Wii Fit profile selection
+struct WiiFitProfileRow: View {
+    @Binding var selectedProfile: String
+
+    var body: some View {
+        HStack {
+            Label("Profile", systemImage: "person")
+            Spacer()
+            TextField("All profiles", text: $selectedProfile)
+                .multilineTextAlignment(.trailing)
+                .textInputAutocapitalization(.never)
+                .autocorrectionDisabled()
+                .foregroundStyle(.secondary)
+        }
+    }
+}
+
+/// ViewModifier for data source change handlers
+struct DataSourceChangeHandlers: ViewModifier {
+    @Binding var typeQuickerUsername: String
+    @Binding var atCoderUsername: String
+    let saveTypeQuickerSettings: (String) async -> Void
+    let saveAtCoderSettings: (String) async -> Void
+
+    func body(content: Content) -> some View {
+        content
+            .onChange(of: typeQuickerUsername) { _, newValue in
+                Task { await saveTypeQuickerSettings(newValue) }
+            }
+            .onChange(of: atCoderUsername) { _, newValue in
+                Task { await saveAtCoderSettings(newValue) }
+            }
+    }
+}
+
+/// ViewModifier for Anki change handlers
+struct AnkiChangeHandlers: ViewModifier {
+    @Binding var ankiHost: String
+    @Binding var ankiPort: String
+    @Binding var ankiDecks: String
+    let saveAnkiSettings: () async -> Void
+
+    func body(content: Content) -> some View {
+        content
+            .onChange(of: ankiHost) { _, _ in Task { await saveAnkiSettings() } }
+            .onChange(of: ankiPort) { _, _ in Task { await saveAnkiSettings() } }
+            .onChange(of: ankiDecks) { _, _ in Task { await saveAnkiSettings() } }
+    }
+}
+
+/// ViewModifier for Zotero change handlers
+struct ZoteroChangeHandlers: ViewModifier {
+    @Binding var zoteroAPIKey: String
+    @Binding var zoteroUserID: String
+    @Binding var zoteroToReadCollection: String
+    @Binding var zoteroInProgressCollection: String
+    @Binding var zoteroReadCollection: String
+    let saveZoteroSettings: () async -> Void
+
+    func body(content: Content) -> some View {
+        content
+            .onChange(of: zoteroAPIKey) { _, _ in Task { await saveZoteroSettings() } }
+            .onChange(of: zoteroUserID) { _, _ in Task { await saveZoteroSettings() } }
+            .onChange(of: zoteroToReadCollection) { _, _ in Task { await saveZoteroSettings() } }
+            .onChange(of: zoteroInProgressCollection) { _, _ in Task { await saveZoteroSettings() } }
+            .onChange(of: zoteroReadCollection) { _, _ in Task { await saveZoteroSettings() } }
+    }
+}
+
+/// ViewModifier for Gemini and Wii Fit change handlers
+struct OtherChangeHandlers: ViewModifier {
+    @Binding var geminiAPIKey: String
+    @Binding var wiiFitIPAddress: String
+    @Binding var wiiFitSelectedProfile: String
+    let saveGeminiSettings: (String) async -> Void
+    let saveWiiFitSettings: () async -> Void
+
+    func body(content: Content) -> some View {
+        content
+            .onChange(of: geminiAPIKey) { _, newValue in Task { await saveGeminiSettings(newValue) } }
+            .onChange(of: wiiFitIPAddress) { _, _ in Task { await saveWiiFitSettings() } }
+            .onChange(of: wiiFitSelectedProfile) { _, _ in Task { await saveWiiFitSettings() } }
     }
 }
 

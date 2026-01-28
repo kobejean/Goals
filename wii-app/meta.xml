@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<app version="1">
+    <name>Wii Fit Sync</name>
+    <coder>kobejean</coder>
+    <version>1.0.0</version>
+    <release_date>20250128</release_date>
+    <short_description>Sync Wii Fit data to iOS</short_description>
+    <long_description>
+Wii Fit Sync allows you to export your Wii Fit body measurement
+and exercise data to the Goals iOS app over your local network.
+
+Features:
+- Exports weight, BMI, and balance measurements
+- Exports exercise/activity history (future)
+- Works with Wii Fit and Wii Fit Plus
+- Simple TCP-based sync protocol
+
+Usage:
+1. Launch this app from the Homebrew Channel
+2. Note the IP address displayed
+3. Open Goals app on iOS, go to Settings > Wii Fit
+4. Enter the IP address and tap Test Connection
+5. Sync your data!
+
+Requirements:
+- Wii with Homebrew Channel installed
+- Wii Fit or Wii Fit Plus save data
+- WiFi connection on the same network as your iOS device
+    </long_description>
+    <arguments></arguments>
+</app>

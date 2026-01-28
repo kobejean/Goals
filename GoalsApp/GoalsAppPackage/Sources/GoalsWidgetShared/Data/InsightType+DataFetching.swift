@@ -13,6 +13,7 @@ extension InsightType {
         .anki: AnkiInsightProvider.self,
         .zotero: ZoteroInsightProvider.self,
         .nutrition: NutritionInsightProvider.self,
+        .wiiFit: WiiFitInsightProvider.self,
     ]
 
     /// Convenience method that creates a shared container and fetches insight data.
