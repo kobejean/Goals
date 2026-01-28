@@ -20,6 +20,7 @@ public final class AtCoderInsightsViewModel: InsightsSectionViewModel {
     public private(set) var contestHistory: [AtCoderContestResult] = []
     public private(set) var dailyEffort: [AtCoderDailyEffort] = []
     public private(set) var goals: [Goal] = []
+    public private(set) var insight: (summary: InsightSummary?, activityData: InsightActivityData?) = (nil, nil)
     public private(set) var errorMessage: String?
     public private(set) var fetchStatus: InsightFetchStatus = .idle
 
@@ -57,14 +58,15 @@ public final class AtCoderInsightsViewModel: InsightsSectionViewModel {
         return dailyEffort.filter { $0.date >= cutoffDate }
     }
 
-    /// Summary data for the overview card (uses shared InsightBuilders for consistency with widgets)
-    public var summary: InsightSummary? {
-        InsightBuilders.buildAtCoderInsight(from: contestHistory, dailyEffort: dailyEffort, goals: goals).summary
-    }
+    /// Summary data for the overview card
+    public var summary: InsightSummary? { insight.summary }
 
-    /// Activity data for GitHub-style contribution chart (uses shared InsightBuilders for consistency with widgets)
-    public var activityData: InsightActivityData? {
-        InsightBuilders.buildAtCoderInsight(from: contestHistory, dailyEffort: dailyEffort, goals: goals).activityData
+    /// Activity data for GitHub-style contribution chart
+    public var activityData: InsightActivityData? { insight.activityData }
+
+    /// Rebuild insight from current data
+    private func rebuildInsight() {
+        insight = AtCoderInsightProvider.build(from: contestHistory, dailyEffort: dailyEffort, goals: goals)
     }
 
     // MARK: - Data Loading
@@ -95,6 +97,7 @@ public final class AtCoderInsightsViewModel: InsightsSectionViewModel {
         if let cachedEffort = try? await dataSource.fetchCachedDailyEffort(from: nil), !cachedEffort.isEmpty {
             dailyEffort = cachedEffort
         }
+        rebuildInsight()
     }
 
     public func loadData() async {
@@ -130,6 +133,7 @@ public final class AtCoderInsightsViewModel: InsightsSectionViewModel {
         if let cachedEffort = try? await dataSource.fetchCachedDailyEffort(from: nil), !cachedEffort.isEmpty {
             dailyEffort = cachedEffort
         }
+        rebuildInsight()
 
         // Fetch fresh data (updates cache internally), then update UI
         do {
@@ -141,6 +145,7 @@ public final class AtCoderInsightsViewModel: InsightsSectionViewModel {
             stats = fetchedStats
             contestHistory = fetchedHistory
             dailyEffort = try await effortTask
+            rebuildInsight()
             fetchStatus = .success
         } catch {
             // Keep cached data on error

@@ -18,6 +18,7 @@ public final class TypeQuickerInsightsViewModel: InsightsSectionViewModel {
 
     public private(set) var stats: [TypeQuickerStats] = []
     public private(set) var goals: [Goal] = []
+    public private(set) var insight: (summary: InsightSummary?, activityData: InsightActivityData?) = (nil, nil)
     public private(set) var errorMessage: String?
     public private(set) var fetchStatus: InsightFetchStatus = .idle
     public var selectedMetric: TypeQuickerMetric = .wpm
@@ -83,14 +84,15 @@ public final class TypeQuickerInsightsViewModel: InsightsSectionViewModel {
         }
     }
 
-    /// Summary data for the overview card (uses shared InsightBuilders for consistency with widgets)
-    public var summary: InsightSummary? {
-        InsightBuilders.buildTypeQuickerInsight(from: stats, goals: goals).summary
-    }
+    /// Summary data for the overview card
+    public var summary: InsightSummary? { insight.summary }
 
-    /// Activity data for GitHub-style contribution chart (uses shared InsightBuilders for consistency with widgets)
-    public var activityData: InsightActivityData? {
-        InsightBuilders.buildTypeQuickerInsight(from: stats, goals: goals).activityData
+    /// Activity data for GitHub-style contribution chart
+    public var activityData: InsightActivityData? { insight.activityData }
+
+    /// Rebuild insight from current stats and goals
+    private func rebuildInsight() {
+        insight = TypeQuickerInsightProvider.build(from: stats, goals: goals)
     }
 
     /// Get the goal target for a specific metric
@@ -160,6 +162,7 @@ public final class TypeQuickerInsightsViewModel: InsightsSectionViewModel {
         // Load cached stats
         if let cachedStats = try? await dataSource.fetchCachedStats(from: startDate, to: endDate), !cachedStats.isEmpty {
             stats = cachedStats
+            rebuildInsight()
             fetchStatus = .success
         }
     }
@@ -192,11 +195,13 @@ public final class TypeQuickerInsightsViewModel: InsightsSectionViewModel {
         // Display cached data immediately
         if let cachedStats = try? await dataSource.fetchCachedStats(from: startDate, to: endDate), !cachedStats.isEmpty {
             stats = cachedStats
+            rebuildInsight()
         }
 
         // Fetch fresh stats (updates cache internally), then update UI
         do {
             stats = try await dataSource.fetchStats(from: startDate, to: endDate)
+            rebuildInsight()
             fetchStatus = .success
         } catch {
             // Keep cached data on error

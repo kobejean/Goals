@@ -18,6 +18,7 @@ public final class AnkiInsightsViewModel: InsightsSectionViewModel {
 
     public private(set) var stats: [AnkiDailyStats] = []
     public private(set) var goals: [Goal] = []
+    public private(set) var insight: (summary: InsightSummary?, activityData: InsightActivityData?) = (nil, nil)
     public private(set) var errorMessage: String?
     public private(set) var fetchStatus: InsightFetchStatus = .idle
     public var selectedMetric: AnkiMetric = .reviews
@@ -80,14 +81,15 @@ public final class AnkiInsightsViewModel: InsightsSectionViewModel {
         }
     }
 
-    /// Summary data for the overview card (uses shared InsightBuilders for consistency with widgets)
-    public var summary: InsightSummary? {
-        InsightBuilders.buildAnkiInsight(from: stats, goals: goals).summary
-    }
+    /// Summary data for the overview card
+    public var summary: InsightSummary? { insight.summary }
 
-    /// Activity data for GitHub-style contribution chart (uses shared InsightBuilders for consistency with widgets)
-    public var activityData: InsightActivityData? {
-        InsightBuilders.buildAnkiInsight(from: stats, goals: goals).activityData
+    /// Activity data for GitHub-style contribution chart
+    public var activityData: InsightActivityData? { insight.activityData }
+
+    /// Rebuild insight from current stats and goals
+    private func rebuildInsight() {
+        insight = AnkiInsightProvider.build(from: stats, goals: goals)
     }
 
     /// Get the goal target for a specific metric
@@ -119,7 +121,7 @@ public final class AnkiInsightsViewModel: InsightsSectionViewModel {
     /// Calculate 30-day moving average for filtered chart data
     public func movingAverageData(for filteredData: [AnkiChartDataPoint], metric: AnkiMetric) -> [(date: Date, value: Double)] {
         let data = filteredData.map { (date: $0.date, value: $0.value(for: metric)) }
-        return InsightBuilders.calculateMovingAverage(for: data, window: 30)
+        return InsightCalculations.calculateMovingAverage(for: data, window: 30)
     }
 
     /// Calculate Y-axis range for chart, including goal line if present
@@ -168,6 +170,7 @@ public final class AnkiInsightsViewModel: InsightsSectionViewModel {
         // Load cached stats
         if let cachedStats = try? await dataSource.fetchCachedDailyStats(from: startDate, to: endDate), !cachedStats.isEmpty {
             stats = cachedStats
+            rebuildInsight()
             fetchStatus = .success
         }
     }
@@ -202,11 +205,13 @@ public final class AnkiInsightsViewModel: InsightsSectionViewModel {
         // Display cached data immediately
         if let cachedStats = try? await dataSource.fetchCachedDailyStats(from: startDate, to: endDate), !cachedStats.isEmpty {
             stats = cachedStats
+            rebuildInsight()
         }
 
         // Fetch fresh stats (updates cache internally), then update UI
         do {
             stats = try await dataSource.fetchDailyStats(from: startDate, to: endDate)
+            rebuildInsight()
             fetchStatus = .success
         } catch is CancellationError {
             // Task was cancelled - don't change status (another fetch may be in progress)

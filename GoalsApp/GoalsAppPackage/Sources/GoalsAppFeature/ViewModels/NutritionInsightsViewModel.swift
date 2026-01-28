@@ -18,6 +18,7 @@ public final class NutritionInsightsViewModel: InsightsSectionViewModel {
     // MARK: - Published State
 
     public private(set) var entries: [NutritionEntry] = []
+    public private(set) var insight: (summary: InsightSummary?, activityData: InsightActivityData?) = (nil, nil)
     public private(set) var errorMessage: String?
     public private(set) var fetchStatus: InsightFetchStatus = .idle
 
@@ -79,14 +80,15 @@ public final class NutritionInsightsViewModel: InsightsSectionViewModel {
         dailySummaries.halfTrendPercentage { $0.totalNutrients.calories }
     }
 
-    /// Summary data for the overview card (uses shared InsightBuilders for consistency with widgets)
-    public var summary: InsightSummary? {
-        InsightBuilders.buildNutritionInsight(from: dailySummaries).summary
-    }
+    /// Summary data for the overview card
+    public var summary: InsightSummary? { insight.summary }
 
-    /// Activity data for GitHub-style contribution chart (uses shared InsightBuilders for consistency with widgets)
-    public var activityData: InsightActivityData? {
-        InsightBuilders.buildNutritionInsight(from: dailySummaries).activityData
+    /// Activity data for GitHub-style contribution chart
+    public var activityData: InsightActivityData? { insight.activityData }
+
+    /// Rebuild insight from current data
+    private func rebuildInsight() {
+        insight = NutritionInsightProvider.build(from: dailySummaries)
     }
 
     // MARK: - Filtered Data
@@ -118,7 +120,7 @@ public final class NutritionInsightsViewModel: InsightsSectionViewModel {
     /// Calculate 7-day moving average for calories
     public func movingAverageData(for summaries: [NutritionDailySummary]) -> [(date: Date, value: Double)] {
         let data = summaries.map { (date: $0.date, value: $0.totalCalories) }
-        return InsightBuilders.calculateMovingAverage(for: data, window: 7)
+        return InsightCalculations.calculateMovingAverage(for: data, window: 7)
     }
 
     /// Calculate Y-axis range for chart
@@ -140,6 +142,7 @@ public final class NutritionInsightsViewModel: InsightsSectionViewModel {
         do {
             entries = try await nutritionRepository.fetchEntries(from: startDate, to: endDate)
             if !entries.isEmpty {
+                rebuildInsight()
                 fetchStatus = .success
             }
         } catch {
@@ -156,6 +159,7 @@ public final class NutritionInsightsViewModel: InsightsSectionViewModel {
 
         do {
             entries = try await nutritionRepository.fetchEntries(from: startDate, to: endDate)
+            rebuildInsight()
             fetchStatus = .success
 
             // Cache daily summaries for widget access

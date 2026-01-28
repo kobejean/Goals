@@ -52,17 +52,17 @@ Goals/
 - **GoalsData**: Depends on GoalsDomain + GoalsCore. Repository implementations with SwiftData, HTTP networking, caching wrappers.
 
 ### GoalsAppPackage Modules
-- **GoalsWidgetShared**: Shared code between app and widget. Contains `InsightBuilders` (single source of truth for building insight summaries), shared models (`InsightSummary`, `InsightType`), reusable chart components, and `InsightCard` UI component.
+- **GoalsWidgetShared**: Shared code between app and widget. Contains `InsightProvider` types (fetch + build insight data), shared models (`InsightSummary`, `InsightType`), reusable chart components, and `InsightCard` UI component.
 - **GoalsAppFeature**: Main app features. Depends on GoalsWidgetShared. Contains Views, ViewModels, and DI container.
 
 ### Widget Architecture
 The widget extension (`GoalsWidget/`) imports `GoalsWidgetShared` to share:
-- **InsightBuilders**: Converts raw data (stats, history) into `InsightSummary` for display
+- **InsightProvider**: Each insight type has a provider (e.g., `AnkiInsightProvider`) that fetches cached data and builds `InsightSummary`
 - **InsightType**: Enum defining all insight types with colors, icons, titles
 - **Chart components**: `SparklineChart`, `ActivityChart`, `DurationRangeChart`, `ScatterMovingAverageChart`, `MacroRadarChart`, `WPMAccuracyChart`, `ScheduleChart`
 - **InsightCard**: Reusable card component used by both app and widget
 
-Data flow: `WidgetDataProvider` fetches cached data → `InsightBuilders.build*()` → `InsightSummary` → Widget views
+Data flow: `InsightType.fetchInsight()` → provider registry → `*InsightProvider.load()` → `InsightSummary` → Widget views
 
 Widget types:
 - **InsightWidget**: Small/medium/large widgets showing insight summaries
@@ -130,7 +130,7 @@ For comprehensive documentation on data flow, caching, persistence, and concurre
 | Entitlements | `GoalsApp/Config/GoalsApp.entitlements` |
 | Widget extension | `GoalsApp/GoalsWidget/` |
 | Shared widget code | `GoalsApp/GoalsAppPackage/Sources/GoalsWidgetShared/` |
-| Insight builders | `GoalsApp/GoalsAppPackage/Sources/GoalsWidgetShared/Data/InsightBuilders.swift` |
+| Insight providers | `GoalsApp/GoalsAppPackage/Sources/GoalsWidgetShared/Providers/` |
 | Insight types | `GoalsApp/GoalsAppPackage/Sources/GoalsWidgetShared/Models/InsightType.swift` |
 | Shared charts | `GoalsApp/GoalsAppPackage/Sources/GoalsWidgetShared/Charts/` |
 | Documentation | `docs/` |
@@ -143,8 +143,8 @@ For comprehensive documentation on data flow, caching, persistence, and concurre
 4. **New capability**: Edit `GoalsApp/Config/GoalsApp.entitlements` XML directly
 5. **New insight type**:
    - Add case to `InsightType` enum in `GoalsWidgetShared/Models/InsightType.swift`
-   - Add builder method in `InsightBuilders.swift` (e.g., `buildNewInsight(from:goals:)`)
-   - Update `WidgetDataProvider` to fetch and build the new insight
+   - Create provider in `GoalsWidgetShared/Providers/` (e.g., `NewInsightProvider.swift`)
+   - Add provider to registry in `InsightType+DataFetching.swift`
    - Create ViewModel in `GoalsAppFeature/ViewModels/` if needed for detail view
 
 ## Code Style

@@ -19,6 +19,7 @@ public final class ZoteroInsightsViewModel: InsightsSectionViewModel {
     public private(set) var stats: [ZoteroDailyStats] = []
     public private(set) var readingStatus: ZoteroReadingStatus?
     public private(set) var goals: [Goal] = []
+    public private(set) var insight: (summary: InsightSummary?, activityData: InsightActivityData?) = (nil, nil)
     public private(set) var errorMessage: String?
     public private(set) var fetchStatus: InsightFetchStatus = .idle
     public var selectedMetric: ZoteroMetric = .totalActivity
@@ -79,14 +80,15 @@ public final class ZoteroInsightsViewModel: InsightsSectionViewModel {
         }
     }
 
-    /// Summary data for the overview card (uses shared InsightBuilders for consistency with widgets)
-    public var summary: InsightSummary? {
-        InsightBuilders.buildZoteroInsight(from: stats, readingStatus: readingStatus, goals: goals).summary
-    }
+    /// Summary data for the overview card
+    public var summary: InsightSummary? { insight.summary }
 
-    /// Activity data for GitHub-style contribution chart (uses shared InsightBuilders for consistency with widgets)
-    public var activityData: InsightActivityData? {
-        InsightBuilders.buildZoteroInsight(from: stats, readingStatus: readingStatus, goals: goals).activityData
+    /// Activity data for GitHub-style contribution chart
+    public var activityData: InsightActivityData? { insight.activityData }
+
+    /// Rebuild insight from current data
+    private func rebuildInsight() {
+        insight = ZoteroInsightProvider.build(from: stats, readingStatus: readingStatus, goals: goals)
     }
 
     /// Get the goal target for a specific metric
@@ -117,7 +119,7 @@ public final class ZoteroInsightsViewModel: InsightsSectionViewModel {
     /// Calculate 30-day moving average for filtered chart data
     public func movingAverageData(for filteredData: [ZoteroChartDataPoint], metric: ZoteroMetric) -> [(date: Date, value: Double)] {
         let data = filteredData.map { (date: $0.date, value: $0.value(for: metric)) }
-        return InsightBuilders.calculateMovingAverage(for: data, window: 30)
+        return InsightCalculations.calculateMovingAverage(for: data, window: 30)
     }
 
     /// Calculate Y-axis range for chart, including goal line if present
@@ -178,6 +180,7 @@ public final class ZoteroInsightsViewModel: InsightsSectionViewModel {
         if let cachedStatus = try? await dataSource.fetchCachedReadingStatus() {
             readingStatus = cachedStatus
         }
+        rebuildInsight()
     }
 
     public func loadData() async {
@@ -221,11 +224,13 @@ public final class ZoteroInsightsViewModel: InsightsSectionViewModel {
         if let cachedStatus = try? await dataSource.fetchCachedReadingStatus() {
             readingStatus = cachedStatus
         }
+        rebuildInsight()
 
         // Fetch fresh stats (updates cache internally, including reading status), then update UI
         do {
             stats = try await dataSource.fetchDailyStats(from: startDate, to: endDate)
             readingStatus = try await dataSource.fetchCachedReadingStatus()
+            rebuildInsight()
             fetchStatus = .success
         } catch {
             // Keep cached data on error (API might not be available)

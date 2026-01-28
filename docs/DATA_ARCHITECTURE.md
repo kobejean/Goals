@@ -758,6 +758,6 @@ public struct SyncDataSourcesUseCase: Sendable {
 | AppContainer | `GoalsApp/GoalsAppPackage/Sources/GoalsAppFeature/DI/AppContainer.swift` |
 | Domain Entities | `GoalsKit/Sources/GoalsDomain/Entities/` |
 | ViewModels | `GoalsApp/GoalsAppPackage/Sources/GoalsAppFeature/ViewModels/` |
-| Insight Builders | `GoalsApp/GoalsAppPackage/Sources/GoalsWidgetShared/Data/InsightBuilders.swift` |
+| Insight Providers | `GoalsApp/GoalsAppPackage/Sources/GoalsWidgetShared/Providers/` |
 | Shared Storage | `GoalsApp/GoalsAppPackage/Sources/GoalsWidgetShared/Data/SharedStorage.swift` |
 | Shared Charts | `GoalsApp/GoalsAppPackage/Sources/GoalsWidgetShared/Charts/` |

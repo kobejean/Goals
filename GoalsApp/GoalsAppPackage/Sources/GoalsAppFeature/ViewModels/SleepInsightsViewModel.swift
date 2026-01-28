@@ -18,6 +18,7 @@ public final class SleepInsightsViewModel: InsightsSectionViewModel {
 
     public private(set) var sleepData: [SleepDailySummary] = []
     public private(set) var goals: [Goal] = []
+    public private(set) var insight: (summary: InsightSummary?, activityData: InsightActivityData?) = (nil, nil)
     public private(set) var isAuthorized: Bool = false
     public private(set) var authorizationChecked: Bool = false
     public private(set) var errorMessage: String?
@@ -69,14 +70,15 @@ public final class SleepInsightsViewModel: InsightsSectionViewModel {
         sleepData.halfTrendPercentage { $0.totalSleepHours }
     }
 
-    /// Summary data for the overview card (uses shared InsightBuilders for consistency with widgets)
-    public var summary: InsightSummary? {
-        InsightBuilders.buildSleepInsight(from: sleepData, goals: goals).summary
-    }
+    /// Summary data for the overview card
+    public var summary: InsightSummary? { insight.summary }
 
-    /// Activity data for GitHub-style contribution chart (uses shared InsightBuilders for consistency with widgets)
-    public var activityData: InsightActivityData? {
-        InsightBuilders.buildSleepInsight(from: sleepData, goals: goals).activityData
+    /// Activity data for GitHub-style contribution chart
+    public var activityData: InsightActivityData? { insight.activityData }
+
+    /// Rebuild insight from current data
+    private func rebuildInsight() {
+        insight = SleepInsightProvider.build(from: sleepData, goals: goals)
     }
 
     /// Get the goal target for a specific metric
@@ -134,6 +136,7 @@ public final class SleepInsightsViewModel: InsightsSectionViewModel {
 
         // Load goals (needed for goal lines on charts)
         goals = (try? await goalRepository.fetch(dataSource: .healthKitSleep)) ?? []
+        rebuildInsight()
     }
 
     public func loadData() async {
@@ -150,6 +153,7 @@ public final class SleepInsightsViewModel: InsightsSectionViewModel {
 
         // Load goals (needed for goal lines on charts)
         goals = (try? await goalRepository.fetch(dataSource: .healthKitSleep)) ?? []
+        rebuildInsight()
 
         // Now request authorization (may show system prompt)
         do {
@@ -167,6 +171,7 @@ public final class SleepInsightsViewModel: InsightsSectionViewModel {
         // Fetch fresh data from HealthKit (updates cache internally)
         do {
             sleepData = try await dataSource.fetchSleepData(from: startDate, to: endDate)
+            rebuildInsight()
             fetchStatus = .success
         } catch {
             // Keep cached data on error
