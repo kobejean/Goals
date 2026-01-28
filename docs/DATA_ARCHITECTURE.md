@@ -33,7 +33,7 @@ The Goals app uses a layered architecture with clean separation of concerns:
                                 ▼
 ┌─────────────────────────────────────────────────────────────────┐
 │                          Data Sources                           │
-│          (Cached wrappers around remote data sources)           │
+│            (With optional built-in caching support)             │
 └─────────────────────────────────────────────────────────────────┘
                                 │
                     ┌───────────┴───────────┐
@@ -47,13 +47,13 @@ The Goals app uses a layered architecture with clean separation of concerns:
 
 ### Key Design Principles
 
-1. **Single Source of Truth**: Cached wrappers always return data from cache after fetching
+1. **Single Source of Truth**: Data sources always return data from cache after fetching
 2. **Unified Schema**: All data (user data + cached external data) stored in a single SwiftData store
 3. **Native Cache Models**: Cached data uses typed SwiftData models, eliminating JSON encoding overhead
 4. **Actor-Based Concurrency**: Thread-safe operations via Swift actors
 5. **Repository Pattern**: Protocol-based abstraction for data persistence
-6. **Decorator Pattern**: Cached data sources wrap remote sources transparently
-7. **Smart Fetching**: Only fetch missing date ranges to minimize API calls
+6. **Optional Caching**: Data sources support caching via `CacheableDataSource` protocol (two initializers pattern)
+7. **Incremental Fetching**: Only fetch missing date ranges to minimize API calls
 
 ---
 
@@ -252,52 +252,52 @@ public final class TypeQuickerStatsModel {
 }
 ```
 
-### Cached Data Source Wrappers (Decorator Pattern)
+### CacheableDataSource Protocol
 
-Cached wrappers implement `CachingDataSourceWrapper`:
+Data sources support optional caching via protocol conformance:
 
-**Location**: `GoalsKit/Sources/GoalsData/Caching/CachingDataSourceWrapper.swift`
+**Location**: `GoalsKit/Sources/GoalsData/DataSources/CacheableDataSource.swift`
 
 ```swift
-public protocol CachingDataSourceWrapper: DataSourceRepositoryProtocol {
-    associatedtype RemoteSource: DataSourceRepositoryProtocol
-    var remote: RemoteSource { get }
-    var cache: DataCache { get }
+/// Base protocol for custom caching logic
+public protocol CacheableDataSource: DataSourceRepositoryProtocol {
+    var cache: DataCache? { get }
+}
+
+/// Standard protocol for incremental date-based caching
+public protocol IncrementalCacheableDataSource: CacheableDataSource {
+    var cacheStrategyKey: String { get }
+    var volatileWindowDays: Int { get }  // Default: 1
 }
 ```
 
-**Pattern**: Each remote data source has a cached wrapper:
+**Pattern**: Each data source has two initializers (without cache for testing, with cache for production):
 
-| Remote Source | Cached Wrapper |
-|---------------|----------------|
-| `TypeQuickerDataSource` | `CachedTypeQuickerDataSource` |
-| `AtCoderDataSource` | `CachedAtCoderDataSource` |
-| `AnkiDataSource` | `CachedAnkiDataSource` |
-| `ZoteroDataSource` | `CachedZoteroDataSource` |
-| `HealthKitSleepDataSource` | `CachedHealthKitSleepDataSource` |
+| Data Source | Protocol | Caching Pattern |
+|-------------|----------|-----------------|
+| `TypeQuickerDataSource` | `IncrementalCacheableDataSource` | Date-based incremental |
+| `AnkiDataSource` | `IncrementalCacheableDataSource` | Date-based incremental |
+| `HealthKitSleepDataSource` | `IncrementalCacheableDataSource` | Date-based incremental |
+| `AtCoderDataSource` | `CacheableDataSource` | Custom count-based validation |
+| `ZoteroDataSource` | `CacheableDataSource` | Custom version-based sync |
 
-### Smart Fetching Algorithm
+### Incremental Fetching Algorithm
 
-Cached wrappers use smart fetching to minimize API calls:
+Data sources using `IncrementalCacheableDataSource` get automatic incremental fetching:
 
 ```swift
 func fetchStats(from startDate: Date, to endDate: Date) async throws -> [Stats] {
-    // 1. Get cached data to determine what's missing
-    let cachedStats = try await fetchCached(Stats.self, from: startDate, to: endDate)
-    let cachedDates = Set(cachedStats.map { Calendar.current.startOfDay(for: $0.date) })
-
-    // 2. Calculate missing date ranges
-    let missingRanges = calculateMissingDateRanges(from: startDate, to: endDate, cachedDates: cachedDates)
-
-    // 3. Fetch only missing ranges from remote
-    for range in missingRanges {
-        let remoteStats = try await remote.fetchStats(from: range.start, to: range.end)
-        try await cache.store(remoteStats)
-    }
-
-    // 4. Single source of truth: always return from cache
-    return try await fetchCached(Stats.self, from: startDate, to: endDate)
+    // Simple one-liner using the protocol extension
+    try await cachedFetch(fetcher: fetchFromRemote, from: startDate, to: endDate)
 }
+
+// The cachedFetch helper internally:
+// 1. Calculates fetch range based on strategy metadata
+// 2. Fetches from remote for the calculated range
+// 3. Stores results in cache
+// 4. Records successful fetch metadata
+// 5. Falls back to cache on error
+// 6. Returns from cache (single source of truth)
 ```
 
 ---
@@ -593,13 +593,13 @@ public final class AppContainer {
     // Caching
     public let dataCache: DataCache
 
-    // Data Sources (cached wrappers)
-    public let typeQuickerDataSource: CachedTypeQuickerDataSource
-    public let atCoderDataSource: CachedAtCoderDataSource
-    public let healthKitSleepDataSource: CachedHealthKitSleepDataSource
+    // Data Sources (with optional caching)
+    public let typeQuickerDataSource: TypeQuickerDataSource
+    public let atCoderDataSource: AtCoderDataSource
+    public let healthKitSleepDataSource: HealthKitSleepDataSource
     public let tasksDataSource: TasksDataSource
-    public let ankiDataSource: CachedAnkiDataSource
-    public let zoteroDataSource: CachedZoteroDataSource
+    public let ankiDataSource: AnkiDataSource
+    public let zoteroDataSource: ZoteroDataSource
     public let geminiDataSource: GeminiDataSource  // For nutrition photo analysis
 
     // Caching Services
@@ -637,11 +637,10 @@ self.dataCache = DataCache(modelContainer: modelContainer)
 let localGoalRepo = SwiftDataGoalRepository(modelContainer: modelContainer)
 self.goalRepository = CloudBackedGoalRepository(local: localGoalRepo, syncQueue: cloudSyncQueue)
 
-// 4. Create cached data sources
-self.typeQuickerDataSource = CachedTypeQuickerDataSource(
-    remote: TypeQuickerDataSource(httpClient: httpClient),
-    cache: dataCache
-)
+// 4. Create data sources with caching enabled
+self.typeQuickerDataSource = TypeQuickerDataSource(cache: dataCache, httpClient: httpClient)
+self.ankiDataSource = AnkiDataSource(cache: dataCache)
+self.atCoderDataSource = AtCoderDataSource(cache: dataCache, httpClient: httpClient)
 
 // 5. Create use cases with dependencies
 self.syncDataSourcesUseCase = SyncDataSourcesUseCase(
@@ -702,13 +701,12 @@ public final class CloudBackedGoalRepository: GoalRepositoryProtocol {
 | Component | Isolation | Reason |
 |-----------|-----------|--------|
 | `DataCache` | Actor | Thread-safe cache operations |
-| `TypeQuickerDataSource` | Actor | Thread-safe HTTP operations |
-| `AtCoderDataSource` | Actor | Thread-safe HTTP operations |
-| `AnkiDataSource` | Actor | Thread-safe JSON-RPC operations |
-| `ZoteroDataSource` | Actor | Thread-safe HTTP operations |
-| `HealthKitSleepDataSource` | Actor | Thread-safe HealthKit operations |
+| `TypeQuickerDataSource` | Actor | Thread-safe HTTP + caching operations |
+| `AtCoderDataSource` | Actor | Thread-safe HTTP + caching operations |
+| `AnkiDataSource` | Actor | Thread-safe JSON-RPC + caching operations |
+| `ZoteroDataSource` | Actor | Thread-safe HTTP + caching operations |
+| `HealthKitSleepDataSource` | Actor | Thread-safe HealthKit + caching operations |
 | `GeminiDataSource` | Actor | Thread-safe AI API operations |
-| Cached wrappers | Actor | Inherits from wrapped source |
 | `CloudSyncQueue` | Actor | Thread-safe queue operations |
 
 ### @MainActor Isolation
@@ -746,7 +744,8 @@ public struct SyncDataSourcesUseCase: Sendable {
 | Category | Location |
 |----------|----------|
 | Data Sources | `GoalsKit/Sources/GoalsData/DataSources/` |
-| Cached Wrappers | `GoalsKit/Sources/GoalsData/DataSources/Cached/` |
+| CacheableDataSource | `GoalsKit/Sources/GoalsData/DataSources/CacheableDataSource.swift` |
+| IncrementalCacheableDataSource | `GoalsKit/Sources/GoalsData/DataSources/IncrementalCacheableDataSource.swift` |
 | DataCache | `GoalsKit/Sources/GoalsData/Caching/DataCache.swift` |
 | CacheableRecord | `GoalsKit/Sources/GoalsDomain/Caching/CacheableRecord.swift` |
 | Caching Strategies | `GoalsKit/Sources/GoalsData/Caching/Strategies/` |
