@@ -91,65 +91,11 @@ public final class TasksInsightsViewModel: InsightsSectionViewModel {
         dailySummaries.halfTrendPercentage { $0.totalDuration / 3600.0 }
     }
 
-    /// Summary data for the overview card
-    public var summary: InsightSummary? {
-        guard !sessions.isEmpty else { return nil }
+    // MARK: - Insight Data (delegated to provider)
 
-        // Fixed 7-day date range for consistent X-axis
-        let dateRange = DateRange.lastDays(10)
-        let calendar = Calendar.current
-
-        // Filter data to the date range (comparing start of day)
-        let rangeStart = calendar.startOfDay(for: dateRange.start)
-        let rangeEnd = calendar.startOfDay(for: dateRange.end)
-
-        let recentData = dailySummaries.filter { summary in
-            let day = calendar.startOfDay(for: summary.date)
-            return day >= rangeStart && day <= rangeEnd
-        }
-
-        let rangeDataPoints = recentData.map { summary in
-            summary.toDurationRangeDataPoint(referenceDate: referenceDate)
-        }
-
-        let durationRangeData = InsightDurationRangeData(
-            dataPoints: rangeDataPoints,
-            defaultColor: .orange,
-            dateRange: dateRange,
-            useSimpleHours: true
-        )
-
-        return InsightSummary(
-            title: "Tasks",
-            systemImage: "timer",
-            color: .orange,
-            durationRangeData: durationRangeData,
-            currentValueFormatted: formatHours(todayTotalHours),
-            trend: trackingTrend
-        )
-    }
-
-    /// Activity data for GitHub-style contribution chart
-    public var activityData: InsightActivityData? {
-        guard !sessions.isEmpty else { return nil }
-
-        // Use goal target or 4 hours as default "full" intensity reference
-        let targetHours = goals.targetValue(for: "dailyDuration").map { $0 / 60.0 } ?? 4.0
-
-        // Limit to last 90 entries for activity chart performance
-        let recentData = dailySummaries.suffix(90)
-        let days = recentData.map { summary in
-            let hours = summary.totalDuration / 3600.0
-            let intensity = min(hours / targetHours, 1.0)
-
-            return InsightActivityDay(
-                date: summary.date,
-                color: .orange,
-                intensity: intensity
-            )
-        }
-
-        return InsightActivityData(days: days, emptyColor: .gray.opacity(0.2))
+    /// Insight data built from current daily summaries
+    public var insight: InsightData {
+        TasksInsightProvider.build(from: dailySummaries, goals: goals, referenceDate: referenceDate)
     }
 
     /// Get the goal target for a specific metric

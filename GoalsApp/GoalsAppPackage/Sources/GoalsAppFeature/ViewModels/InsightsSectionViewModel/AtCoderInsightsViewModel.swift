@@ -58,12 +58,6 @@ public final class AtCoderInsightsViewModel: InsightsSectionViewModel {
         return dailyEffort.filter { $0.date >= cutoffDate }
     }
 
-    /// Summary data for the overview card
-    public var summary: InsightSummary? { insight.summary }
-
-    /// Activity data for GitHub-style contribution chart
-    public var activityData: InsightActivityData? { insight.activityData }
-
     /// Rebuild insight from current data
     private func rebuildInsight() {
         insight = AtCoderInsightProvider.build(from: contestHistory, dailyEffort: dailyEffort, goals: goals)

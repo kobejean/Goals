@@ -1,6 +1,9 @@
 import SwiftUI
 import GoalsWidgetShared
 
+/// Insight data tuple containing summary and activity data
+public typealias InsightData = (summary: InsightSummary?, activityData: InsightActivityData?)
+
 /// Protocol for insights section ViewModels
 /// Defines common interface for insight data providers
 @MainActor
@@ -14,11 +17,8 @@ public protocol InsightsSectionViewModel: AnyObject, Observable, Sendable {
     /// Static color for the insight (available before loading)
     var color: Color { get }
 
-    /// Summary data for the overview card
-    var summary: InsightSummary? { get }
-
-    /// Activity data for GitHub-style contribution chart
-    var activityData: InsightActivityData? { get }
+    /// Insight data containing summary and activity data
+    var insight: InsightData { get }
 
     /// Current fetch status for the insight data
     var fetchStatus: InsightFetchStatus { get }

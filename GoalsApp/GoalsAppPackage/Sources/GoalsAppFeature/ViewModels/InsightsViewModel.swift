@@ -130,8 +130,8 @@ public final class InsightsViewModel {
             title: viewModel.title,
             systemImage: viewModel.systemImage,
             color: viewModel.color,
-            summary: viewModel.summary,
-            activityData: viewModel.activityData,
+            summary: viewModel.insight.summary,
+            activityData: viewModel.insight.activityData,
             fetchStatus: viewModel.fetchStatus,
             makeDetailView: detailView
         )

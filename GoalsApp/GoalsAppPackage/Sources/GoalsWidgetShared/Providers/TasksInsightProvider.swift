@@ -18,9 +18,14 @@ public final class TasksInsightProvider: BaseInsightProvider<TaskDailySummary> {
     // MARK: - Build Logic (Public for ViewModel use)
 
     /// Build Tasks insight from daily summaries
+    /// - Parameters:
+    ///   - dailySummaries: The daily summary data to build from
+    ///   - goals: Optional goals for target values
+    ///   - referenceDate: Reference date for active session duration calculations (defaults to now)
     public static func build(
         from dailySummaries: [TaskDailySummary],
-        goals: [Goal] = []
+        goals: [Goal] = [],
+        referenceDate: Date = Date()
     ) -> (summary: InsightSummary?, activityData: InsightActivityData?) {
         guard !dailySummaries.isEmpty else { return (nil, nil) }
 
@@ -38,7 +43,7 @@ public final class TasksInsightProvider: BaseInsightProvider<TaskDailySummary> {
         }
 
         let rangeDataPoints = recentData.map { summary in
-            summary.toDurationRangeDataPoint()
+            summary.toDurationRangeDataPoint(referenceDate: referenceDate)
         }
 
         let durationRangeData = InsightDurationRangeData(
@@ -48,11 +53,11 @@ public final class TasksInsightProvider: BaseInsightProvider<TaskDailySummary> {
             useSimpleHours: true
         )
 
-        // Calculate today's hours
-        let today = calendar.startOfDay(for: Date())
+        // Calculate today's hours using referenceDate for active sessions
+        let today = calendar.startOfDay(for: referenceDate)
         let todayTotalHours = dailySummaries
             .filter { calendar.startOfDay(for: $0.date) == today }
-            .reduce(0.0) { $0 + $1.totalDuration / 3600.0 }
+            .reduce(0.0) { $0 + $1.totalDuration(at: referenceDate) / 3600.0 }
 
         let trend = InsightCalculations.calculateTrend(for: dailySummaries.map { $0.totalDuration / 3600.0 })
 

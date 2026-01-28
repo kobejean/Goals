@@ -70,12 +70,6 @@ public final class SleepInsightsViewModel: InsightsSectionViewModel {
         sleepData.halfTrendPercentage { $0.totalSleepHours }
     }
 
-    /// Summary data for the overview card
-    public var summary: InsightSummary? { insight.summary }
-
-    /// Activity data for GitHub-style contribution chart
-    public var activityData: InsightActivityData? { insight.activityData }
-
     /// Rebuild insight from current data
     private func rebuildInsight() {
         insight = SleepInsightProvider.build(from: sleepData, goals: goals)

@@ -80,12 +80,6 @@ public final class NutritionInsightsViewModel: InsightsSectionViewModel {
         dailySummaries.halfTrendPercentage { $0.totalNutrients.calories }
     }
 
-    /// Summary data for the overview card
-    public var summary: InsightSummary? { insight.summary }
-
-    /// Activity data for GitHub-style contribution chart
-    public var activityData: InsightActivityData? { insight.activityData }
-
     /// Rebuild insight from current data
     private func rebuildInsight() {
         insight = NutritionInsightProvider.build(from: dailySummaries)

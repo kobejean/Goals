@@ -81,12 +81,6 @@ public final class AnkiInsightsViewModel: InsightsSectionViewModel {
         }
     }
 
-    /// Summary data for the overview card
-    public var summary: InsightSummary? { insight.summary }
-
-    /// Activity data for GitHub-style contribution chart
-    public var activityData: InsightActivityData? { insight.activityData }
-
     /// Rebuild insight from current stats and goals
     private func rebuildInsight() {
         insight = AnkiInsightProvider.build(from: stats, goals: goals)
