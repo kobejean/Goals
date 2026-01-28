@@ -4,32 +4,15 @@ import GoalsDomain
 /// Protocol for data sources that support optional caching.
 /// Provides a unified interface for data sources that can work with or without a cache.
 ///
-/// **Design Goals:**
-/// - Single data source class handles both cached and non-cached scenarios
-/// - Caching logic is encapsulated in protocol extension helpers
-/// - Data sources can use `cachedFetch()` for standard patterns or custom logic for complex cases
+/// **Protocol Hierarchy:**
+/// - `CacheableDataSource` - Base protocol with cache helpers (for custom caching logic)
+/// - `IncrementalCacheableDataSource` - Standard pattern for immutable date-based data (recommended)
 ///
-/// **Usage:**
-/// ```swift
-/// public actor MyDataSource: MyDataSourceProtocol, CacheableDataSource {
-///     public let cache: DataCache?
-///     private let strategy = DateBasedStrategy(strategyKey: "my.stats", volatileWindowDays: 1)
-///
-///     public init() { self.cache = nil }  // For testing
-///     public init(cache: DataCache) { self.cache = cache }  // For production
-///
-///     public func fetchData(from: Date, to: Date) async throws -> [MyData] {
-///         try await cachedFetch(
-///             strategy: strategy,
-///             fetcher: fetchFromRemote,
-///             from: from, to: to
-///         )
-///     }
-/// }
-/// ```
-///
-/// For data sources with custom caching logic (e.g., count-based validation, version-based sync),
-/// use the individual helpers (`fetchCached`, `storeInCache`, etc.) instead of `cachedFetch()`.
+/// **When to use which:**
+/// - **IncrementalCacheableDataSource**: For immutable historical data (TypeQuicker, Anki, HealthKit Sleep).
+///   Just provide `cacheStrategyKey` and call `cachedFetch(fetcher:from:to:)`.
+/// - **CacheableDataSource**: For custom caching logic (count-based validation, version-based sync).
+///   Use individual helpers (`fetchCached`, `storeInCache`, etc.).
 public protocol CacheableDataSource: DataSourceRepositoryProtocol {
     /// The cache to use for storing and retrieving data.
     /// When nil, data source operates without caching.
@@ -39,7 +22,7 @@ public protocol CacheableDataSource: DataSourceRepositoryProtocol {
 // MARK: - Cached Fetch Helper
 
 public extension CacheableDataSource {
-    /// Performs a cached fetch operation with the standard pattern:
+    /// Performs a cached fetch operation with a custom strategy:
     /// 1. Calculate fetch range based on strategy
     /// 2. Fetch from remote
     /// 3. Store results in cache
@@ -48,6 +31,7 @@ public extension CacheableDataSource {
     /// 6. Return from cache (single source of truth)
     ///
     /// - Parameters:
+    ///   - strategy: The incremental fetch strategy to use
     ///   - fetcher: Function to fetch data from remote
     ///   - from: Start date of requested range
     ///   - to: End date of requested range
@@ -142,7 +126,7 @@ public extension CacheableDataSource {
 
 public extension CacheableDataSource {
     /// Calculate the fetch range based on the incremental strategy and stored metadata.
-    /// If no strategy is configured, returns the requested range unchanged.
+    /// If no cache is configured, returns the requested range unchanged.
     func calculateIncrementalFetchRange<S: IncrementalFetchStrategy>(
         strategy: S,
         for requested: (start: Date, end: Date)

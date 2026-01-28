@@ -3,7 +3,7 @@ import GoalsDomain
 
 /// Data source implementation for TypeQuicker typing statistics.
 /// Supports optional caching via DataCache - uses DateBasedStrategy since typing stats are immutable.
-public actor TypeQuickerDataSource: TypeQuickerDataSourceProtocol, CacheableDataSource {
+public actor TypeQuickerDataSource: TypeQuickerDataSourceProtocol, IncrementalCacheableDataSource {
     public let dataSourceType: DataSourceType = .typeQuicker
 
     public nonisolated var availableMetrics: [MetricInfo] {
@@ -24,13 +24,10 @@ public actor TypeQuickerDataSource: TypeQuickerDataSourceProtocol, CacheableData
         }
     }
 
-    // MARK: - CacheableDataSource
+    // MARK: - IncrementalCacheableDataSource
 
     public let cache: DataCache?
-
-    /// Strategy for incremental fetching.
-    /// TypeQuicker stats are immutable once recorded, so we only need to fetch recent data.
-    private let strategy = DateBasedStrategy(strategyKey: "typeQuicker.stats", volatileWindowDays: 1)
+    public nonisolated let cacheStrategyKey = "typeQuicker.stats"
 
     // MARK: - Configuration
 
@@ -78,13 +75,7 @@ public actor TypeQuickerDataSource: TypeQuickerDataSourceProtocol, CacheableData
     }
 
     public func fetchStats(from startDate: Date, to endDate: Date) async throws -> [TypeQuickerStats] {
-        // Use cached fetch if caching is enabled
-        try await cachedFetch(
-            strategy: strategy,
-            fetcher: fetchStatsFromRemote,
-            from: startDate,
-            to: endDate
-        )
+        try await cachedFetch(fetcher: fetchStatsFromRemote, from: startDate, to: endDate)
     }
 
     /// Internal method that fetches stats directly from TypeQuicker API.

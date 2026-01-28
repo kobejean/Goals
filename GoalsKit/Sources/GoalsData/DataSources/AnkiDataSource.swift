@@ -3,7 +3,7 @@ import GoalsDomain
 
 /// Data source implementation for Anki learning statistics via AnkiConnect.
 /// Supports optional caching via DataCache - uses DateBasedStrategy since review stats are immutable.
-public actor AnkiDataSource: AnkiDataSourceProtocol, CacheableDataSource {
+public actor AnkiDataSource: AnkiDataSourceProtocol, IncrementalCacheableDataSource {
     public let dataSourceType: DataSourceType = .anki
 
     public nonisolated var availableMetrics: [MetricInfo] {
@@ -26,13 +26,10 @@ public actor AnkiDataSource: AnkiDataSourceProtocol, CacheableDataSource {
         }
     }
 
-    // MARK: - CacheableDataSource
+    // MARK: - IncrementalCacheableDataSource
 
     public let cache: DataCache?
-
-    /// Strategy for incremental fetching.
-    /// Anki review stats are immutable once recorded, so we only need to fetch recent data.
-    private let strategy = DateBasedStrategy(strategyKey: "anki.dailyStats", volatileWindowDays: 1)
+    public nonisolated let cacheStrategyKey = "anki.dailyStats"
 
     // MARK: - Configuration
 
@@ -109,13 +106,7 @@ public actor AnkiDataSource: AnkiDataSourceProtocol, CacheableDataSource {
     // MARK: - AnkiDataSourceProtocol
 
     public func fetchDailyStats(from startDate: Date, to endDate: Date) async throws -> [AnkiDailyStats] {
-        // Use cached fetch if caching is enabled
-        try await cachedFetch(
-            strategy: strategy,
-            fetcher: fetchDailyStatsFromRemote,
-            from: startDate,
-            to: endDate
-        )
+        try await cachedFetch(fetcher: fetchDailyStatsFromRemote, from: startDate, to: endDate)
     }
 
     /// Internal method that fetches stats directly from AnkiConnect.

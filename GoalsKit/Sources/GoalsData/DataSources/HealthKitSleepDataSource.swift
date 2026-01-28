@@ -4,7 +4,7 @@ import GoalsDomain
 
 /// Data source implementation for HealthKit sleep data.
 /// Supports optional caching via DataCache - uses DateBasedStrategy since sleep records are immutable.
-public actor HealthKitSleepDataSource: HealthKitSleepDataSourceProtocol, CacheableDataSource {
+public actor HealthKitSleepDataSource: HealthKitSleepDataSourceProtocol, IncrementalCacheableDataSource {
     public let dataSourceType: DataSourceType = .healthKitSleep
 
     public nonisolated var availableMetrics: [MetricInfo] {
@@ -33,13 +33,10 @@ public actor HealthKitSleepDataSource: HealthKitSleepDataSourceProtocol, Cacheab
         }
     }
 
-    // MARK: - CacheableDataSource
+    // MARK: - IncrementalCacheableDataSource
 
     public let cache: DataCache?
-
-    /// Strategy for incremental fetching.
-    /// Sleep records are immutable once recorded, so we only need to fetch recent data.
-    private let strategy = DateBasedStrategy(strategyKey: "healthkit.sleep", volatileWindowDays: 1)
+    public nonisolated let cacheStrategyKey = "healthkit.sleep"
 
     // MARK: - Configuration
 
@@ -111,13 +108,7 @@ public actor HealthKitSleepDataSource: HealthKitSleepDataSourceProtocol, Cacheab
     }
 
     public func fetchSleepData(from startDate: Date, to endDate: Date) async throws -> [SleepDailySummary] {
-        // Use cached fetch if caching is enabled
-        try await cachedFetch(
-            strategy: strategy,
-            fetcher: fetchSleepDataFromHealthKit,
-            from: startDate,
-            to: endDate
-        )
+        try await cachedFetch(fetcher: fetchSleepDataFromHealthKit, from: startDate, to: endDate)
     }
 
     /// Internal method that fetches sleep data directly from HealthKit.
