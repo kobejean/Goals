@@ -383,7 +383,9 @@ public actor AtCoderDataSource: AtCoderDataSourceProtocol, CacheableDataSource {
 
     private func buildSubmissionsURL(username: String, fromSecond: Int) throws -> URL {
         let url = kenkooooBaseURL.appendingPathComponent("user/submissions")
-        var components = URLComponents(url: url, resolvingAgainstBaseURL: false)!
+        guard var components = URLComponents(url: url, resolvingAgainstBaseURL: false) else {
+            throw DataSourceError.invalidURL
+        }
         components.queryItems = [
             URLQueryItem(name: "user", value: username),
             URLQueryItem(name: "from_second", value: String(fromSecond))
@@ -398,7 +400,9 @@ public actor AtCoderDataSource: AtCoderDataSourceProtocol, CacheableDataSource {
 
     private func buildSubmissionCountURL(username: String, fromSecond: Int, toSecond: Int) throws -> URL {
         let url = kenkooooBaseURL.appendingPathComponent("user/submission_count")
-        var components = URLComponents(url: url, resolvingAgainstBaseURL: false)!
+        guard var components = URLComponents(url: url, resolvingAgainstBaseURL: false) else {
+            throw DataSourceError.invalidURL
+        }
         components.queryItems = [
             URLQueryItem(name: "user", value: username),
             URLQueryItem(name: "from_second", value: String(fromSecond)),
@@ -414,7 +418,9 @@ public actor AtCoderDataSource: AtCoderDataSourceProtocol, CacheableDataSource {
 
     private func buildKenkooooURL(path: String, username: String) throws -> URL {
         let url = kenkooooBaseURL.appendingPathComponent(path)
-        var components = URLComponents(url: url, resolvingAgainstBaseURL: false)!
+        guard var components = URLComponents(url: url, resolvingAgainstBaseURL: false) else {
+            throw DataSourceError.invalidURL
+        }
         components.queryItems = [URLQueryItem(name: "user", value: username)]
 
         guard let requestURL = components.url else {

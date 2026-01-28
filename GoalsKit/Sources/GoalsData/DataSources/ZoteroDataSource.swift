@@ -168,11 +168,7 @@ public actor ZoteroDataSource: ZoteroDataSourceProtocol, CacheableDataSource {
         }
 
         // Fetch fresh reading status first so we have today's snapshot for progress calculation
-        let freshStatus = try? await fetchReadingStatus()
-        let dateFormatter = DateFormatter()
-        dateFormatter.dateFormat = "yyyy-MM-dd HH:mm:ss"
-        print("[Zotero] Fresh reading status fetched: \(freshStatus != nil ? dateFormatter.string(from: freshStatus!.date) : "nil")")
-        print("[Zotero] Query date range: \(dateFormatter.string(from: startDate)) to \(dateFormatter.string(from: endDate))")
+        _ = try? await fetchReadingStatus()
 
         // Compute reading progress scores from reading status snapshots and merge into stats
         let statsFromCache = try await fetchCached(ZoteroDailyStats.self, from: startDate, to: endDate)
@@ -310,33 +306,16 @@ public actor ZoteroDataSource: ZoteroDataSourceProtocol, CacheableDataSource {
     /// Returns the change in reading progress from the previous day (delta).
     /// Score formula: toRead×0.25 + inProgress×0.5 + read×1.0
     private func computeReadingProgressScores(from startDate: Date, to endDate: Date) async throws -> [Date: Double] {
-        // First log all cached snapshots (without date filter)
-        let allSnapshots = try await fetchCached(ZoteroReadingStatus.self)
-        let dateFormatter = DateFormatter()
-        dateFormatter.dateFormat = "yyyy-MM-dd HH:mm:ss"
-        print("[Zotero] All cached reading status snapshots: \(allSnapshots.count)")
-        for snapshot in allSnapshots.sorted(by: { $0.date < $1.date }) {
-            print("[Zotero]   - \(dateFormatter.string(from: snapshot.date))")
-        }
-
         let snapshots = try await fetchCached(ZoteroReadingStatus.self, from: startDate, to: endDate)
         guard !snapshots.isEmpty else {
-            print("[Zotero] No reading status snapshots found in date range")
             return [:]
         }
 
         let calendar = Calendar.current
-        dateFormatter.dateFormat = "yyyy-MM-dd"
-
         var scores: [Date: Double] = [:]
 
         // Sort snapshots by date to compute deltas
         let sortedSnapshots = snapshots.sorted { $0.date < $1.date }
-
-        print("[Zotero] === Raw Daily Snapshot Data ===")
-        for snapshot in sortedSnapshots {
-            print("[Zotero] \(dateFormatter.string(from: snapshot.date)): toRead=\(snapshot.toReadCount), inProgress=\(snapshot.inProgressCount), read=\(snapshot.readCount)")
-        }
 
         // Compute absolute score for each snapshot
         func absoluteScore(for snapshot: ZoteroReadingStatus) -> Double {
@@ -347,7 +326,6 @@ public actor ZoteroDataSource: ZoteroDataSourceProtocol, CacheableDataSource {
 
         var previousScore: Double? = nil
 
-        print("[Zotero] === Reading Progress Score Calculation ===")
         for snapshot in sortedSnapshots {
             let day = calendar.startOfDay(for: snapshot.date)
             let currentScore = absoluteScore(for: snapshot)
@@ -357,9 +335,7 @@ public actor ZoteroDataSource: ZoteroDataSourceProtocol, CacheableDataSource {
             let prevScore = previousScore ?? 0
             let delta = currentScore - prevScore
             // Only record positive deltas (progress), ignore negative (items removed)
-            let finalDelta = max(0, delta)
-            scores[day] = finalDelta
-            print("[Zotero] \(dateFormatter.string(from: day)): absoluteScore=\(currentScore), prevScore=\(prevScore), delta=\(delta), finalDelta=\(finalDelta)")
+            scores[day] = max(0, delta)
 
             previousScore = currentScore
         }
@@ -459,7 +435,9 @@ public actor ZoteroDataSource: ZoteroDataSourceProtocol, CacheableDataSource {
         return url
     }
 
-    private func performRequest<T: Decodable>(url: URL, apiKey: String) async throws -> T {
+    /// Executes an HTTP request with Zotero API headers and handles rate limiting.
+    /// Returns raw data and the HTTP response for further processing.
+    private func executeRequest(url: URL, apiKey: String) async throws -> (data: Data, response: HTTPURLResponse) {
         var request = URLRequest(url: url)
         request.setValue(apiKey, forHTTPHeaderField: "Zotero-API-Key")
         request.setValue("3", forHTTPHeaderField: "Zotero-API-Version")
@@ -470,39 +448,14 @@ public actor ZoteroDataSource: ZoteroDataSourceProtocol, CacheableDataSource {
             throw DataSourceError.invalidResponse
         }
 
-        // Handle rate limiting
+        // Handle rate limiting with automatic retry
         if httpResponse.statusCode == 429 {
             let backoffSeconds = Int(httpResponse.value(forHTTPHeaderField: "Backoff") ?? "5") ?? 5
             try await Task.sleep(for: .seconds(backoffSeconds))
-            return try await performRequest(url: url, apiKey: apiKey)
+            return try await executeRequest(url: url, apiKey: apiKey)
         }
 
-        guard (200...299).contains(httpResponse.statusCode) else {
-            throw DataSourceError.httpError(statusCode: httpResponse.statusCode)
-        }
-
-        return try JSONDecoder().decode(T.self, from: data)
-    }
-
-    private func performRequestWithTotalCount(url: URL, apiKey: String) async throws -> (data: Data, totalResults: Int, libraryVersion: Int) {
-        var request = URLRequest(url: url)
-        request.setValue(apiKey, forHTTPHeaderField: "Zotero-API-Key")
-        request.setValue("3", forHTTPHeaderField: "Zotero-API-Version")
-
-        let (data, response) = try await urlSession.data(for: request)
-
-        guard let httpResponse = response as? HTTPURLResponse else {
-            throw DataSourceError.invalidResponse
-        }
-
-        // Handle rate limiting
-        if httpResponse.statusCode == 429 {
-            let backoffSeconds = Int(httpResponse.value(forHTTPHeaderField: "Backoff") ?? "5") ?? 5
-            try await Task.sleep(for: .seconds(backoffSeconds))
-            return try await performRequestWithTotalCount(url: url, apiKey: apiKey)
-        }
-
-        // Handle authentication errors specifically
+        // Handle authentication errors
         if httpResponse.statusCode == 401 || httpResponse.statusCode == 403 {
             throw DataSourceError.unauthorized
         }
@@ -511,9 +464,18 @@ public actor ZoteroDataSource: ZoteroDataSourceProtocol, CacheableDataSource {
             throw DataSourceError.httpError(statusCode: httpResponse.statusCode)
         }
 
+        return (data, httpResponse)
+    }
+
+    private func performRequest<T: Decodable>(url: URL, apiKey: String) async throws -> T {
+        let (data, _) = try await executeRequest(url: url, apiKey: apiKey)
+        return try JSONDecoder().decode(T.self, from: data)
+    }
+
+    private func performRequestWithTotalCount(url: URL, apiKey: String) async throws -> (data: Data, totalResults: Int, libraryVersion: Int) {
+        let (data, httpResponse) = try await executeRequest(url: url, apiKey: apiKey)
         let totalResults = Int(httpResponse.value(forHTTPHeaderField: "Total-Results") ?? "0") ?? 0
         let libraryVersion = Int(httpResponse.value(forHTTPHeaderField: "Last-Modified-Version") ?? "0") ?? 0
-
         return (data, totalResults, libraryVersion)
     }
 
@@ -529,6 +491,8 @@ public actor ZoteroDataSource: ZoteroDataSourceProtocol, CacheableDataSource {
         var latestLibraryVersion = 0
 
         while true {
+            try Task.checkCancellation()
+
             var queryItems = [
                 URLQueryItem(name: "itemType", value: "annotation"),
                 URLQueryItem(name: "sort", value: "dateAdded"),
@@ -583,6 +547,8 @@ public actor ZoteroDataSource: ZoteroDataSourceProtocol, CacheableDataSource {
         var latestLibraryVersion = 0
 
         while true {
+            try Task.checkCancellation()
+
             var queryItems = [
                 URLQueryItem(name: "itemType", value: "note"),
                 URLQueryItem(name: "sort", value: "dateAdded"),

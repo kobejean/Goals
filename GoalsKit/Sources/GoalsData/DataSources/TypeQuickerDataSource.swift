@@ -6,6 +6,13 @@ import GoalsDomain
 public actor TypeQuickerDataSource: TypeQuickerDataSourceProtocol, IncrementalCacheableDataSource {
     public let dataSourceType: DataSourceType = .typeQuicker
 
+    /// Cached date formatter for day strings (yyyy-MM-dd).
+    private nonisolated static let dayFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyy-MM-dd"
+        return formatter
+    }()
+
     public nonisolated var availableMetrics: [MetricInfo] {
         [
             MetricInfo(key: "wpm", name: "Average WPM", unit: "WPM", icon: "speedometer"),
@@ -93,13 +100,12 @@ public actor TypeQuickerDataSource: TypeQuickerDataSourceProtocol, IncrementalCa
         }
 
         let base = baseURL ?? URL(string: "https://api.typequicker.com")!
-        let dateFormatter = DateFormatter()
-        dateFormatter.dateFormat = "yyyy-MM-dd"
-
-        var components = URLComponents(url: base.appendingPathComponent("stats/\(username)"), resolvingAgainstBaseURL: false)!
+        guard var components = URLComponents(url: base.appendingPathComponent("stats/\(username)"), resolvingAgainstBaseURL: false) else {
+            throw DataSourceError.invalidURL
+        }
         components.queryItems = [
-            URLQueryItem(name: "start_date", value: dateFormatter.string(from: startDate)),
-            URLQueryItem(name: "end_date", value: dateFormatter.string(from: endDate))
+            URLQueryItem(name: "start_date", value: Self.dayFormatter.string(from: startDate)),
+            URLQueryItem(name: "end_date", value: Self.dayFormatter.string(from: endDate))
         ]
 
         guard let url = components.url else {
@@ -172,6 +178,13 @@ public actor TypeQuickerDataSource: TypeQuickerDataSourceProtocol, IncrementalCa
 private struct TypeQuickerAPIResponse: Codable {
     let activity: [String: [Session]]?
 
+    /// Cached date formatter for day strings (yyyy-MM-dd).
+    private static let dayFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyy-MM-dd"
+        return formatter
+    }()
+
     // Handle empty responses gracefully
     var safeActivity: [String: [Session]] {
         activity ?? [:]
@@ -189,37 +202,36 @@ private struct TypeQuickerAPIResponse: Codable {
         let keyboardLayout: String
     }
 
-    func toStats() -> [TypeQuickerStats] {
-        let dateFormatter = DateFormatter()
-        dateFormatter.dateFormat = "yyyy-MM-dd"
+    /// Computes time-weighted averages for WPM and accuracy from sessions.
+    private static func computeWeightedAverages(sessions: [Session]) -> (wpm: Double, accuracy: Double, totalTimeMs: Int) {
+        guard !sessions.isEmpty else { return (0, 0, 0) }
 
+        let totalTimeMs = sessions.reduce(0) { $0 + $1.timeTyping }
+        guard totalTimeMs > 0 else { return (0, 0, 0) }
+
+        let weightedWpm = sessions.reduce(0.0) { acc, session in
+            acc + session.wpm * Double(session.timeTyping) / Double(totalTimeMs)
+        }
+        let weightedAccuracy = sessions.reduce(0.0) { acc, session in
+            acc + session.trueAccuracy * Double(session.timeTyping) / Double(totalTimeMs)
+        }
+
+        return (weightedWpm, weightedAccuracy, totalTimeMs)
+    }
+
+    func toStats() -> [TypeQuickerStats] {
         return safeActivity.compactMap { (dateString, sessions) -> TypeQuickerStats? in
-            guard let date = dateFormatter.date(from: dateString), !sessions.isEmpty else {
+            guard let date = Self.dayFormatter.date(from: dateString), !sessions.isEmpty else {
                 return nil
             }
 
-            // Aggregate all sessions for the day
-            let totalTimeMs = sessions.reduce(0) { $0 + $1.timeTyping }
-
-            // Weighted average WPM based on time spent
-            let weightedWpm = sessions.reduce(0.0) { acc, session in
-                let weight = Double(session.timeTyping) / Double(max(totalTimeMs, 1))
-                return acc + (session.wpm * weight)
-            }
-
-            // Weighted average accuracy
-            let weightedAccuracy = sessions.reduce(0.0) { acc, session in
-                let weight = Double(session.timeTyping) / Double(max(totalTimeMs, 1))
-                return acc + (session.trueAccuracy * weight)
-            }
-
-            // Group by mode for this day
+            let (wpm, accuracy, totalTimeMs) = Self.computeWeightedAverages(sessions: sessions)
             let modeStats = aggregateByMode(sessions: sessions)
 
             return TypeQuickerStats(
                 date: date,
-                wordsPerMinute: weightedWpm,
-                accuracy: weightedAccuracy,
+                wordsPerMinute: wpm,
+                accuracy: accuracy,
                 practiceTimeMinutes: totalTimeMs / 60000, // ms to minutes
                 sessionsCount: sessions.count,
                 byMode: modeStats.isEmpty ? nil : modeStats
@@ -240,24 +252,12 @@ private struct TypeQuickerAPIResponse: Codable {
         return grouped.compactMap { (mode, modeSessions) -> TypeQuickerModeStats? in
             guard !modeSessions.isEmpty else { return nil }
 
-            let totalTimeMs = modeSessions.reduce(0) { $0 + $1.timeTyping }
-
-            // Weighted average WPM
-            let weightedWpm = modeSessions.reduce(0.0) { acc, session in
-                let weight = Double(session.timeTyping) / Double(max(totalTimeMs, 1))
-                return acc + (session.wpm * weight)
-            }
-
-            // Weighted average accuracy
-            let weightedAccuracy = modeSessions.reduce(0.0) { acc, session in
-                let weight = Double(session.timeTyping) / Double(max(totalTimeMs, 1))
-                return acc + (session.trueAccuracy * weight)
-            }
+            let (wpm, accuracy, totalTimeMs) = Self.computeWeightedAverages(sessions: modeSessions)
 
             return TypeQuickerModeStats(
                 mode: mode,
-                wordsPerMinute: weightedWpm,
-                accuracy: weightedAccuracy,
+                wordsPerMinute: wpm,
+                accuracy: accuracy,
                 practiceTimeMinutes: totalTimeMs / 60000,
                 sessionsCount: modeSessions.count
             )

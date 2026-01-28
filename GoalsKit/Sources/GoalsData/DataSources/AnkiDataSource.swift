@@ -253,27 +253,9 @@ public actor AnkiDataSource: AnkiDataSourceProtocol, IncrementalCacheableDataSou
             return []
         }
 
-        // Parse card reviews: each review is [reviewTime, cardID, usn, buttonPressed, newInterval, previousInterval, newFactor, reviewDuration, reviewType]
+        // Parse card reviews using AnkiConnect's cardReviews response format
         return result.compactMap { review -> AnkiCardReview? in
-            guard review.count >= 9 else {
-                return nil
-            }
-
-            let reviewTimeMs = review[0]
-            let buttonPressed = review[3]
-            let reviewDurationMs = review[7]
-            let reviewType = review[8]
-
-            let reviewDate = Date(timeIntervalSince1970: Double(reviewTimeMs) / 1000.0)
-            let isCorrect = buttonPressed >= 2 // Button 2+ means "Good" or better
-            let isNewCard = reviewType == 0 // reviewType 0 = learning/new
-
-            return AnkiCardReview(
-                date: reviewDate,
-                durationSeconds: reviewDurationMs / 1000,
-                isCorrect: isCorrect,
-                isNewCard: isNewCard
-            )
+            AnkiReviewParser.parse(review)
         }
     }
 
@@ -365,4 +347,44 @@ private struct AnkiCardReview {
     let durationSeconds: Int
     let isCorrect: Bool
     let isNewCard: Bool
+}
+
+/// Parser for AnkiConnect's cardReviews response format.
+/// Each review is an array: [reviewTime, cardID, usn, buttonPressed, newInterval, previousInterval, newFactor, reviewDuration, reviewType]
+private enum AnkiReviewParser {
+    // Array indices for cardReviews response
+    private enum Index {
+        static let reviewTimeMs = 0
+        static let buttonPressed = 3
+        static let reviewDurationMs = 7
+        static let reviewType = 8
+    }
+
+    // Review type constants
+    private enum ReviewType {
+        static let learning = 0 // New/learning cards
+    }
+
+    // Button press thresholds
+    private enum Button {
+        static let goodOrBetter = 2 // Button 2+ means "Good" or better (correct)
+    }
+
+    static let requiredFieldCount = 9
+
+    static func parse(_ review: [Int]) -> AnkiCardReview? {
+        guard review.count >= requiredFieldCount else { return nil }
+
+        let reviewTimeMs = review[Index.reviewTimeMs]
+        let buttonPressed = review[Index.buttonPressed]
+        let reviewDurationMs = review[Index.reviewDurationMs]
+        let reviewType = review[Index.reviewType]
+
+        return AnkiCardReview(
+            date: Date(timeIntervalSince1970: Double(reviewTimeMs) / 1000.0),
+            durationSeconds: reviewDurationMs / 1000,
+            isCorrect: buttonPressed >= Button.goodOrBetter,
+            isNewCard: reviewType == ReviewType.learning
+        )
+    }
 }
