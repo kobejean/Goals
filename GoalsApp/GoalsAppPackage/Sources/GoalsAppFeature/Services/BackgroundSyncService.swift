@@ -10,10 +10,10 @@ import GoalsWidgetShared
 public final class BackgroundSyncService: Sendable {
     private let dataCache: DataCache
     private let httpClient: HTTPClient
-    private let typeQuickerDataSource: CachedTypeQuickerDataSource
-    private let atCoderDataSource: CachedAtCoderDataSource
-    private let ankiDataSource: CachedAnkiDataSource
-    private let healthKitSleepDataSource: CachedHealthKitSleepDataSource
+    private let typeQuickerDataSource: TypeQuickerDataSource
+    private let atCoderDataSource: AtCoderDataSource
+    private let ankiDataSource: AnkiDataSource
+    private let healthKitSleepDataSource: HealthKitSleepDataSource
 
     /// Creates a BackgroundSyncService with its own dependencies
     /// Uses the shared App Group container with unified schema
@@ -45,23 +45,11 @@ public final class BackgroundSyncService: Sendable {
         self.dataCache = DataCache(modelContainer: container)
         self.httpClient = HTTPClient()
 
-        // Create data sources with caching
-        self.typeQuickerDataSource = CachedTypeQuickerDataSource(
-            remote: TypeQuickerDataSource(httpClient: httpClient),
-            cache: dataCache
-        )
-        self.atCoderDataSource = CachedAtCoderDataSource(
-            remote: AtCoderDataSource(httpClient: httpClient),
-            cache: dataCache
-        )
-        self.ankiDataSource = CachedAnkiDataSource(
-            remote: AnkiDataSource(),
-            cache: dataCache
-        )
-        self.healthKitSleepDataSource = CachedHealthKitSleepDataSource(
-            remote: HealthKitSleepDataSource(),
-            cache: dataCache
-        )
+        // Create data sources with caching enabled
+        self.typeQuickerDataSource = TypeQuickerDataSource(cache: dataCache, httpClient: httpClient)
+        self.atCoderDataSource = AtCoderDataSource(cache: dataCache, httpClient: httpClient)
+        self.ankiDataSource = AnkiDataSource(cache: dataCache)
+        self.healthKitSleepDataSource = HealthKitSleepDataSource(cache: dataCache)
     }
 
     /// Performs the background sync operation

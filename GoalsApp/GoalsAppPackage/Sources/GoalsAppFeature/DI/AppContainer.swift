@@ -150,12 +150,12 @@ public final class AppContainer {
 
     // MARK: - Data Sources
 
-    public let typeQuickerDataSource: CachedTypeQuickerDataSource
-    public let atCoderDataSource: CachedAtCoderDataSource
-    public let healthKitSleepDataSource: CachedHealthKitSleepDataSource
+    public let typeQuickerDataSource: TypeQuickerDataSource
+    public let atCoderDataSource: AtCoderDataSource
+    public let healthKitSleepDataSource: HealthKitSleepDataSource
     public let tasksDataSource: TasksDataSource
-    public let ankiDataSource: CachedAnkiDataSource
-    public let zoteroDataSource: CachedZoteroDataSource
+    public let ankiDataSource: AnkiDataSource
+    public let zoteroDataSource: ZoteroDataSource
     public let geminiDataSource: GeminiDataSource
 
     // MARK: - Caching Services
@@ -258,28 +258,13 @@ public final class AppContainer {
         // Initialize networking
         self.httpClient = HTTPClient()
 
-        // Initialize data sources with caching
-        self.typeQuickerDataSource = CachedTypeQuickerDataSource(
-            remote: TypeQuickerDataSource(httpClient: httpClient),
-            cache: dataCache
-        )
-        self.atCoderDataSource = CachedAtCoderDataSource(
-            remote: AtCoderDataSource(httpClient: httpClient),
-            cache: dataCache
-        )
-        self.healthKitSleepDataSource = CachedHealthKitSleepDataSource(
-            remote: HealthKitSleepDataSource(),
-            cache: dataCache
-        )
+        // Initialize data sources with caching enabled
+        self.typeQuickerDataSource = TypeQuickerDataSource(cache: dataCache, httpClient: httpClient)
+        self.atCoderDataSource = AtCoderDataSource(cache: dataCache, httpClient: httpClient)
+        self.healthKitSleepDataSource = HealthKitSleepDataSource(cache: dataCache)
         self.tasksDataSource = TasksDataSource(taskRepository: taskRepository)
-        self.ankiDataSource = CachedAnkiDataSource(
-            remote: AnkiDataSource(),
-            cache: dataCache
-        )
-        self.zoteroDataSource = CachedZoteroDataSource(
-            remote: ZoteroDataSource(),
-            cache: dataCache
-        )
+        self.ankiDataSource = AnkiDataSource(cache: dataCache)
+        self.zoteroDataSource = ZoteroDataSource(cache: dataCache)
         self.geminiDataSource = GeminiDataSource()
 
         // Initialize caching services

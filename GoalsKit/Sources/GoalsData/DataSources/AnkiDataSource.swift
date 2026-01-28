@@ -1,8 +1,9 @@
 import Foundation
 import GoalsDomain
 
-/// Data source implementation for Anki learning statistics via AnkiConnect
-public actor AnkiDataSource: AnkiDataSourceProtocol {
+/// Data source implementation for Anki learning statistics via AnkiConnect.
+/// Supports optional caching via DataCache - uses DateBasedStrategy since review stats are immutable.
+public actor AnkiDataSource: AnkiDataSourceProtocol, CacheableDataSource {
     public let dataSourceType: DataSourceType = .anki
 
     public nonisolated var availableMetrics: [MetricInfo] {
@@ -25,23 +26,48 @@ public actor AnkiDataSource: AnkiDataSourceProtocol {
         }
     }
 
+    // MARK: - CacheableDataSource
+
+    public let cache: DataCache?
+
+    /// Strategy for incremental fetching.
+    /// Anki review stats are immutable once recorded, so we only need to fetch recent data.
+    public nonisolated var incrementalStrategy: (any IncrementalFetchStrategy)? {
+        cache != nil ? DateBasedStrategy(strategyKey: "anki.dailyStats", volatileWindowDays: 1) : nil
+    }
+
+    private let dateBasedStrategy = DateBasedStrategy(strategyKey: "anki.dailyStats", volatileWindowDays: 1)
+
+    // MARK: - Configuration
+
     private var host: String?
     private var port: Int?
     private var selectedDecks: [String]?
     private let urlSession: URLSession
 
+    /// Creates an AnkiDataSource without caching (for testing).
     public init(urlSession: URLSession? = nil) {
-        if let urlSession = urlSession {
-            self.urlSession = urlSession
-        } else {
-            // Use ephemeral config to avoid connection pooling issues with AnkiConnect
-            // AnkiConnect is single-threaded and doesn't handle connection reuse well
-            let config = URLSessionConfiguration.ephemeral
-            config.httpMaximumConnectionsPerHost = 1
-            config.timeoutIntervalForRequest = 30
-            config.timeoutIntervalForResource = 60
-            self.urlSession = URLSession(configuration: config)
+        self.cache = nil
+        self.urlSession = Self.createURLSession(urlSession)
+    }
+
+    /// Creates an AnkiDataSource with caching enabled (for production).
+    public init(cache: DataCache, urlSession: URLSession? = nil) {
+        self.cache = cache
+        self.urlSession = Self.createURLSession(urlSession)
+    }
+
+    private static func createURLSession(_ provided: URLSession?) -> URLSession {
+        if let provided = provided {
+            return provided
         }
+        // Use ephemeral config to avoid connection pooling issues with AnkiConnect
+        // AnkiConnect is single-threaded and doesn't handle connection reuse well
+        let config = URLSessionConfiguration.ephemeral
+        config.httpMaximumConnectionsPerHost = 1
+        config.timeoutIntervalForRequest = 30
+        config.timeoutIntervalForResource = 60
+        return URLSession(configuration: config)
     }
 
     public func isConfigured() async -> Bool {
@@ -87,6 +113,17 @@ public actor AnkiDataSource: AnkiDataSourceProtocol {
     // MARK: - AnkiDataSourceProtocol
 
     public func fetchDailyStats(from startDate: Date, to endDate: Date) async throws -> [AnkiDailyStats] {
+        // Use cached fetch if caching is enabled
+        try await cachedFetch(
+            strategy: dateBasedStrategy,
+            fetcher: fetchDailyStatsFromRemote,
+            from: startDate,
+            to: endDate
+        )
+    }
+
+    /// Internal method that fetches stats directly from AnkiConnect.
+    private func fetchDailyStatsFromRemote(from startDate: Date, to endDate: Date) async throws -> [AnkiDailyStats] {
         // Check for cancellation immediately - avoid any work if already cancelled
         try Task.checkCancellation()
 
@@ -284,6 +321,16 @@ public actor AnkiDataSource: AnkiDataSourceProtocol {
                 newCardsCount: newCardsCount
             )
         }.sorted { $0.date < $1.date }
+    }
+
+    // MARK: - Cache-Only Methods (for instant display)
+
+    public func fetchCachedDailyStats(from startDate: Date, to endDate: Date) async throws -> [AnkiDailyStats] {
+        try await fetchCached(AnkiDailyStats.self, from: startDate, to: endDate)
+    }
+
+    public func hasCachedData() async throws -> Bool {
+        try await hasCached(AnkiDailyStats.self)
     }
 }
 

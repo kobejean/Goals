@@ -1,8 +1,9 @@
 import Foundation
 import GoalsDomain
 
-/// Data source implementation for TypeQuicker typing statistics
-public actor TypeQuickerDataSource: TypeQuickerDataSourceProtocol {
+/// Data source implementation for TypeQuicker typing statistics.
+/// Supports optional caching via DataCache - uses DateBasedStrategy since typing stats are immutable.
+public actor TypeQuickerDataSource: TypeQuickerDataSourceProtocol, CacheableDataSource {
     public let dataSourceType: DataSourceType = .typeQuicker
 
     public nonisolated var availableMetrics: [MetricInfo] {
@@ -23,11 +24,33 @@ public actor TypeQuickerDataSource: TypeQuickerDataSourceProtocol {
         }
     }
 
+    // MARK: - CacheableDataSource
+
+    public let cache: DataCache?
+
+    /// Strategy for incremental fetching.
+    /// TypeQuicker stats are immutable once recorded, so we only need to fetch recent data.
+    public nonisolated var incrementalStrategy: (any IncrementalFetchStrategy)? {
+        cache != nil ? DateBasedStrategy(strategyKey: "typeQuicker.stats", volatileWindowDays: 1) : nil
+    }
+
+    private let dateBasedStrategy = DateBasedStrategy(strategyKey: "typeQuicker.stats", volatileWindowDays: 1)
+
+    // MARK: - Configuration
+
     private var username: String?
     private var baseURL: URL?
     private let httpClient: HTTPClient
 
+    /// Creates a TypeQuickerDataSource without caching (for testing).
     public init(httpClient: HTTPClient = HTTPClient()) {
+        self.cache = nil
+        self.httpClient = httpClient
+    }
+
+    /// Creates a TypeQuickerDataSource with caching enabled (for production).
+    public init(cache: DataCache, httpClient: HTTPClient = HTTPClient()) {
+        self.cache = cache
         self.httpClient = httpClient
     }
 
@@ -59,6 +82,17 @@ public actor TypeQuickerDataSource: TypeQuickerDataSourceProtocol {
     }
 
     public func fetchStats(from startDate: Date, to endDate: Date) async throws -> [TypeQuickerStats] {
+        // Use cached fetch if caching is enabled
+        try await cachedFetch(
+            strategy: dateBasedStrategy,
+            fetcher: fetchStatsFromRemote,
+            from: startDate,
+            to: endDate
+        )
+    }
+
+    /// Internal method that fetches stats directly from TypeQuicker API.
+    private func fetchStatsFromRemote(from startDate: Date, to endDate: Date) async throws -> [TypeQuickerStats] {
         let url = try buildStatsURL(from: startDate, to: endDate)
         let apiResponse: TypeQuickerAPIResponse = try await httpClient.get(url)
         return apiResponse.toStats()
@@ -98,9 +132,48 @@ public actor TypeQuickerDataSource: TypeQuickerDataSourceProtocol {
 
     /// Fetch stats aggregated by mode across all dates in the range
     public func fetchStatsByMode(from startDate: Date, to endDate: Date) async throws -> [TypeQuickerModeStats] {
-        let url = try buildStatsURL(from: startDate, to: endDate)
-        let apiResponse: TypeQuickerAPIResponse = try await httpClient.get(url)
-        return apiResponse.toStatsByMode()
+        // Stats by mode requires full session data, so we fetch from remote
+        // and cache the individual stats
+        let stats = try await fetchStats(from: startDate, to: endDate)
+
+        // Aggregate mode stats from all days
+        var modeAggregation: [String: (wpm: Double, accuracy: Double, time: Int, sessions: Int, weight: Int)] = [:]
+
+        for dayStat in stats {
+            guard let modeStats = dayStat.byMode else { continue }
+            for modeStat in modeStats {
+                let existing = modeAggregation[modeStat.mode] ?? (0, 0, 0, 0, 0)
+                let newTime = existing.time + modeStat.practiceTimeMinutes
+                let newSessions = existing.sessions + modeStat.sessionsCount
+
+                // Weighted average calculation
+                let totalWeight = existing.weight + modeStat.practiceTimeMinutes
+                let weightedWpm = (existing.wpm * Double(existing.weight) + modeStat.wordsPerMinute * Double(modeStat.practiceTimeMinutes)) / Double(max(totalWeight, 1))
+                let weightedAccuracy = (existing.accuracy * Double(existing.weight) + modeStat.accuracy * Double(modeStat.practiceTimeMinutes)) / Double(max(totalWeight, 1))
+
+                modeAggregation[modeStat.mode] = (weightedWpm, weightedAccuracy, newTime, newSessions, totalWeight)
+            }
+        }
+
+        return modeAggregation.map { mode, values in
+            TypeQuickerModeStats(
+                mode: mode,
+                wordsPerMinute: values.wpm,
+                accuracy: values.accuracy,
+                practiceTimeMinutes: values.time,
+                sessionsCount: values.sessions
+            )
+        }.sorted { $0.practiceTimeMinutes > $1.practiceTimeMinutes }
+    }
+
+    // MARK: - Cache-Only Methods (for instant display)
+
+    public func fetchCachedStats(from startDate: Date, to endDate: Date) async throws -> [TypeQuickerStats] {
+        try await fetchCached(TypeQuickerStats.self, from: startDate, to: endDate)
+    }
+
+    public func hasCachedData() async throws -> Bool {
+        try await hasCached(TypeQuickerStats.self)
     }
 }
 

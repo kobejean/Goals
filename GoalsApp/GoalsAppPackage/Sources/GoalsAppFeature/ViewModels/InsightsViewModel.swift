@@ -37,13 +37,13 @@ public final class InsightsViewModel {
     // MARK: - Initialization
 
     public init(
-        typeQuickerDataSource: CachedTypeQuickerDataSource,
-        atCoderDataSource: CachedAtCoderDataSource,
-        sleepDataSource: CachedHealthKitSleepDataSource,
+        typeQuickerDataSource: TypeQuickerDataSource,
+        atCoderDataSource: AtCoderDataSource,
+        sleepDataSource: HealthKitSleepDataSource,
         taskRepository: TaskRepositoryProtocol,
         goalRepository: GoalRepositoryProtocol,
-        ankiDataSource: CachedAnkiDataSource,
-        zoteroDataSource: CachedZoteroDataSource,
+        ankiDataSource: AnkiDataSource,
+        zoteroDataSource: ZoteroDataSource,
         nutritionRepository: NutritionRepositoryProtocol,
         dataCache: DataCache? = nil,
         taskCachingService: TaskCachingService? = nil

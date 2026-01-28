@@ -1,8 +1,9 @@
 import Foundation
 import GoalsDomain
 
-/// Data source implementation for Zotero reading and annotation statistics via Zotero API
-public actor ZoteroDataSource: ZoteroDataSourceProtocol {
+/// Data source implementation for Zotero reading and annotation statistics via Zotero API.
+/// Supports optional caching via DataCache - uses VersionBasedStrategy since annotations can be edited.
+public actor ZoteroDataSource: ZoteroDataSourceProtocol, CacheableDataSource {
     public let dataSourceType: DataSourceType = .zotero
 
     public nonisolated var availableMetrics: [MetricInfo] {
@@ -33,6 +34,20 @@ public actor ZoteroDataSource: ZoteroDataSourceProtocol {
         return nil
     }
 
+    // MARK: - CacheableDataSource
+
+    public let cache: DataCache?
+
+    /// Strategy for incremental fetching.
+    /// Zotero annotations are mutable and the API supports version-based sync.
+    public nonisolated var incrementalStrategy: (any IncrementalFetchStrategy)? {
+        cache != nil ? versionBasedStrategy : nil
+    }
+
+    private let versionBasedStrategy = VersionBasedStrategy(strategyKey: "zotero.dailyStats")
+
+    // MARK: - Configuration
+
     private var apiKey: String?
     private var userID: String?
     private var toReadCollectionKey: String?
@@ -43,7 +58,15 @@ public actor ZoteroDataSource: ZoteroDataSourceProtocol {
     private static let baseURL = "https://api.zotero.org"
     private static let maxItemsPerPage = 100
 
+    /// Creates a ZoteroDataSource without caching (for testing).
     public init(urlSession: URLSession = .shared) {
+        self.cache = nil
+        self.urlSession = urlSession
+    }
+
+    /// Creates a ZoteroDataSource with caching enabled (for production).
+    public init(cache: DataCache, urlSession: URLSession = .shared) {
+        self.cache = cache
         self.urlSession = urlSession
     }
 
@@ -100,8 +123,72 @@ public actor ZoteroDataSource: ZoteroDataSourceProtocol {
     // MARK: - ZoteroDataSourceProtocol
 
     public func fetchDailyStats(from startDate: Date, to endDate: Date) async throws -> [ZoteroDailyStats] {
-        let (stats, _) = try await fetchDailyStatsWithVersion(from: startDate, to: endDate, sinceVersion: nil)
-        return stats
+        guard let cache = cache else {
+            // No caching - just fetch and return
+            let (stats, _) = try await fetchDailyStatsWithVersion(from: startDate, to: endDate, sinceVersion: nil)
+            return stats
+        }
+
+        // Get current cached data
+        let cachedStats = try await fetchCached(ZoteroDailyStats.self, from: startDate, to: endDate)
+
+        // Get version for incremental fetch
+        let metadata = try? await cache.fetchStrategyMetadata(for: versionBasedStrategy)
+        let sinceVersion = versionBasedStrategy.versionForIncrementalFetch(metadata: metadata)
+
+        do {
+            // Use version-based incremental sync
+            // - If we have sinceVersion, only fetch items modified since then
+            // - If not, do a full fetch (first time or after cache clear)
+            let (remoteStats, newLibraryVersion) = try await fetchDailyStatsWithVersion(
+                from: startDate,
+                to: endDate,
+                sinceVersion: sinceVersion
+            )
+
+            if !remoteStats.isEmpty {
+                // Merge new stats with existing cached data
+                // For incremental sync, we need to combine counts for the same day
+                let mergedStats = mergeStats(existing: cachedStats, new: remoteStats)
+                try await storeInCache(mergedStats)
+            }
+
+            // Update library version on success
+            if newLibraryVersion > 0 {
+                let updatedMetadata = versionBasedStrategy.updateMetadata(
+                    previous: metadata,
+                    fetchedRange: (startDate, endDate),
+                    fetchedAt: Date(),
+                    newVersion: newLibraryVersion
+                )
+                try await cache.storeStrategyMetadata(updatedMetadata, for: versionBasedStrategy)
+            }
+        } catch {
+            // Don't fail if we already have cached data - use what we have
+            // This is graceful degradation for when Zotero API isn't available
+            if cachedStats.isEmpty {
+                throw error
+            }
+        }
+
+        // Fetch fresh reading status first so we have today's snapshot for progress calculation
+        let freshStatus = try? await fetchReadingStatus()
+        let dateFormatter = DateFormatter()
+        dateFormatter.dateFormat = "yyyy-MM-dd HH:mm:ss"
+        print("[Zotero] Fresh reading status fetched: \(freshStatus != nil ? dateFormatter.string(from: freshStatus!.date) : "nil")")
+        print("[Zotero] Query date range: \(dateFormatter.string(from: startDate)) to \(dateFormatter.string(from: endDate))")
+
+        // Compute reading progress scores from reading status snapshots and merge into stats
+        let statsFromCache = try await fetchCached(ZoteroDailyStats.self, from: startDate, to: endDate)
+        let progressScores = try await computeReadingProgressScores(from: startDate, to: endDate)
+        let statsWithProgress = mergeReadingProgress(stats: statsFromCache, progressScores: progressScores)
+
+        // Store the merged stats back to cache
+        if !progressScores.isEmpty {
+            try await storeInCache(statsWithProgress)
+        }
+
+        return statsWithProgress
     }
 
     /// Fetches daily stats with version-based incremental sync support.
@@ -158,16 +245,28 @@ public actor ZoteroDataSource: ZoteroDataSourceProtocol {
             return nil
         }
 
-        async let toReadCount = fetchCollectionItemCount(apiKey: apiKey, userID: userID, collectionKey: toReadKey)
-        async let inProgressCount = fetchCollectionItemCount(apiKey: apiKey, userID: userID, collectionKey: inProgressKey)
-        async let readCount = fetchCollectionItemCount(apiKey: apiKey, userID: userID, collectionKey: readKey)
+        // Reading status is a point-in-time snapshot, so always try to fetch fresh
+        // But cache it for widget access
+        do {
+            async let toReadCount = fetchCollectionItemCount(apiKey: apiKey, userID: userID, collectionKey: toReadKey)
+            async let inProgressCount = fetchCollectionItemCount(apiKey: apiKey, userID: userID, collectionKey: inProgressKey)
+            async let readCount = fetchCollectionItemCount(apiKey: apiKey, userID: userID, collectionKey: readKey)
 
-        return ZoteroReadingStatus(
-            date: Date(),
-            toReadCount: try await toReadCount,
-            inProgressCount: try await inProgressCount,
-            readCount: try await readCount
-        )
+            let status = ZoteroReadingStatus(
+                date: Date(),
+                toReadCount: try await toReadCount,
+                inProgressCount: try await inProgressCount,
+                readCount: try await readCount
+            )
+
+            // Cache the reading status
+            try await storeInCache([status])
+
+            return status
+        } catch {
+            // Fall back to cached reading status on error
+            return try await fetchCachedReadingStatus()
+        }
     }
 
     public func testConnection() async throws -> Bool {
@@ -191,6 +290,164 @@ public actor ZoteroDataSource: ZoteroDataSourceProtocol {
         } catch {
             throw DataSourceError.connectionFailed(error.localizedDescription)
         }
+    }
+
+    // MARK: - Cache-Only Methods (for instant display)
+
+    public func fetchCachedDailyStats(from startDate: Date, to endDate: Date) async throws -> [ZoteroDailyStats] {
+        try await fetchCached(ZoteroDailyStats.self, from: startDate, to: endDate)
+    }
+
+    public func fetchCachedReadingStatus() async throws -> ZoteroReadingStatus? {
+        // Get the most recent reading status from cache
+        let cachedStatuses = try await fetchCached(ZoteroReadingStatus.self)
+        return cachedStatuses.max { $0.date < $1.date }
+    }
+
+    public func hasCachedData() async throws -> Bool {
+        try await hasCached(ZoteroDailyStats.self)
+    }
+
+    // MARK: - Merge Helpers
+
+    /// Compute reading progress delta scores from cached reading status snapshots.
+    /// Returns the change in reading progress from the previous day (delta).
+    /// Score formula: toRead×0.25 + inProgress×0.5 + read×1.0
+    private func computeReadingProgressScores(from startDate: Date, to endDate: Date) async throws -> [Date: Double] {
+        // First log all cached snapshots (without date filter)
+        let allSnapshots = try await fetchCached(ZoteroReadingStatus.self)
+        let dateFormatter = DateFormatter()
+        dateFormatter.dateFormat = "yyyy-MM-dd HH:mm:ss"
+        print("[Zotero] All cached reading status snapshots: \(allSnapshots.count)")
+        for snapshot in allSnapshots.sorted(by: { $0.date < $1.date }) {
+            print("[Zotero]   - \(dateFormatter.string(from: snapshot.date))")
+        }
+
+        let snapshots = try await fetchCached(ZoteroReadingStatus.self, from: startDate, to: endDate)
+        guard !snapshots.isEmpty else {
+            print("[Zotero] No reading status snapshots found in date range")
+            return [:]
+        }
+
+        let calendar = Calendar.current
+        dateFormatter.dateFormat = "yyyy-MM-dd"
+
+        var scores: [Date: Double] = [:]
+
+        // Sort snapshots by date to compute deltas
+        let sortedSnapshots = snapshots.sorted { $0.date < $1.date }
+
+        print("[Zotero] === Raw Daily Snapshot Data ===")
+        for snapshot in sortedSnapshots {
+            print("[Zotero] \(dateFormatter.string(from: snapshot.date)): toRead=\(snapshot.toReadCount), inProgress=\(snapshot.inProgressCount), read=\(snapshot.readCount)")
+        }
+
+        // Compute absolute score for each snapshot
+        func absoluteScore(for snapshot: ZoteroReadingStatus) -> Double {
+            Double(snapshot.toReadCount) * 0.25 +
+            Double(snapshot.inProgressCount) * 0.5 +
+            Double(snapshot.readCount) * 1.0
+        }
+
+        var previousScore: Double? = nil
+
+        print("[Zotero] === Reading Progress Score Calculation ===")
+        for snapshot in sortedSnapshots {
+            let day = calendar.startOfDay(for: snapshot.date)
+            let currentScore = absoluteScore(for: snapshot)
+
+            // Delta = current - previous (how much progress made today)
+            // For first snapshot, assume previous score was 0 (empty state)
+            let prevScore = previousScore ?? 0
+            let delta = currentScore - prevScore
+            // Only record positive deltas (progress), ignore negative (items removed)
+            let finalDelta = max(0, delta)
+            scores[day] = finalDelta
+            print("[Zotero] \(dateFormatter.string(from: day)): absoluteScore=\(currentScore), prevScore=\(prevScore), delta=\(delta), finalDelta=\(finalDelta)")
+
+            previousScore = currentScore
+        }
+
+        return scores
+    }
+
+    /// Merge computed reading progress scores into daily stats.
+    private func mergeReadingProgress(stats: [ZoteroDailyStats], progressScores: [Date: Double]) -> [ZoteroDailyStats] {
+        guard !progressScores.isEmpty else {
+            return stats
+        }
+
+        let calendar = Calendar.current
+        var statsByDay: [Date: ZoteroDailyStats] = [:]
+
+        // Index existing stats by day
+        for stat in stats {
+            let day = calendar.startOfDay(for: stat.date)
+            statsByDay[day] = stat
+        }
+
+        // Merge reading progress scores
+        for (day, score) in progressScores {
+            if let existingStat = statsByDay[day] {
+                // Update existing stat with reading progress score
+                statsByDay[day] = ZoteroDailyStats(
+                    date: existingStat.date,
+                    annotationCount: existingStat.annotationCount,
+                    noteCount: existingStat.noteCount,
+                    readingProgressScore: score
+                )
+            } else {
+                // Create new stat entry for reading progress only
+                statsByDay[day] = ZoteroDailyStats(
+                    date: day,
+                    annotationCount: 0,
+                    noteCount: 0,
+                    readingProgressScore: score
+                )
+            }
+        }
+
+        return statsByDay.values.sorted { $0.date < $1.date }
+    }
+
+    /// Merges new stats with existing cached stats.
+    /// For incremental sync, new stats may include modified items that were already counted.
+    /// To avoid double-counting: only add stats for dates that didn't exist before,
+    /// and for today's date (which is volatile and may have genuinely new items).
+    private func mergeStats(existing: [ZoteroDailyStats], new: [ZoteroDailyStats]) -> [ZoteroDailyStats] {
+        let calendar = Calendar.current
+        let today = calendar.startOfDay(for: Date())
+        var statsByDay: [Date: ZoteroDailyStats] = [:]
+
+        // First, add all existing stats
+        for stat in existing {
+            let day = calendar.startOfDay(for: stat.date)
+            statsByDay[day] = stat
+        }
+
+        // Then merge in new stats
+        for stat in new {
+            let day = calendar.startOfDay(for: stat.date)
+            if let existingStat = statsByDay[day] {
+                // For today's date, add to existing counts (genuinely new items likely)
+                // For past dates, the incremental data might include modified items
+                // we already counted, so only add if it's today
+                if day == today {
+                    statsByDay[day] = ZoteroDailyStats(
+                        date: existingStat.date,
+                        annotationCount: existingStat.annotationCount + stat.annotationCount,
+                        noteCount: existingStat.noteCount + stat.noteCount,
+                        readingProgressScore: existingStat.readingProgressScore
+                    )
+                }
+                // For past dates, skip - they're likely modified items we already counted
+            } else {
+                // New date we haven't seen before - add it
+                statsByDay[day] = stat
+            }
+        }
+
+        return statsByDay.values.sorted { $0.date < $1.date }
     }
 
     // MARK: - Private Helpers

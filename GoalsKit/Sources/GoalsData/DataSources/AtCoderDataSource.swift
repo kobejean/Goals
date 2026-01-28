@@ -1,9 +1,10 @@
 import Foundation
 import GoalsDomain
 
-/// Data source implementation for AtCoder competitive programming statistics
-/// Uses official AtCoder API for contest history and kenkoooo's AtCoder Problems API for solve counts
-public actor AtCoderDataSource: AtCoderDataSourceProtocol {
+/// Data source implementation for AtCoder competitive programming statistics.
+/// Uses official AtCoder API for contest history and kenkoooo's AtCoder Problems API for solve counts.
+/// Supports optional caching via DataCache - uses custom count-based validation for submissions.
+public actor AtCoderDataSource: AtCoderDataSourceProtocol, CacheableDataSource {
     public let dataSourceType: DataSourceType = .atCoder
 
     public nonisolated var availableMetrics: [MetricInfo] {
@@ -29,6 +30,24 @@ public actor AtCoderDataSource: AtCoderDataSourceProtocol {
         }
     }
 
+    // MARK: - CacheableDataSource
+
+    public let cache: DataCache?
+
+    /// Strategy property to satisfy CacheableDataSource protocol.
+    /// AtCoder uses custom count-based validation instead of date-based incremental,
+    /// so this strategy is not used for submissions but satisfies the protocol.
+    public nonisolated var incrementalStrategy: (any IncrementalFetchStrategy)? {
+        cache != nil ? AlwaysFetchRecentStrategy(strategyKey: "atcoder.unused", recentDays: 2) : nil
+    }
+
+    /// Time interval to always re-fetch (in seconds) - 2 days
+    /// Recent submissions within this window are always fetched fresh
+    /// Older data is validated by comparing local vs server counts
+    private static let alwaysFetchInterval = 3600 * 24 * 2
+
+    // MARK: - Configuration
+
     private var username: String?
     private let httpClient: HTTPClient
 
@@ -36,7 +55,15 @@ public actor AtCoderDataSource: AtCoderDataSourceProtocol {
     private let atCoderBaseURL = URL(string: "https://atcoder.jp")!
     private let kenkooooBaseURL = URL(string: "https://kenkoooo.com/atcoder/atcoder-api/v3")!
 
+    /// Creates an AtCoderDataSource without caching (for testing).
     public init(httpClient: HTTPClient = HTTPClient()) {
+        self.cache = nil
+        self.httpClient = httpClient
+    }
+
+    /// Creates an AtCoderDataSource with caching enabled (for production).
+    public init(cache: DataCache, httpClient: HTTPClient = HTTPClient()) {
+        self.cache = cache
         self.httpClient = httpClient
     }
 
@@ -110,6 +137,9 @@ public actor AtCoderDataSource: AtCoderDataSourceProtocol {
             )
         }
 
+        // Store contest history in cache if available
+        try await storeInCache(history)
+
         // Build current stats
         let stats: AtCoderCurrentStats?
         if let latest = contestHistory.last {
@@ -135,24 +165,78 @@ public actor AtCoderDataSource: AtCoderDataSourceProtocol {
             stats = nil
         }
 
-        return (stats, history)
+        // Single source of truth for history: always return from cache if available
+        let cachedHistory = try await fetchCached(AtCoderContestResult.self)
+        return (stats, cachedHistory.isEmpty ? history : cachedHistory)
     }
 
     // MARK: - Submission APIs
 
     /// Fetches user submissions (protocol-conforming method)
+    /// Uses count-based cache validation to ensure complete history integrity.
     /// - Parameter fromDate: Start date (nil means all time)
     /// - Returns: Array of submissions
     public func fetchSubmissions(from fromDate: Date?) async throws -> [AtCoderSubmission] {
-        let fromSecond = fromDate.map { Int($0.timeIntervalSince1970) } ?? 0
-        return try await fetchSubmissions(fromSecond: fromSecond)
+        guard cache != nil else {
+            // No caching - just fetch from remote
+            let fromSecond = fromDate.map { Int($0.timeIntervalSince1970) } ?? 0
+            return try await fetchSubmissionsFromRemote(fromSecond: fromSecond)
+        }
+
+        // Load cached submissions (all of them for validation)
+        let cachedSubmissions = try await fetchCached(AtCoderSubmission.self)
+
+        // Sort by epoch second to find latest
+        let sortedCache = cachedSubmissions.sorted { $0.epochSecond < $1.epochSecond }
+
+        let fetchFromSecond: Int
+
+        if let latestSubmission = sortedCache.last {
+            // Calculate validation boundary (latest - 2 days)
+            // We always re-fetch submissions within this window to catch any updates
+            let validationBoundary = latestSubmission.epochSecond - Self.alwaysFetchInterval
+
+            // Count local submissions before the boundary
+            let localCount = sortedCache.filter { $0.epochSecond < validationBoundary }.count
+
+            // Get server count before the boundary to validate cache integrity
+            let serverCount = try await fetchSubmissionCount(
+                fromSecond: 0,
+                toSecond: validationBoundary
+            )
+
+            // Validate cache by comparing counts
+            let isCacheValid = localCount == serverCount
+
+            if isCacheValid {
+                // Cache is valid - only fetch from the validation boundary
+                fetchFromSecond = validationBoundary
+            } else {
+                // Cache is invalid (count mismatch) - fetch everything from beginning
+                fetchFromSecond = 0
+            }
+        } else {
+            // No cached data - fetch from the beginning
+            fetchFromSecond = 0
+        }
+
+        // Fetch new submissions
+        let newSubmissions = try await fetchSubmissionsFromRemote(fromSecond: fetchFromSecond)
+
+        // Store in cache
+        try await storeInCache(newSubmissions)
+
+        // Single source of truth: always return from cache
+        // If fromDate is nil, return all submissions; otherwise filter by date
+        return try await fetchCached(AtCoderSubmission.self, from: fromDate)
+            .sorted { $0.date < $1.date }
     }
 
-    /// Fetches user submissions from kenkoooo API
+    /// Fetches user submissions from kenkoooo API (without caching)
     /// - Parameters:
     ///   - fromSecond: Unix timestamp to start from (defaults to 0 for all history)
     /// - Returns: Array of submissions
-    public func fetchSubmissions(fromSecond: Int = 0) async throws -> [AtCoderSubmission] {
+    private func fetchSubmissionsFromRemote(fromSecond: Int = 0) async throws -> [AtCoderSubmission] {
         guard let username = username else {
             throw DataSourceError.notConfigured
         }
@@ -191,16 +275,14 @@ public actor AtCoderDataSource: AtCoderDataSourceProtocol {
     /// - Parameter fromDate: Start date (nil means all time)
     /// - Returns: Array of daily effort summaries sorted by date
     public func fetchDailyEffort(from fromDate: Date? = nil) async throws -> [AtCoderDailyEffort] {
-        let fromSecond = fromDate.map { Int($0.timeIntervalSince1970) } ?? 0
+        // Use our cached fetchSubmissions which has count-based validation
+        // This ensures we have all historical submissions before computing daily effort
+        let submissions = try await fetchSubmissions(from: fromDate)
 
-        // Fetch submissions and difficulties concurrently
-        async let submissionsTask = fetchSubmissions(fromSecond: fromSecond)
-        async let difficultiesTask = fetchProblemDifficulties()
+        // Fetch problem difficulties for effort calculation
+        let difficulties = try await fetchProblemDifficulties()
 
-        let submissions = try await submissionsTask
-        let difficulties = try await difficultiesTask
-
-        // Group submissions by day
+        // Group submissions by day and compute effort
         let calendar = Calendar.current
         var dailyData: [Date: [AtCoderRankColor: Int]] = [:]
 
@@ -216,9 +298,14 @@ public actor AtCoderDataSource: AtCoderDataSourceProtocol {
         }
 
         // Convert to array and sort by date
-        return dailyData.map { date, submissions in
+        let effort = dailyData.map { date, submissions in
             AtCoderDailyEffort(date: date, submissionsByDifficulty: submissions)
         }.sorted { $0.date < $1.date }
+
+        // Store computed effort in cache
+        try await storeInCache(effort)
+
+        return effort
     }
 
     // MARK: - Private API Methods
@@ -342,6 +429,28 @@ public actor AtCoderDataSource: AtCoderDataSourceProtocol {
         }
 
         return requestURL
+    }
+
+    // MARK: - Cache-Only Methods (for instant display)
+
+    public func fetchCachedContestHistory() async throws -> [AtCoderContestResult] {
+        try await fetchCached(AtCoderContestResult.self)
+    }
+
+    public func fetchCachedDailyEffort(from startDate: Date?) async throws -> [AtCoderDailyEffort] {
+        try await fetchCached(AtCoderDailyEffort.self, from: startDate)
+    }
+
+    public func fetchCachedSubmissions(from startDate: Date) async throws -> [AtCoderSubmission] {
+        try await fetchCached(AtCoderSubmission.self, from: startDate)
+    }
+
+    public func hasCachedContestHistory() async throws -> Bool {
+        try await hasCached(AtCoderContestResult.self)
+    }
+
+    public func hasCachedDailyEffort() async throws -> Bool {
+        try await hasCached(AtCoderDailyEffort.self)
     }
 }
 
