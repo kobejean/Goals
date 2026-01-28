@@ -48,10 +48,12 @@ The Goals app uses a layered architecture with clean separation of concerns:
 ### Key Design Principles
 
 1. **Single Source of Truth**: Cached wrappers always return data from cache after fetching
-2. **Actor-Based Concurrency**: Thread-safe operations via Swift actors
-3. **Repository Pattern**: Protocol-based abstraction for data persistence
-4. **Decorator Pattern**: Cached data sources wrap remote sources transparently
-5. **Smart Fetching**: Only fetch missing date ranges to minimize API calls
+2. **Unified Schema**: All data (user data + cached external data) stored in a single SwiftData store
+3. **Native Cache Models**: Cached data uses typed SwiftData models, eliminating JSON encoding overhead
+4. **Actor-Based Concurrency**: Thread-safe operations via Swift actors
+5. **Repository Pattern**: Protocol-based abstraction for data persistence
+6. **Decorator Pattern**: Cached data sources wrap remote sources transparently
+7. **Smart Fetching**: Only fetch missing date ranges to minimize API calls
 
 ---
 
@@ -139,7 +141,7 @@ public protocol DataSourceRepositoryProtocol: Sendable {
 
 ### DataCache Actor
 
-The `DataCache` actor provides thread-safe cache operations backed by SwiftData.
+The `DataCache` actor provides thread-safe cache operations backed by SwiftData with native cache models.
 
 **Location**: `GoalsKit/Sources/GoalsData/Caching/DataCache.swift`
 
@@ -147,11 +149,11 @@ The `DataCache` actor provides thread-safe cache operations backed by SwiftData.
 public actor DataCache {
     private let modelContainer: ModelContainer
 
-    // Store Operations
+    // Store Operations (type-routed to native SwiftData models)
     public func store<T: CacheableRecord>(_ records: [T]) async throws
     public func store<T: CacheableRecord>(_ record: T) async throws
 
-    // Fetch Operations
+    // Fetch Operations (type-routed to native SwiftData models)
     public func fetch<T: CacheableRecord>(_ type: T.Type, from: Date?, to: Date?) async throws -> [T]
     public func fetch<T: CacheableRecord>(_ type: T.Type, cacheKey: String) async throws -> T?
 
@@ -164,13 +166,19 @@ public actor DataCache {
     // Delete Operations
     public func deleteAll<T: CacheableRecord>(for type: T.Type) async throws
     public func deleteOlderThan<T: CacheableRecord>(_ date: Date, for type: T.Type) async throws
+
+    // Strategy Metadata (stored in UserDefaults)
+    public func storeStrategyMetadata<S: IncrementalFetchStrategy>(_ metadata: S.Metadata, for strategy: S) throws
+    public func fetchStrategyMetadata<S: IncrementalFetchStrategy>(for strategy: S) throws -> S.Metadata?
+    public func clearStrategyMetadata<S: IncrementalFetchStrategy>(for strategy: S)
 }
 ```
 
 **Key Features**:
+- Type-specific routing to native SwiftData models (no JSON encoding overhead)
 - Conflict resolution based on `fetchedAt` timestamp (newer wins)
 - Date range queries via predicates
-- Type-safe operations via generics
+- Type-safe operations via generics with runtime type dispatch
 
 ### CacheableRecord Protocol
 
@@ -201,19 +209,46 @@ extension TypeQuickerStats: CacheableRecord {
 }
 ```
 
-### CachedDataEntry Model
+### Native Cache Models
 
-**Location**: `GoalsKit/Sources/GoalsData/Persistence/Models/CachedDataEntry.swift`
+Instead of generic JSON-encoded storage, each cached data type has a dedicated SwiftData model:
 
+| Domain Type | SwiftData Cache Model |
+|-------------|----------------------|
+| `TypeQuickerStats` | `TypeQuickerStatsModel` |
+| `AtCoderContestResult` | `AtCoderContestResultModel` |
+| `AtCoderSubmission` | `AtCoderSubmissionModel` |
+| `AtCoderDailyEffort` | `AtCoderDailyEffortModel` |
+| `AnkiDailyStats` | `AnkiDailyStatsModel` |
+| `ZoteroDailyStats` | `ZoteroDailyStatsModel` |
+| `ZoteroReadingStatus` | `ZoteroReadingStatusModel` |
+| `SleepDailySummary` | `SleepDailySummaryModel` |
+| `TaskDailySummary` | `TaskDailySummaryModel` |
+| `NutritionDailySummary` | `NutritionDailySummaryModel` |
+
+**Example**: `TypeQuickerStatsModel`
 ```swift
 @Model
-public final class CachedDataEntry {
-    public var cacheKey: String       // "{dataSource}:{recordType}:{uniqueKey}"
-    public var dataSourceRaw: String  // DataSourceType raw value
-    public var recordType: String     // e.g., "stats", "submission"
-    public var recordDate: Date       // For date range queries
-    public var payload: Data          // JSON-encoded domain object
-    public var fetchedAt: Date        // When fetched from API
+public final class TypeQuickerStatsModel {
+    @Attribute(.unique)
+    public var cacheKey: String = ""
+    public var recordDate: Date = Date()
+    public var fetchedAt: Date = Date()
+
+    // Typed fields (no JSON encoding)
+    public var wordsPerMinute: Double = 0
+    public var accuracy: Double = 0
+    public var practiceTimeMinutes: Int = 0
+    public var sessionsCount: Int = 0
+
+    // Complex nested data uses external storage
+    @Attribute(.externalStorage)
+    public var byModeData: Data?
+
+    // Domain conversion
+    func toDomain() -> TypeQuickerStats { ... }
+    static func from(_ record: TypeQuickerStats, fetchedAt: Date) -> TypeQuickerStatsModel { ... }
+    func update(from record: TypeQuickerStats, fetchedAt: Date) { ... }
 }
 ```
 
@@ -269,38 +304,62 @@ func fetchStats(from startDate: Date, to endDate: Date) async throws -> [Stats] 
 
 ## Persistence Layer (SwiftData)
 
-### Two ModelContainers
+### Unified Schema Architecture
 
-The app uses separate ModelContainers for different purposes:
+The app uses a **single ModelContainer** with a unified schema containing all models. This approach:
+- Simplifies container management (one store instead of two)
+- Enables widget access to all data via App Group
+- Allows native SwiftData models for cached data (better performance than JSON encoding)
 
-#### 1. Main Store
-**Models**: `GoalModel`, `TaskDefinitionModel`, `TaskSessionModel`, `EarnedBadgeModel`, `NutritionEntryModel`
-
-```swift
-let mainSchema = Schema([
-    GoalModel.self,
-    EarnedBadgeModel.self,
-    TaskDefinitionModel.self,
-    TaskSessionModel.self,
-    NutritionEntryModel.self,
-])
-```
-
-#### 2. Cache Store
-**Models**: `CachedDataEntry`
+**Location**: `GoalsKit/Sources/GoalsData/Persistence/UnifiedSchema.swift`
 
 ```swift
-let cacheSchema = Schema([CachedDataEntry.self])
+public enum UnifiedSchema {
+    public static let allModels: [any PersistentModel.Type] = [
+        // User data models
+        GoalModel.self,
+        EarnedBadgeModel.self,
+        TaskDefinitionModel.self,
+        TaskSessionModel.self,
+        NutritionEntryModel.self,
+
+        // Cached external data models
+        TypeQuickerStatsModel.self,
+        AtCoderContestResultModel.self,
+        AtCoderSubmissionModel.self,
+        AtCoderDailyEffortModel.self,
+        AnkiDailyStatsModel.self,
+        ZoteroDailyStatsModel.self,
+        ZoteroReadingStatusModel.self,
+        SleepDailySummaryModel.self,
+        TaskDailySummaryModel.self,
+        NutritionDailySummaryModel.self,
+    ]
+
+    public static func createSchema() -> Schema { Schema(allModels) }
+    public static func createContainer(url: URL?, inMemory: Bool, cloudKit: ...) throws -> ModelContainer
+}
 ```
 
 ### Shared Storage (App Group)
 
-Both stores use a shared App Group container for widget access:
+The store uses a shared App Group container for widget access:
 
 ```swift
-if let containerURL = SharedStorage.sharedContainerURL {
-    let storeURL = containerURL.appendingPathComponent("Library/Application Support/CacheStore.sqlite")
-    // ...
+if let storeURL = SharedStorage.sharedMainStoreURL {
+    // Use shared container: "Library/Application Support/default.store"
+    let configuration = ModelConfiguration(schema: unifiedSchema, url: storeURL, ...)
+}
+```
+
+**Location**: `GoalsApp/GoalsAppPackage/Sources/GoalsWidgetShared/Data/SharedStorage.swift`
+
+```swift
+public enum SharedStorage {
+    public static let appGroupIdentifier = "group.com.kobejean.goals"
+    public static var sharedMainStoreURL: URL? {
+        sharedContainerURL?.appendingPathComponent("Library/Application Support/default.store")
+    }
 }
 ```
 
@@ -308,14 +367,23 @@ if let containerURL = SharedStorage.sharedContainerURL {
 
 **Location**: `GoalsKit/Sources/GoalsData/Persistence/Models/`
 
-| Model | Purpose |
-|-------|---------|
-| `GoalModel` | User goals with progress tracking |
-| `TaskDefinitionModel` | Task definitions for time tracking |
-| `TaskSessionModel` | Individual task sessions |
-| `EarnedBadgeModel` | Badges earned by users |
-| `NutritionEntryModel` | Nutrition entries with nutrients and photo data |
-| `CachedDataEntry` | Cached external data |
+| Model | Purpose | Category |
+|-------|---------|----------|
+| `GoalModel` | User goals with progress tracking | User Data |
+| `TaskDefinitionModel` | Task definitions for time tracking | User Data |
+| `TaskSessionModel` | Individual task sessions | User Data |
+| `EarnedBadgeModel` | Badges earned by users | User Data |
+| `NutritionEntryModel` | Nutrition entries with nutrients and photo data | User Data |
+| `TypeQuickerStatsModel` | Cached TypeQuicker daily stats | Cached Data |
+| `AtCoderContestResultModel` | Cached AtCoder contest results | Cached Data |
+| `AtCoderSubmissionModel` | Cached AtCoder submissions | Cached Data |
+| `AtCoderDailyEffortModel` | Cached AtCoder daily effort summaries | Cached Data |
+| `AnkiDailyStatsModel` | Cached Anki daily statistics | Cached Data |
+| `ZoteroDailyStatsModel` | Cached Zotero daily stats | Cached Data |
+| `ZoteroReadingStatusModel` | Cached Zotero reading status | Cached Data |
+| `SleepDailySummaryModel` | Cached sleep daily summaries | Cached Data |
+| `TaskDailySummaryModel` | Cached task daily summaries | Cached Data |
+| `NutritionDailySummaryModel` | Cached nutrition daily summaries | Cached Data |
 
 ---
 
@@ -502,7 +570,7 @@ Goal progress updated
 **Location**: `GoalsApp/GoalsAppPackage/Sources/GoalsAppFeature/DI/AppContainer.swift`
 
 The `AppContainer` is the central DI container that:
-1. Creates and owns all ModelContainers (main store + cache store)
+1. Creates and owns the unified ModelContainer (single store for all data)
 2. Instantiates all repositories with cloud-backed decorators
 3. Creates cached data source wrappers
 4. Provides use case instances
@@ -513,8 +581,8 @@ The `AppContainer` is the central DI container that:
 @MainActor
 @Observable
 public final class AppContainer {
-    // Model Container
-    public let modelContainer: ModelContainer      // Main store (goals, tasks, badges, nutrition)
+    // Model Container (unified schema with all models)
+    public let modelContainer: ModelContainer
 
     // Repositories (with cloud-backed decorators)
     public let goalRepository: GoalRepositoryProtocol
@@ -536,7 +604,6 @@ public final class AppContainer {
 
     // Caching Services
     public let taskCachingService: TaskCachingService
-    public let thumbnailBackfillService: ThumbnailBackfillService
 
     // Use Cases
     public let createGoalUseCase: CreateGoalUseCase
@@ -547,7 +614,6 @@ public final class AppContainer {
     public let cloudSyncQueue: CloudSyncQueue
     public private(set) var cloudBackupService: CloudKitBackupService?
     public private(set) var cloudSyncScheduler: BackgroundCloudSyncScheduler?
-    public private(set) var dataRecoveryService: DataRecoveryService?
 
     // ViewModels (lazily created, persist for app lifetime)
     public var insightsViewModel: InsightsViewModel { ... }
@@ -560,20 +626,24 @@ public final class AppContainer {
 ```swift
 // In AppContainer.init()
 
-// 1. Create cache container first (for data sources)
-self.dataCache = DataCache(modelContainer: cacheContainer)
+// 1. Create unified ModelContainer with all models
+let unifiedSchema = UnifiedSchema.createSchema()
+self.modelContainer = try ModelContainer(for: unifiedSchema, configurations: [mainConfiguration])
 
-// 2. Create repositories
-let goalRepo = SwiftDataGoalRepository(modelContainer: modelContainer)
-self.goalRepository = goalRepo
+// 2. Create cache using the unified container
+self.dataCache = DataCache(modelContainer: modelContainer)
 
-// 3. Create cached data sources
+// 3. Create repositories
+let localGoalRepo = SwiftDataGoalRepository(modelContainer: modelContainer)
+self.goalRepository = CloudBackedGoalRepository(local: localGoalRepo, syncQueue: cloudSyncQueue)
+
+// 4. Create cached data sources
 self.typeQuickerDataSource = CachedTypeQuickerDataSource(
     remote: TypeQuickerDataSource(httpClient: httpClient),
     cache: dataCache
 )
 
-// 4. Create use cases with dependencies
+// 5. Create use cases with dependencies
 self.syncDataSourcesUseCase = SyncDataSourcesUseCase(
     goalRepository: goalRepo,
     dataSources: [
@@ -622,13 +692,6 @@ public final class CloudBackedGoalRepository: GoalRepositoryProtocol {
     }
 }
 ```
-
-### Data Recovery
-
-`DataRecoveryService` enables restoring data from CloudKit backup:
-- Fetches all records from CloudKit zone
-- Replaces local data with cloud data
-- Used for device migration or data recovery
 
 ---
 
@@ -687,6 +750,7 @@ public struct SyncDataSourcesUseCase: Sendable {
 | DataCache | `GoalsKit/Sources/GoalsData/Caching/DataCache.swift` |
 | CacheableRecord | `GoalsKit/Sources/GoalsDomain/Caching/CacheableRecord.swift` |
 | Caching Strategies | `GoalsKit/Sources/GoalsData/Caching/Strategies/` |
+| Unified Schema | `GoalsKit/Sources/GoalsData/Persistence/UnifiedSchema.swift` |
 | SwiftData Models | `GoalsKit/Sources/GoalsData/Persistence/Models/` |
 | Repository Implementations | `GoalsKit/Sources/GoalsData/Persistence/Repositories/` |
 | Repository Protocols | `GoalsKit/Sources/GoalsDomain/Repositories/` |
@@ -696,4 +760,5 @@ public struct SyncDataSourcesUseCase: Sendable {
 | Domain Entities | `GoalsKit/Sources/GoalsDomain/Entities/` |
 | ViewModels | `GoalsApp/GoalsAppPackage/Sources/GoalsAppFeature/ViewModels/` |
 | Insight Builders | `GoalsApp/GoalsAppPackage/Sources/GoalsWidgetShared/Data/InsightBuilders.swift` |
+| Shared Storage | `GoalsApp/GoalsAppPackage/Sources/GoalsWidgetShared/Data/SharedStorage.swift` |
 | Shared Charts | `GoalsApp/GoalsAppPackage/Sources/GoalsWidgetShared/Charts/` |
