@@ -11,8 +11,9 @@
 // TCP port for sync service
 #define SYNC_PORT 8888
 
-// Maximum message size
-#define MAX_MESSAGE_SIZE 65536
+// Maximum message size (must be large enough for ~1024 measurements)
+// Each measurement is ~100 bytes JSON, plus profile overhead
+#define MAX_MESSAGE_SIZE (256 * 1024)  // 256KB
 
 // Network states
 typedef enum {

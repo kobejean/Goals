@@ -263,10 +263,26 @@ public struct SettingsView: View {
                 }
             }
             .disabled(wiiFitIPAddress.isEmpty)
+            Button {
+                Task { await syncWiiFitData() }
+            } label: {
+                HStack {
+                    Spacer()
+                    if wiiFitSaveState == .saving {
+                        ProgressView()
+                            .controlSize(.small)
+                        Text("Syncing...")
+                    } else {
+                        Text("Sync Data")
+                    }
+                    Spacer()
+                }
+            }
+            .disabled(wiiFitIPAddress.isEmpty || wiiFitConnectionStatus != .connected)
         } header: {
             Text("Wii Fit")
         } footer: {
-            Text("Enter the IP address shown on your Wii running Wii Fit Sync. Leave profile empty to sync all profiles.")
+            Text("Enter the IP address shown on your Wii running Wii Fit Sync. Test connection first, then sync to import data.")
         }
     }
 
@@ -609,11 +625,28 @@ public struct SettingsView: View {
 
         // Test connection
         do {
-            let connected = try await container.wiiFitDataSource.testConnection(ipAddress: wiiFitIPAddress)
+            let connected = try await container.wiiFitDataSource.testConnection()
             wiiFitConnectionStatus = connected ? .connected : .disconnected
         } catch {
             wiiFitConnectionStatus = .disconnected
         }
+    }
+
+    private func syncWiiFitData() async {
+        wiiFitSaveState = .saving
+
+        do {
+            let result = try await container.wiiFitDataSource.sync()
+            print("[WiiFit] Synced \(result.measurements.count) measurements, \(result.activities.count) activities")
+            wiiFitSaveState = .saved
+            container.notifySettingsChanged()
+        } catch {
+            print("[WiiFit] Sync error: \(error)")
+            wiiFitSaveState = .idle
+        }
+
+        try? await Task.sleep(for: .seconds(1.5))
+        wiiFitSaveState = .idle
     }
 
     public init() {}

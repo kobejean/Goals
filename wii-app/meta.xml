@@ -5,6 +5,7 @@
     <version>1.0.0</version>
     <release_date>20250128</release_date>
     <short_description>Sync Wii Fit data to iOS</short_description>
+    <ahb_access/>
     <long_description>
 Wii Fit Sync allows you to export your Wii Fit body measurement
 and exercise data to the Goals iOS app over your local network.

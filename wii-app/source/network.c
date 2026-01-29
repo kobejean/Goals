@@ -1,21 +1,26 @@
 /*
  * network.c
  * TCP server implementation for Wii
+ * Uses standard BSD socket API as shown in devkitPro examples
  */
 
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
-#include <network.h>
+#include <unistd.h>
 #include <errno.h>
 #include <fcntl.h>
+#include <ogcsys.h>
+#include <gccore.h>
+#include <network.h>
 #include "network.h"
 
 static NetworkState current_state = NET_STATE_INIT;
 static char error_msg[256] = {0};
 static char ip_string[32] = {0};
 
-static int server_socket = -1;
-static int client_socket = -1;
+static s32 server_socket = -1;
+static s32 client_socket = -1;
 
 static struct sockaddr_in server_addr;
 static struct sockaddr_in client_addr;
@@ -23,7 +28,8 @@ static struct sockaddr_in client_addr;
 int network_init(void) {
     current_state = NET_STATE_INIT;
 
-    // Initialize network interface
+    // Initialize network and get IP using if_config
+    // This handles both net_init and interface configuration
     s32 ret = if_config(ip_string, NULL, NULL, true, 20);
     if (ret < 0) {
         snprintf(error_msg, sizeof(error_msg),
@@ -41,8 +47,8 @@ const char* network_get_ip(void) {
 }
 
 int network_start_server(void) {
-    // Create socket
-    server_socket = net_socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
+    // Create socket using standard BSD API
+    server_socket = net_socket(AF_INET, SOCK_STREAM, IPPROTO_IP);
     if (server_socket < 0) {
         snprintf(error_msg, sizeof(error_msg),
                  "Failed to create socket (error %d)", server_socket);
@@ -51,12 +57,14 @@ int network_start_server(void) {
     }
 
     // Set socket options
-    int yes = 1;
+    u32 yes = 1;
     net_setsockopt(server_socket, SOL_SOCKET, SO_REUSEADDR, &yes, sizeof(yes));
 
-    // Set non-blocking
-    int flags = net_fcntl(server_socket, F_GETFL, 0);
-    net_fcntl(server_socket, F_SETFL, flags | O_NONBLOCK);
+    // Set non-blocking mode so accept doesn't freeze the app
+    s32 flags = net_fcntl(server_socket, F_GETFL, 0);
+    if (flags >= 0) {
+        net_fcntl(server_socket, F_SETFL, flags | 4);  // 4 = IOS_O_NONBLOCK
+    }
 
     // Bind to port
     memset(&server_addr, 0, sizeof(server_addr));
@@ -112,10 +120,6 @@ int network_accept_client(void) {
         return NET_ERR_ACCEPT;
     }
 
-    // Set client socket non-blocking
-    int flags = net_fcntl(client_socket, F_GETFL, 0);
-    net_fcntl(client_socket, F_SETFL, flags | O_NONBLOCK);
-
     current_state = NET_STATE_CONNECTED;
     return 1;
 }
@@ -156,13 +160,19 @@ int network_send(const char* data, int len) {
 
     current_state = NET_STATE_SENDING;
 
+    // Send in small chunks with delay to avoid Wii network stack issues
+    #define SEND_CHUNK_SIZE 512
+
     int total_sent = 0;
     while (total_sent < len) {
-        s32 ret = net_send(client_socket, data + total_sent, len - total_sent, 0);
+        int to_send = len - total_sent;
+        if (to_send > SEND_CHUNK_SIZE) to_send = SEND_CHUNK_SIZE;
+
+        s32 ret = net_send(client_socket, data + total_sent, to_send, 0);
 
         if (ret < 0) {
             if (ret == -EAGAIN || ret == -EWOULDBLOCK) {
-                // Would block, try again
+                usleep(5000);
                 continue;
             }
             snprintf(error_msg, sizeof(error_msg),
@@ -172,8 +182,10 @@ int network_send(const char* data, int len) {
         }
 
         total_sent += ret;
+        usleep(1000);  // 1ms delay between chunks
     }
 
+    printf("Sent %d\n", total_sent);
     current_state = NET_STATE_CONNECTED;
     return total_sent;
 }

@@ -120,6 +120,28 @@ const char* wiifit_error_string(int error_code);
  */
 void wiifit_cleanup(void);
 
+/**
+ * Get array of save file paths being searched.
+ * @param count Output: number of paths in array
+ * @return Array of path strings
+ */
+const char** wiifit_get_search_paths(int* count);
+
+/**
+ * Get the last path that was tried during search.
+ * Useful for debugging when save file is not found.
+ * @return Path string or NULL if no search attempted
+ */
+const char* wiifit_get_last_tried_path(void);
+
+/**
+ * Debug: Scan title directories to see what exists.
+ * @param output Buffer to write results to
+ * @param max_len Maximum buffer length
+ * @return Number of characters written
+ */
+int wiifit_scan_titles(char* output, int max_len);
+
 // Error codes
 #define WIIFIT_SUCCESS           0
 #define WIIFIT_ERR_INIT         -1

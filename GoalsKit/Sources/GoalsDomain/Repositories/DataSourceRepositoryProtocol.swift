@@ -248,10 +248,9 @@ public extension ZoteroDataSourceProtocol {
 
 /// Protocol for Wii Fit data source
 public protocol WiiFitDataSourceProtocol: DataSourceRepositoryProtocol {
-    /// Syncs data from a Wii running the homebrew app
-    /// - Parameter ipAddress: IP address of the Wii
+    /// Syncs data from a Wii running the homebrew app (uses configured IP)
     /// - Returns: Sync result with measurements and activities
-    func sync(ipAddress: String) async throws -> WiiFitSyncResult
+    func sync() async throws -> WiiFitSyncResult
 
     /// Fetches measurements for a date range (from cache or remote)
     func fetchMeasurements(from startDate: Date, to endDate: Date) async throws -> [WiiFitMeasurement]
@@ -259,8 +258,8 @@ public protocol WiiFitDataSourceProtocol: DataSourceRepositoryProtocol {
     /// Fetches activities for a date range (from cache or remote)
     func fetchActivities(from startDate: Date, to endDate: Date) async throws -> [WiiFitActivity]
 
-    /// Tests connection to a Wii at the given IP
-    func testConnection(ipAddress: String) async throws -> Bool
+    /// Tests connection to the configured Wii
+    func testConnection() async throws -> Bool
 
     /// Fetches available profiles from the last sync
     func fetchAvailableProfiles() async throws -> [WiiFitProfileInfo]

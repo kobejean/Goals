@@ -110,7 +110,10 @@ public actor WiiFitDataSource: WiiFitDataSourceProtocol, CacheableDataSource {
 
     // MARK: - WiiFitDataSourceProtocol
 
-    public func sync(ipAddress: String) async throws -> WiiFitSyncResult {
+    public func sync() async throws -> WiiFitSyncResult {
+        guard let ipAddress = ipAddress, !ipAddress.isEmpty else {
+            throw DataSourceError.notConfigured
+        }
         let result = try await wiiConnection.sync(ipAddress: ipAddress)
 
         // Filter by selected profile if set
@@ -151,7 +154,10 @@ public actor WiiFitDataSource: WiiFitDataSourceProtocol, CacheableDataSource {
         return try await fetchCachedActivities(from: startDate, to: endDate)
     }
 
-    public func testConnection(ipAddress: String) async throws -> Bool {
+    public func testConnection() async throws -> Bool {
+        guard let ipAddress = ipAddress, !ipAddress.isEmpty else {
+            throw DataSourceError.notConfigured
+        }
         return try await wiiConnection.testConnection(ipAddress: ipAddress)
     }
 

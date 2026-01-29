@@ -15,12 +15,14 @@
 #include <string.h>
 #include <unistd.h>
 #include <gccore.h>
+#include <ogc/machine/processor.h>
 #include <wiiuse/wpad.h>
 #include <fat.h>
 
 #include "wiifit_reader.h"
 #include "network.h"
 #include "json_builder.h"
+#include "iospatch.h"
 
 // Application states
 typedef enum {
@@ -84,12 +86,29 @@ static void init_video(void) {
     if (rmode->viTVMode & VI_NON_INTERLACE) VIDEO_WaitVSync();
 }
 
+// Check if we have AHBPROT (hardware access)
+static int have_ahbprot(void) {
+    return (*(vu32*)0xcd800064 == 0xFFFFFFFF);
+}
+
 static int init_systems(void) {
     printf("Initializing systems...\n");
 
-    // Initialize WPAD for controller input
-    WPAD_Init();
-    WPAD_SetDataFormat(WPAD_CHAN_0, WPAD_FMT_BTNS_ACC_IR);
+    // Show current IOS and AHBPROT status
+    s32 current_ios = IOS_GetVersion();
+    printf("Running on IOS%d\n", current_ios);
+
+    int has_ahb = have_ahbprot();
+    if (has_ahb) {
+        set_color(CON_GREEN);
+        printf("AHBPROT: Enabled (NAND access available)\n");
+        reset_color();
+    } else {
+        set_color(CON_YELLOW);
+        printf("AHBPROT: Disabled (may not have NAND access)\n");
+        printf("Try launching from Homebrew Channel 1.0.8+\n");
+        reset_color();
+    }
 
     // Initialize FAT (for potential logging)
     if (!fatInitDefault()) {
@@ -98,7 +117,7 @@ static int init_systems(void) {
         reset_color();
     }
 
-    // Initialize Wii Fit reader
+    // ===== PHASE 1: Read NAND data while we have AHBPROT =====
     printf("Initializing Wii Fit reader...\n");
     int ret = wiifit_init();
     if (ret < 0) {
@@ -108,21 +127,74 @@ static int init_systems(void) {
         return ret;
     }
 
-    // Initialize network
+    // Pre-read the save data while we have AHBPROT access
+    printf("Reading Wii Fit save data...\n");
+    ret = wiifit_read_save(&save_data);
+    if (ret == 0) {
+        set_color(CON_GREEN);
+        printf("Save data loaded: %d profile(s)\n", save_data.profile_count);
+        reset_color();
+    } else {
+        set_color(CON_YELLOW);
+        printf("Could not load save data: %s\n", save_data.error_msg);
+        reset_color();
+    }
+
+    // Clean up ISFS before IOS reload
+    wiifit_cleanup();
+
+    // ===== PHASE 2: Reload IOS for working network =====
+    // The HBC's async network callback interferes with network operations.
+    // Solution: Patch ES to preserve AHBPROT, then reload IOS to get fresh network stack.
+    // Reference: https://gbatemp.net/threads/how-to-fix-the-connection-issue-while-running-in-ahbprot-mode.301061/
+
+    if (has_ahb) {
+        printf("Patching IOS for network compatibility...\n");
+        u32 patched = iospatch_ahbprot();
+        if (patched > 0) {
+            set_color(CON_GREEN);
+            printf("ES patched successfully\n");
+            reset_color();
+
+            // Reload IOS to get fresh network stack
+            printf("Reloading IOS%d...\n", current_ios);
+            ret = IOS_ReloadIOS(current_ios);
+            if (ret < 0) {
+                set_color(CON_YELLOW);
+                printf("IOS reload failed (error %d), continuing anyway...\n", ret);
+                reset_color();
+            } else {
+                set_color(CON_GREEN);
+                printf("IOS reloaded successfully\n");
+                reset_color();
+            }
+        } else {
+            set_color(CON_YELLOW);
+            printf("ES patch failed, network may not work\n");
+            reset_color();
+        }
+    }
+
+    // ===== PHASE 3: Initialize network with fresh IOS =====
+    // Initialize WPAD for controller input (must be after IOS reload)
+    WPAD_Init();
+    WPAD_SetDataFormat(WPAD_CHAN_0, WPAD_FMT_BTNS_ACC_IR);
+
     printf("Initializing network...\n");
     ret = network_init();
     if (ret < 0) {
         set_color(CON_RED);
-        printf("Error: %s\n", network_get_error());
+        printf("Network error: %s\n", network_get_error());
+        printf("Network features will not be available.\n");
         reset_color();
-        return ret;
-    }
-
-    const char* ip = network_get_ip();
-    if (ip) {
-        set_color(CON_GREEN);
-        printf("Network ready: %s\n", ip);
-        reset_color();
+        // Don't return error - still allow viewing data
+    } else {
+        const char* ip = network_get_ip();
+        if (ip) {
+            set_color(CON_GREEN);
+            printf("Network ready: %s\n", ip);
+            reset_color();
+        }
     }
 
     return 0;
@@ -145,12 +217,11 @@ static void show_menu(void) {
         reset_color();
     }
 
-    // Read save data status
-    int ret = wiifit_read_save(&save_data);
-    if (ret == 0) {
+    // Show pre-loaded save data status (don't re-read, we may have lost AHBPROT)
+    if (save_data.error_code == 0 && save_data.profile_count > 0) {
         printf("Wii Fit Data: ");
         set_color(CON_GREEN);
-        printf("Found %d profile(s)\n", save_data.profile_count);
+        printf("Loaded %d profile(s)\n", save_data.profile_count);
         reset_color();
 
         for (int i = 0; i < save_data.profile_count; i++) {
@@ -161,14 +232,20 @@ static void show_menu(void) {
     } else {
         printf("Wii Fit Data: ");
         set_color(CON_RED);
-        printf("Not found\n");
+        printf("Not loaded\n");
         reset_color();
-        printf("  %s\n", save_data.error_msg);
+        if (save_data.error_msg[0]) {
+            printf("  %s\n", save_data.error_msg);
+        }
     }
 
     printf("\n");
     set_color(CON_CYAN);
-    printf("Press A to start sync server\n");
+    if (ip) {
+        printf("Press A to start sync server\n");
+    } else {
+        printf("Network unavailable - cannot sync\n");
+    }
     printf("Press HOME to exit\n");
     reset_color();
 }
@@ -192,52 +269,95 @@ static void show_waiting_screen(void) {
 }
 
 static void handle_client(void) {
-    // Receive request
-    int recv_len = network_receive(recv_buffer, sizeof(recv_buffer) - 1);
+    // Wait for request with timeout (5 seconds)
+    int recv_len = 0;
+    int timeout_ms = 5000;
+    int waited_ms = 0;
 
-    if (recv_len > 0) {
-        recv_buffer[recv_len] = '\0';
+    printf("Waiting for sync request...\n");
 
-        // Check for sync request
-        if (strstr(recv_buffer, "\"action\"") && strstr(recv_buffer, "\"sync\"")) {
-            printf("Sync request received, sending data...\n");
+    while (waited_ms < timeout_ms) {
+        recv_len = network_receive(recv_buffer, sizeof(recv_buffer) - 1);
 
-            // Read fresh save data
-            int ret = wiifit_read_save(&save_data);
-            int json_len;
-
-            if (ret == 0) {
-                json_len = json_build_response(&save_data, json_buffer, sizeof(json_buffer));
-            } else {
-                json_len = json_build_error(ret, save_data.error_msg, json_buffer, sizeof(json_buffer));
-            }
-
-            // Send response
-            ret = network_send(json_buffer, json_len);
-            if (ret > 0) {
-                set_color(CON_GREEN);
-                printf("Sent %d bytes\n", ret);
-                reset_color();
-            } else {
-                set_color(CON_RED);
-                printf("Send failed: %s\n", network_get_error());
-                reset_color();
-            }
-
-            // Wait for ACK
-            usleep(100000); // 100ms
-            recv_len = network_receive(recv_buffer, sizeof(recv_buffer) - 1);
-            if (recv_len > 0 && strstr(recv_buffer, "\"ack\"")) {
-                printf("Sync completed successfully!\n");
-            }
+        if (recv_len > 0) {
+            break;  // Got data
+        } else if (recv_len == NET_ERR_DISCONNECTED) {
+            printf("Client disconnected\n");
+            network_close_client();
+            return;
+        } else if (recv_len < 0 && recv_len != NET_ERR_DISCONNECTED) {
+            set_color(CON_RED);
+            printf("Receive error: %s\n", network_get_error());
+            reset_color();
+            network_close_client();
+            return;
         }
 
-        // Close connection after handling request
-        network_close_client();
-    } else if (recv_len == NET_ERR_DISCONNECTED) {
-        printf("Client disconnected\n");
-        network_close_client();
+        // No data yet, wait a bit
+        usleep(10000);  // 10ms
+        waited_ms += 10;
     }
+
+    if (recv_len <= 0) {
+        set_color(CON_YELLOW);
+        printf("Timeout waiting for request\n");
+        reset_color();
+        network_close_client();
+        return;
+    }
+
+    recv_buffer[recv_len] = '\0';
+
+    // Check for sync request
+    if (strstr(recv_buffer, "\"action\"") && strstr(recv_buffer, "\"sync\"")) {
+        printf("Sync request received\n");
+
+        // Clear buffer before building (prevent stale data)
+        memset(json_buffer, 0, sizeof(json_buffer));
+
+        int json_len;
+        if (save_data.error_code == 0 && save_data.profile_count > 0) {
+            json_len = json_build_response(&save_data, json_buffer, sizeof(json_buffer));
+        } else {
+            json_len = json_build_error(save_data.error_code, save_data.error_msg, json_buffer, sizeof(json_buffer));
+        }
+
+        printf("JSON: %d bytes\n", json_len);
+
+        if (json_len <= 0 || json_len > (int)sizeof(json_buffer)) {
+            printf("Bad length!\n");
+            network_close_client();
+            return;
+        }
+
+        // Send response
+        int ret = network_send(json_buffer, json_len);
+        printf("Sent: %d\n", ret);
+
+        // Wait for ACK with timeout
+        waited_ms = 0;
+        while (waited_ms < 2000) {
+            recv_len = network_receive(recv_buffer, sizeof(recv_buffer) - 1);
+            if (recv_len > 0) {
+                recv_buffer[recv_len] = '\0';
+                if (strstr(recv_buffer, "\"ack\"")) {
+                    set_color(CON_GREEN);
+                    printf("Sync completed successfully!\n");
+                    reset_color();
+                }
+                break;
+            }
+            usleep(10000);
+            waited_ms += 10;
+        }
+    } else {
+        set_color(CON_YELLOW);
+        printf("Unknown request: %.50s...\n", recv_buffer);
+        reset_color();
+    }
+
+    // Close connection after handling request
+    network_close_client();
 }
 
 int main(int argc, char** argv) {

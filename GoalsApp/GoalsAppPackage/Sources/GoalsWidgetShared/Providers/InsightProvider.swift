@@ -53,41 +53,22 @@ public enum InsightCalculations {
     }
 
     /// Calculate moving average for a series of data points
+    /// Only uses actual data points (skips missing days)
     public static func calculateMovingAverage(
         for data: [(date: Date, value: Double)],
         window: Int
     ) -> [(date: Date, value: Double)] {
         guard !data.isEmpty else { return [] }
 
-        let calendar = Calendar.current
         let sorted = data.sorted { $0.date < $1.date }
 
-        var valuesByDate: [Date: Double] = [:]
-        for point in sorted {
-            let day = calendar.startOfDay(for: point.date)
-            valuesByDate[day] = point.value
-        }
-
-        guard let firstDate = sorted.first?.date,
-              let lastDate = sorted.last?.date else { return [] }
-
-        let startDay = calendar.startOfDay(for: firstDate)
-        let endDay = calendar.startOfDay(for: lastDate)
-
-        var continuousSeries: [(date: Date, value: Double)] = []
-        var currentDay = startDay
-        while currentDay <= endDay {
-            let value = valuesByDate[currentDay] ?? 0.0
-            continuousSeries.append((date: currentDay, value: value))
-            currentDay = calendar.date(byAdding: .day, value: 1, to: currentDay) ?? currentDay
-        }
-
+        // Calculate moving average using only existing data points
         var result: [(date: Date, value: Double)] = []
-        for i in 0..<continuousSeries.count {
+        for i in 0..<sorted.count {
             let windowStart = Swift.max(0, i - window + 1)
-            let windowData = continuousSeries[windowStart...i]
+            let windowData = sorted[windowStart...i]
             let average = windowData.reduce(0.0) { $0 + $1.value } / Double(windowData.count)
-            result.append((date: continuousSeries[i].date, value: average))
+            result.append((date: sorted[i].date, value: average))
         }
 
         return result

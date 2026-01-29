@@ -92,6 +92,7 @@ public final class AppContainer {
             ankiDataSource: ankiDataSource,
             zoteroDataSource: zoteroDataSource,
             nutritionRepository: nutritionRepository,
+            wiiFitDataSource: wiiFitDataSource,
             taskCachingService: taskCachingService
         )
         _insightsViewModel = vm
