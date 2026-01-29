@@ -6,7 +6,13 @@
 #
 # Build: make
 # Clean: make clean
+# Run:   make run (sends to Wii over network)
 #---------------------------------------------------------------------------------
+
+#---------------------------------------------------------------------------------
+# Wii network settings for wiiload
+#---------------------------------------------------------------------------------
+WIILOAD		:=	tcp:100.64.1.38
 
 #---------------------------------------------------------------------------------
 # Clear the implicit built in rules
@@ -104,7 +110,7 @@ export LIBPATHS	:=	$(foreach dir,$(LIBDIRS),-L$(dir)/lib) \
 					-L$(LIBOGC_LIB)
 
 export OUTPUT	:=	$(CURDIR)/$(TARGET)
-.PHONY: $(BUILD) clean
+.PHONY: $(BUILD) clean run
 
 #---------------------------------------------------------------------------------
 $(BUILD):
@@ -115,6 +121,14 @@ $(BUILD):
 clean:
 	@echo clean ...
 	@rm -fr $(BUILD) $(OUTPUT).elf $(OUTPUT).dol
+
+#---------------------------------------------------------------------------------
+# Send to Wii over network using wiiload
+# Requires Homebrew Channel to be running on the Wii
+#---------------------------------------------------------------------------------
+run: $(BUILD)
+	@echo Sending $(TARGET).dol to Wii...
+	WIILOAD=$(WIILOAD) wiiload $(OUTPUT).dol
 
 #---------------------------------------------------------------------------------
 else
