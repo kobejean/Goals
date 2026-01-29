@@ -56,6 +56,19 @@ This produces `boot.dol` which is the homebrew executable.
 make clean
 ```
 
+### Deploy over Network
+
+Instead of moving the SD card back and forth, you can send the app directly to your Wii:
+
+```bash
+make run
+```
+
+This uses `wiiload` to send `boot.dol` to the Wii over the network. Requirements:
+- Homebrew Channel must be open on the Wii (at the main menu, not inside an app)
+- Both devices on the same network
+- Edit `WIILOAD` in Makefile if your Wii's IP changes
+
 ## Installation
 
 1. Copy the built files to your SD card:
@@ -64,10 +77,28 @@ make clean
    SD:/apps/wiifitsync/meta.xml   (from wii-app/meta.xml)
    ```
 
-2. (Optional) Add an icon:
+2. Add the icon for Homebrew Channel:
    ```
-   SD:/apps/wiifitsync/icon.png
+   SD:/apps/wiifitsync/icon.png    (from wii-app/icon.png)
    ```
+
+### Creating a Wii Menu Channel (Optional)
+
+To launch Wii Fit Sync directly from the Wii Menu (without going through Homebrew Channel):
+
+1. Generate channel assets:
+   ```bash
+   cd assets
+   ./generate_icons.sh
+   ```
+
+2. Use a forwarder tool like [ForwardMii](https://github.com/FIX94/ForwardMii) to create a WAD:
+   - Set path to `sd:/apps/wiifitsync/boot.dol`
+   - Import the generated banner and icon images
+
+3. Install the WAD using YAWMM or Wii Mod Lite
+
+See `assets/README.md` for detailed instructions.
 
 ## Usage
 
