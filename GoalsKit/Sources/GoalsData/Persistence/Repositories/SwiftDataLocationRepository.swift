@@ -249,6 +249,53 @@ public final class SwiftDataLocationRepository: LocationRepositoryProtocol {
         try modelContext.save()
     }
 
+    // MARK: - Path Tracking Operations
+
+    public func addPathEntries(_ entries: [PathEntry]) async throws {
+        for entry in entries {
+            let model = PathEntryModel.from(entry)
+            modelContext.insert(model)
+        }
+        try modelContext.save()
+    }
+
+    public func fetchPathEntries(for date: Date) async throws -> [PathEntry] {
+        let calendar = Calendar.current
+        let startOfDay = calendar.startOfDay(for: date)
+        let endOfDay = calendar.date(byAdding: .day, value: 1, to: startOfDay) ?? date
+
+        let descriptor = FetchDescriptor<PathEntryModel>(
+            predicate: #Predicate { entry in
+                entry.timestamp >= startOfDay && entry.timestamp < endOfDay
+            },
+            sortBy: [SortDescriptor(\.timestamp)]
+        )
+        let models = try modelContext.fetch(descriptor)
+        return models.map { $0.toDomain() }
+    }
+
+    public func fetchPathEntries(from startDate: Date, to endDate: Date) async throws -> [PathEntry] {
+        let descriptor = FetchDescriptor<PathEntryModel>(
+            predicate: #Predicate { entry in
+                entry.timestamp >= startDate && entry.timestamp <= endDate
+            },
+            sortBy: [SortDescriptor(\.timestamp)]
+        )
+        let models = try modelContext.fetch(descriptor)
+        return models.map { $0.toDomain() }
+    }
+
+    public func pruneOldPathEntries(olderThan date: Date) async throws {
+        let descriptor = FetchDescriptor<PathEntryModel>(
+            predicate: #Predicate { $0.timestamp < date }
+        )
+        let oldEntries = try modelContext.fetch(descriptor)
+        for entry in oldEntries {
+            modelContext.delete(entry)
+        }
+        try modelContext.save()
+    }
+
     // MARK: - Hashable & Equatable
 
     nonisolated public func hash(into hasher: inout Hasher) {

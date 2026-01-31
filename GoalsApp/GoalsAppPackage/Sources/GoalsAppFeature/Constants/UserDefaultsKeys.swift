@@ -44,6 +44,9 @@ public enum UserDefaultsKeys {
     public static let tensorTonicUserId = "tensorTonicUserId"
     public static let tensorTonicSessionToken = "tensorTonicSessionToken"
 
+    // Location settings
+    public static let pathTrackingEnabled = "pathTrackingEnabled"
+
     /// Returns the shared UserDefaults if available, otherwise standard
     public static var shared: UserDefaults {
         SharedStorage.sharedDefaults ?? .standard
@@ -176,6 +179,14 @@ public extension UserDefaults {
         set {
             set(newValue, forKey: UserDefaultsKeys.tensorTonicSessionToken)
             UserDefaults.shared.set(newValue, forKey: UserDefaultsKeys.tensorTonicSessionToken)
+        }
+    }
+
+    var pathTrackingEnabled: Bool {
+        get { bool(forKey: UserDefaultsKeys.pathTrackingEnabled) }
+        set {
+            set(newValue, forKey: UserDefaultsKeys.pathTrackingEnabled)
+            UserDefaults.shared.set(newValue, forKey: UserDefaultsKeys.pathTrackingEnabled)
         }
     }
 }

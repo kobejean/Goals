@@ -72,6 +72,7 @@ public struct LocationsSectionView: View {
         .sheet(isPresented: $showingSettings) {
             LocationSettingsView(
                 locations: viewModel.locations,
+                isPathTrackingEnabled: viewModel.isPathTrackingEnabled,
                 onCreateLocation: { location in
                     Task {
                         await viewModel.createLocation(location)
@@ -85,6 +86,11 @@ public struct LocationsSectionView: View {
                 onDeleteLocation: { location in
                     Task {
                         await viewModel.deleteLocation(location)
+                    }
+                },
+                onSetPathTracking: { enabled in
+                    Task {
+                        await viewModel.setPathTrackingEnabled(enabled)
                     }
                 }
             )

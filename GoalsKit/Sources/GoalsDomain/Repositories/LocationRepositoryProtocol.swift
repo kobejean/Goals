@@ -68,4 +68,18 @@ public protocol LocationRepositoryProtocol: Sendable {
 
     /// Prunes entries older than the specified date
     func pruneOldEntries(olderThan date: Date) async throws
+
+    // MARK: - Path Tracking Operations
+
+    /// Adds path entries in batch (for all-day tracking)
+    func addPathEntries(_ entries: [PathEntry]) async throws
+
+    /// Fetches path entries for a specific date
+    func fetchPathEntries(for date: Date) async throws -> [PathEntry]
+
+    /// Fetches path entries within a date range
+    func fetchPathEntries(from startDate: Date, to endDate: Date) async throws -> [PathEntry]
+
+    /// Prunes path entries older than the specified date
+    func pruneOldPathEntries(olderThan date: Date) async throws
 }

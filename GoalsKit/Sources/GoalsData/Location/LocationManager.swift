@@ -43,8 +43,11 @@ public final class LocationManager: NSObject, @unchecked Sendable {
     /// Interval for high-frequency tracking during active sessions (seconds)
     public static let highFrequencyInterval: TimeInterval = 10
 
-    /// Distance filter for location updates (meters)
+    /// Distance filter for high-frequency location updates (meters)
     public static let distanceFilter: CLLocationDistance = 10
+
+    /// Distance filter for path tracking (meters) - larger for battery efficiency
+    public static let pathTrackingDistanceFilter: CLLocationDistance = 50
 
     /// Enable debug logging (set to false for production)
     public static nonisolated(unsafe) var debugLogging = true
@@ -68,10 +71,14 @@ public final class LocationManager: NSObject, @unchecked Sendable {
     /// Called when region state is determined (inside/outside)
     public var onRegionState: (@Sendable (UUID, CLRegionState) -> Void)?
 
+    /// Called when path tracking updates are received (all-day tracking)
+    public var onPathUpdate: (@Sendable (CLLocation) -> Void)?
+
     // MARK: - State
 
     private let locationManager: CLLocationManager
     private var isHighFrequencyTracking = false
+    private var isPathTracking = false
     private var monitoredLocationIds: [String: UUID] = [:] // region identifier -> location UUID
     private let lock = NSLock()
 
@@ -175,7 +182,14 @@ public final class LocationManager: NSObject, @unchecked Sendable {
     public func startHighFrequencyTracking() {
         guard !isHighFrequencyTracking else { return }
         isHighFrequencyTracking = true
-        locationManager.startUpdatingLocation()
+
+        // Use smaller distance filter for high-frequency tracking
+        locationManager.distanceFilter = Self.distanceFilter
+
+        // Start location updates if not already running from path tracking
+        if !isPathTracking {
+            locationManager.startUpdatingLocation()
+        }
         log("Started high-frequency location tracking")
     }
 
@@ -183,13 +197,54 @@ public final class LocationManager: NSObject, @unchecked Sendable {
     public func stopHighFrequencyTracking() {
         guard isHighFrequencyTracking else { return }
         isHighFrequencyTracking = false
-        locationManager.stopUpdatingLocation()
+
+        // If path tracking is active, restore its distance filter; otherwise stop updates
+        if isPathTracking {
+            locationManager.distanceFilter = Self.pathTrackingDistanceFilter
+        } else {
+            locationManager.stopUpdatingLocation()
+        }
         log("Stopped high-frequency location tracking")
     }
 
     /// Whether high-frequency tracking is active
     public var isTracking: Bool {
         isHighFrequencyTracking
+    }
+
+    // MARK: - Path Tracking (All-Day)
+
+    /// Start all-day path tracking with larger distance filter
+    public func startPathTracking() {
+        guard !isPathTracking else { return }
+        isPathTracking = true
+
+        // If high-frequency tracking is also active, keep the smaller distance filter
+        if !isHighFrequencyTracking {
+            locationManager.distanceFilter = Self.pathTrackingDistanceFilter
+            locationManager.startUpdatingLocation()
+        }
+        log("🛤️ Started path tracking (distance filter: \(Self.pathTrackingDistanceFilter)m)")
+    }
+
+    /// Stop all-day path tracking
+    public func stopPathTracking() {
+        guard isPathTracking else { return }
+        isPathTracking = false
+
+        // Only stop location updates if high-frequency tracking is also inactive
+        if !isHighFrequencyTracking {
+            locationManager.stopUpdatingLocation()
+        } else {
+            // Restore high-frequency distance filter
+            locationManager.distanceFilter = Self.distanceFilter
+        }
+        log("🛤️ Stopped path tracking")
+    }
+
+    /// Whether path tracking is active
+    public var isPathTrackingEnabled: Bool {
+        isPathTracking
     }
 
     // MARK: - Current Location
@@ -237,12 +292,18 @@ extension LocationManager: CLLocationManagerDelegate {
     }
 
     public func locationManager(_ manager: CLLocationManager, didUpdateLocations locations: [CLLocation]) {
-        guard isHighFrequencyTracking else { return }
+        guard let location = locations.last else { return }
 
-        // Only report the most recent location
-        if let location = locations.last {
+        // Dispatch to high-frequency tracking callback (for session entries)
+        if isHighFrequencyTracking {
             log("📍 Location update: (\(String(format: "%.4f", location.coordinate.latitude)), \(String(format: "%.4f", location.coordinate.longitude))) ±\(Int(location.horizontalAccuracy))m")
             onLocationUpdate?(location)
+        }
+
+        // Dispatch to path tracking callback (for all-day path entries)
+        if isPathTracking {
+            log("🛤️ Path update: (\(String(format: "%.4f", location.coordinate.latitude)), \(String(format: "%.4f", location.coordinate.longitude))) ±\(Int(location.horizontalAccuracy))m")
+            onPathUpdate?(location)
         }
     }
 

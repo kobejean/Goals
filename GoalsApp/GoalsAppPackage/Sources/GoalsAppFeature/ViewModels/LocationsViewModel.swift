@@ -35,6 +35,11 @@ public final class LocationsViewModel: Sendable {
     /// Timer tick for live duration updates
     public private(set) var timerTick: Date = Date()
 
+    /// Whether path tracking is enabled - forwards to tracking service
+    public var isPathTrackingEnabled: Bool {
+        locationTrackingService.isPathTrackingEnabled
+    }
+
     // MARK: - Dependencies
 
     private let locationRepository: LocationRepositoryProtocol
@@ -97,9 +102,30 @@ public final class LocationsViewModel: Sendable {
             if activeSession != nil {
                 startTimer()
             }
+
+            // Start path tracking if enabled in settings
+            if UserDefaults.standard.pathTrackingEnabled {
+                locationTrackingService.enablePathTracking()
+            }
         } catch {
             errorMessage = error.localizedDescription
         }
+    }
+
+    /// Toggle path tracking on/off
+    public func setPathTrackingEnabled(_ enabled: Bool) async {
+        UserDefaults.standard.pathTrackingEnabled = enabled
+
+        if enabled {
+            locationTrackingService.enablePathTracking()
+        } else {
+            await locationTrackingService.disablePathTracking()
+        }
+    }
+
+    /// Fetch today's path entries for visualization
+    public func fetchTodayPath() async throws -> [PathEntry] {
+        try await locationTrackingService.fetchTodayPath()
     }
 
     /// Manually toggle a location session

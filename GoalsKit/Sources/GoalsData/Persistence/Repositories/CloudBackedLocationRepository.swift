@@ -115,4 +115,23 @@ public final class CloudBackedLocationRepository: LocationRepositoryProtocol {
     public func pruneOldEntries(olderThan date: Date) async throws {
         try await local.pruneOldEntries(olderThan: date)
     }
+
+    // MARK: - Path Tracking Operations (Not synced to cloud)
+
+    public func addPathEntries(_ entries: [PathEntry]) async throws {
+        try await local.addPathEntries(entries)
+        // Path entries are not synced to cloud - local only
+    }
+
+    public func fetchPathEntries(for date: Date) async throws -> [PathEntry] {
+        try await local.fetchPathEntries(for: date)
+    }
+
+    public func fetchPathEntries(from startDate: Date, to endDate: Date) async throws -> [PathEntry] {
+        try await local.fetchPathEntries(from: startDate, to: endDate)
+    }
+
+    public func pruneOldPathEntries(olderThan date: Date) async throws {
+        try await local.pruneOldPathEntries(olderThan: date)
+    }
 }

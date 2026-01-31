@@ -16,6 +16,7 @@ public enum UnifiedSchema {
         LocationSessionModel.self,
         LocationEntryModel.self,
         LocationDailySummaryModel.self,
+        PathEntryModel.self,
 
         // Cached external data models
         TypeQuickerStatsModel.self,

@@ -17,16 +17,23 @@ public final class LocationTrackingService: Sendable {
     /// Whether high-frequency tracking is active
     public private(set) var isTracking: Bool = false
 
+    /// Whether all-day path tracking is enabled
+    public private(set) var isPathTrackingEnabled: Bool = false
+
     // MARK: - Dependencies
 
     private let locationManager: LocationManager
     private let locationRepository: LocationRepositoryProtocol
 
-    // MARK: - Entry Buffer
+    // MARK: - Entry Buffers
 
-    /// Buffer for batching location entries before persisting
+    /// Buffer for batching location entries before persisting (session-based)
     private var pendingEntries: [LocationEntry] = []
     private let batchSize = 6 // Flush every ~60 seconds worth of entries
+
+    /// Buffer for batching path entries before persisting (all-day tracking)
+    private var pendingPathEntries: [PathEntry] = []
+    private let pathBatchSize = 30 // Flush every ~25 minutes (50m filter = ~2min between updates)
 
     // MARK: - Debug Logging
 
@@ -74,6 +81,12 @@ public final class LocationTrackingService: Sendable {
                 await self?.handleRegionState(locationId: locationId, state: state)
             }
         }
+
+        locationManager.onPathUpdate = { [weak self] location in
+            Task { @MainActor [weak self] in
+                await self?.handlePathUpdate(location)
+            }
+        }
     }
 
     // MARK: - Public Control
@@ -116,7 +129,35 @@ public final class LocationTrackingService: Sendable {
     public func stopTracking() {
         locationManager.stopAllMonitoring()
         locationManager.stopHighFrequencyTracking()
+        locationManager.stopPathTracking()
         isTracking = false
+        isPathTrackingEnabled = false
+    }
+
+    // MARK: - Path Tracking (All-Day)
+
+    /// Enable all-day path tracking
+    public func enablePathTracking() {
+        guard !isPathTrackingEnabled else { return }
+        isPathTrackingEnabled = true
+        locationManager.startPathTracking()
+        log("🛤️ Path tracking enabled")
+    }
+
+    /// Disable all-day path tracking
+    public func disablePathTracking() async {
+        guard isPathTrackingEnabled else { return }
+        isPathTrackingEnabled = false
+        locationManager.stopPathTracking()
+
+        // Flush any pending path entries
+        await flushPendingPathEntries()
+        log("🛤️ Path tracking disabled")
+    }
+
+    /// Fetch today's path entries
+    public func fetchTodayPath() async throws -> [PathEntry] {
+        try await locationRepository.fetchPathEntries(for: Date())
     }
 
     /// Refresh monitored locations (call after adding/removing locations)
@@ -288,11 +329,52 @@ public final class LocationTrackingService: Sendable {
         }
     }
 
+    // MARK: - Path Update Handler
+
+    private func handlePathUpdate(_ location: CLLocation) async {
+        let entry = PathEntry(
+            timestamp: location.timestamp,
+            latitude: location.coordinate.latitude,
+            longitude: location.coordinate.longitude,
+            horizontalAccuracy: location.horizontalAccuracy,
+            altitude: location.altitude,
+            speed: location.speed >= 0 ? location.speed : nil,
+            course: location.course >= 0 ? location.course : nil
+        )
+
+        pendingPathEntries.append(entry)
+
+        // Flush if buffer is full
+        if pendingPathEntries.count >= pathBatchSize {
+            await flushPendingPathEntries()
+        }
+    }
+
+    private func flushPendingPathEntries() async {
+        guard !pendingPathEntries.isEmpty else { return }
+
+        let entriesToFlush = pendingPathEntries
+        pendingPathEntries = []
+
+        log("🛤️💾 Flushing \(entriesToFlush.count) pending path entries to database")
+        do {
+            try await locationRepository.addPathEntries(entriesToFlush)
+        } catch {
+            log("❌ Failed to save path entries: \(error)")
+        }
+    }
+
     // MARK: - Maintenance
 
     /// Prune old location entries (call periodically)
     public func pruneOldEntries(olderThan days: Int = 30) async throws {
         let cutoffDate = Calendar.current.date(byAdding: .day, value: -days, to: Date()) ?? Date()
         try await locationRepository.pruneOldEntries(olderThan: cutoffDate)
+    }
+
+    /// Prune old path entries (call periodically)
+    public func pruneOldPathEntries(olderThan days: Int = 7) async throws {
+        let cutoffDate = Calendar.current.date(byAdding: .day, value: -days, to: Date()) ?? Date()
+        try await locationRepository.pruneOldPathEntries(olderThan: cutoffDate)
     }
 }

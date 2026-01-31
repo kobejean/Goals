@@ -73,4 +73,8 @@ actor PreviewLocationRepository: LocationRepositoryProtocol {
     func addEntries(_ entries: [LocationEntry]) async throws {}
     func fetchEntries(sessionId: UUID) async throws -> [LocationEntry] { [] }
     func pruneOldEntries(olderThan: Date) async throws {}
+    func addPathEntries(_ entries: [PathEntry]) async throws {}
+    func fetchPathEntries(for date: Date) async throws -> [PathEntry] { [] }
+    func fetchPathEntries(from: Date, to: Date) async throws -> [PathEntry] { [] }
+    func pruneOldPathEntries(olderThan: Date) async throws {}
 }
