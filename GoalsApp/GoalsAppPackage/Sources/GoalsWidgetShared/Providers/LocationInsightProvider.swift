@@ -102,18 +102,67 @@ public final class LocationInsightProvider: BaseInsightProvider<LocationDailySum
     }
 
     /// Find the color of the dominant location (most time spent) for a day
+    /// Only considers time within the active window (6 AM - midnight)
     private static func dominantLocationColor(for summary: LocationDailySummary) -> Color? {
         guard !summary.sessions.isEmpty else { return nil }
 
-        // Group sessions by location and sum durations
+        let calendar = Calendar.current
+
+        // Active window: 6 AM to midnight (next day 0 AM)
+        let activeStartHour = 6
+        let activeEndHour = 24  // midnight
+
+        // Group sessions by location and sum durations within active window
         var durationByLocation: [UUID: (duration: TimeInterval, color: Color)] = [:]
         for session in summary.sessions {
+            let activeDuration = durationWithinActiveWindow(
+                session: session,
+                activeStartHour: activeStartHour,
+                activeEndHour: activeEndHour,
+                calendar: calendar
+            )
+            guard activeDuration > 0 else { continue }
+
             let existing = durationByLocation[session.locationId]
-            let newDuration = (existing?.duration ?? 0) + session.duration
+            let newDuration = (existing?.duration ?? 0) + activeDuration
             durationByLocation[session.locationId] = (newDuration, session.locationColor.swiftUIColor)
         }
 
         // Find location with maximum duration
         return durationByLocation.values.max(by: { $0.duration < $1.duration })?.color
+    }
+
+    /// Calculate how much of a session falls within the active window (e.g., 6 AM - midnight)
+    private static func durationWithinActiveWindow(
+        session: CachedLocationSession,
+        activeStartHour: Int,
+        activeEndHour: Int,
+        calendar: Calendar
+    ) -> TimeInterval {
+        let sessionStart = session.startDate
+        let sessionEnd = session.endDate ?? Date()
+
+        // Get the day of the session start
+        let dayStart = calendar.startOfDay(for: sessionStart)
+
+        // Calculate active window boundaries for this day
+        guard let windowStart = calendar.date(bySettingHour: activeStartHour, minute: 0, second: 0, of: dayStart),
+              let windowEnd = calendar.date(bySettingHour: activeEndHour % 24, minute: 0, second: 0, of: dayStart) else {
+            return session.duration
+        }
+
+        // Adjust window end for midnight (add a day if activeEndHour is 24)
+        let adjustedWindowEnd = activeEndHour >= 24
+            ? calendar.date(byAdding: .day, value: 1, to: windowEnd) ?? windowEnd
+            : windowEnd
+
+        // Calculate overlap between session and active window
+        let overlapStart = max(sessionStart, windowStart)
+        let overlapEnd = min(sessionEnd, adjustedWindowEnd)
+
+        if overlapEnd > overlapStart {
+            return overlapEnd.timeIntervalSince(overlapStart)
+        }
+        return 0
     }
 }
