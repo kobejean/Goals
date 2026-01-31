@@ -31,7 +31,8 @@ public final class AppContainer {
             .tasks: tasksDataSource,
             .anki: ankiDataSource,
             .zotero: zoteroDataSource,
-            .wiiFit: wiiFitDataSource
+            .wiiFit: wiiFitDataSource,
+            .tensorTonic: tensorTonicDataSource
             // Note: nutrition is excluded - it doesn't expose metrics for goals
         ]
     }
@@ -65,6 +66,10 @@ public final class AppContainer {
             try? await wiiFitDataSource.configure(settings: settings)
         }
 
+        if let settings = TensorTonicDataSource.loadSettingsFromUserDefaults() {
+            try? await tensorTonicDataSource.configure(settings: settings)
+        }
+
         // HealthKit doesn't need configuration - it uses system authorization
 
         // Configure Gemini (not using DataSourceConfigurable - different pattern)
@@ -93,6 +98,7 @@ public final class AppContainer {
             zoteroDataSource: zoteroDataSource,
             nutritionRepository: nutritionRepository,
             wiiFitDataSource: wiiFitDataSource,
+            tensorTonicDataSource: tensorTonicDataSource,
             taskCachingService: taskCachingService
         )
         _insightsViewModel = vm
@@ -136,6 +142,7 @@ public final class AppContainer {
     public let ankiDataSource: AnkiDataSource
     public let zoteroDataSource: ZoteroDataSource
     public let wiiFitDataSource: WiiFitDataSource
+    public let tensorTonicDataSource: TensorTonicDataSource
     public let geminiDataSource: GeminiDataSource
 
     // MARK: - Caching Services
@@ -243,6 +250,7 @@ public final class AppContainer {
         self.ankiDataSource = AnkiDataSource(modelContainer: modelContainer)
         self.zoteroDataSource = ZoteroDataSource(modelContainer: modelContainer)
         self.wiiFitDataSource = WiiFitDataSource(modelContainer: modelContainer)
+        self.tensorTonicDataSource = TensorTonicDataSource(modelContainer: modelContainer)
         self.geminiDataSource = GeminiDataSource()
 
         // Initialize caching services
@@ -262,7 +270,8 @@ public final class AppContainer {
                 .tasks: tasksDataSource,
                 .anki: ankiDataSource,
                 .zotero: zoteroDataSource,
-                .wiiFit: wiiFitDataSource
+                .wiiFit: wiiFitDataSource,
+                .tensorTonic: tensorTonicDataSource
             ]
         )
         self.badgeEvaluationUseCase = BadgeEvaluationUseCase(

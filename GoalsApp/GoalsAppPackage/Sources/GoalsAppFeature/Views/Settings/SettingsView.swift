@@ -21,11 +21,15 @@ public struct SettingsView: View {
     @State private var wiiFitIPAddress = ""
     @State private var wiiFitSelectedProfile = ""
     @State private var wiiFitConnectionStatus: WiiFitConnectionStatus = .unknown
+    @State private var tensorTonicUserId = ""
+    @State private var tensorTonicSessionToken = ""
+    @State private var tensorTonicConnectionStatus: TensorTonicConnectionStatus = .unknown
     @State private var typeQuickerSaveState: SaveState = .idle
     @State private var atCoderSaveState: SaveState = .idle
     @State private var ankiSaveState: SaveState = .idle
     @State private var zoteroSaveState: SaveState = .idle
     @State private var wiiFitSaveState: SaveState = .idle
+    @State private var tensorTonicSaveState: SaveState = .idle
 
     enum SaveState {
         case idle
@@ -55,6 +59,14 @@ public struct SettingsView: View {
         case disconnected
     }
 
+    enum TensorTonicConnectionStatus {
+        case unknown
+        case testing
+        case connected
+        case disconnected
+        case unauthorized  // Session expired or invalid
+    }
+
     public var body: some View {
         NavigationStack {
             settingsForm
@@ -67,6 +79,7 @@ public struct SettingsView: View {
             ankiSection
             zoteroSection
             wiiFitSection
+            tensorTonicSection
             geminiSection
             backupSection
             aboutSection
@@ -101,6 +114,11 @@ public struct SettingsView: View {
             wiiFitSelectedProfile: $wiiFitSelectedProfile,
             saveGeminiSettings: saveGeminiSettings,
             saveWiiFitSettings: saveWiiFitSettings
+        ))
+        .modifier(TensorTonicChangeHandlers(
+            tensorTonicUserId: $tensorTonicUserId,
+            tensorTonicSessionToken: $tensorTonicSessionToken,
+            saveTensorTonicSettings: saveTensorTonicSettings
         ))
     }
 
@@ -286,6 +304,86 @@ public struct SettingsView: View {
         }
     }
 
+    @State private var showTensorTonicAuth = false
+
+    private var tensorTonicSection: some View {
+        Section {
+            if tensorTonicUserId.isEmpty {
+                // Not signed in - show sign in button
+                Button {
+                    showTensorTonicAuth = true
+                } label: {
+                    HStack {
+                        Label("Sign in with GitHub", systemImage: "person.badge.key")
+                        Spacer()
+                        Image(systemName: "arrow.up.forward")
+                            .foregroundStyle(.secondary)
+                    }
+                }
+            } else {
+                // Signed in - show status
+                HStack {
+                    Label("User ID", systemImage: "person")
+                    Spacer()
+                    Text(tensorTonicUserId)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                        .truncationMode(.middle)
+                }
+                HStack {
+                    Text("Status")
+                    Spacer()
+                    tensorTonicStatusView
+                }
+                Button {
+                    Task { await testTensorTonicConnection() }
+                } label: {
+                    HStack {
+                        Spacer()
+                        Text("Test Connection")
+                        Spacer()
+                    }
+                }
+                Button(role: .destructive) {
+                    signOutTensorTonic()
+                } label: {
+                    HStack {
+                        Spacer()
+                        Text("Sign Out")
+                        Spacer()
+                    }
+                }
+            }
+        } header: {
+            Text("TensorTonic")
+        } footer: {
+            if tensorTonicUserId.isEmpty {
+                Text("Sign in with your GitHub account to track AI/ML problem-solving progress.")
+            } else {
+                Text("Session tokens expire in ~7 days. Sign in again if connection fails.")
+            }
+        }
+        .sheet(isPresented: $showTensorTonicAuth) {
+            TensorTonicAuthView { userId, sessionToken in
+                tensorTonicUserId = userId
+                tensorTonicSessionToken = sessionToken
+                tensorTonicConnectionStatus = .connected
+            }
+        }
+    }
+
+    private func signOutTensorTonic() {
+        tensorTonicUserId = ""
+        tensorTonicSessionToken = ""
+        tensorTonicConnectionStatus = .unknown
+        UserDefaults.standard.tensorTonicUserId = nil
+        UserDefaults.standard.tensorTonicSessionToken = nil
+        Task {
+            try? await container.tensorTonicDataSource.clearConfiguration()
+        }
+        container.notifySettingsChanged()
+    }
+
     private var geminiSection: some View {
         Section {
             HStack {
@@ -432,6 +530,43 @@ public struct SettingsView: View {
         }
     }
 
+    @ViewBuilder
+    private var tensorTonicStatusView: some View {
+        switch tensorTonicConnectionStatus {
+        case .unknown:
+            Text("Not tested")
+                .foregroundStyle(.secondary)
+        case .testing:
+            HStack(spacing: 4) {
+                ProgressView()
+                    .scaleEffect(0.8)
+                Text("Testing...")
+                    .foregroundStyle(.secondary)
+            }
+        case .connected:
+            HStack(spacing: 4) {
+                Image(systemName: "checkmark.circle.fill")
+                    .foregroundStyle(.green)
+                Text("Connected")
+                    .foregroundStyle(.green)
+            }
+        case .disconnected:
+            HStack(spacing: 4) {
+                Image(systemName: "xmark.circle.fill")
+                    .foregroundStyle(.red)
+                Text("Disconnected")
+                    .foregroundStyle(.red)
+            }
+        case .unauthorized:
+            HStack(spacing: 4) {
+                Image(systemName: "exclamationmark.triangle.fill")
+                    .foregroundStyle(.orange)
+                Text("Session expired")
+                    .foregroundStyle(.orange)
+            }
+        }
+    }
+
     private func loadSettings() async {
         typeQuickerUsername = UserDefaults.standard.typeQuickerUsername ?? ""
         atCoderUsername = UserDefaults.standard.atCoderUsername ?? ""
@@ -446,6 +581,8 @@ public struct SettingsView: View {
         geminiAPIKey = UserDefaults.standard.geminiAPIKey ?? ""
         wiiFitIPAddress = UserDefaults.standard.wiiFitIPAddress ?? ""
         wiiFitSelectedProfile = UserDefaults.standard.wiiFitSelectedProfile ?? ""
+        tensorTonicUserId = UserDefaults.standard.tensorTonicUserId ?? ""
+        tensorTonicSessionToken = UserDefaults.standard.tensorTonicSessionToken ?? ""
     }
 
     private func saveTypeQuickerSettings(username: String) async {
@@ -649,6 +786,48 @@ public struct SettingsView: View {
         wiiFitSaveState = .idle
     }
 
+    private func saveTensorTonicSettings() async {
+        tensorTonicSaveState = .saving
+        UserDefaults.standard.tensorTonicUserId = tensorTonicUserId
+        UserDefaults.standard.tensorTonicSessionToken = tensorTonicSessionToken
+
+        if !tensorTonicUserId.isEmpty && !tensorTonicSessionToken.isEmpty {
+            let settings = DataSourceSettings(
+                dataSourceType: .tensorTonic,
+                credentials: ["userId": tensorTonicUserId, "sessionToken": tensorTonicSessionToken]
+            )
+            try? await container.tensorTonicDataSource.configure(settings: settings)
+        }
+
+        container.notifySettingsChanged()
+        tensorTonicSaveState = .saved
+        try? await Task.sleep(for: .seconds(1.5))
+        tensorTonicSaveState = .idle
+    }
+
+    private func testTensorTonicConnection() async {
+        tensorTonicConnectionStatus = .testing
+
+        // Configure first if not already
+        if !tensorTonicUserId.isEmpty && !tensorTonicSessionToken.isEmpty {
+            let settings = DataSourceSettings(
+                dataSourceType: .tensorTonic,
+                credentials: ["userId": tensorTonicUserId, "sessionToken": tensorTonicSessionToken]
+            )
+            try? await container.tensorTonicDataSource.configure(settings: settings)
+        }
+
+        // Test connection
+        do {
+            let connected = try await container.tensorTonicDataSource.testConnection()
+            tensorTonicConnectionStatus = connected ? .connected : .disconnected
+        } catch DataSourceError.unauthorized {
+            tensorTonicConnectionStatus = .unauthorized
+        } catch {
+            tensorTonicConnectionStatus = .disconnected
+        }
+    }
+
     public init() {}
 }
 
@@ -775,6 +954,19 @@ struct OtherChangeHandlers: ViewModifier {
             .onChange(of: geminiAPIKey) { _, newValue in Task { await saveGeminiSettings(newValue) } }
             .onChange(of: wiiFitIPAddress) { _, _ in Task { await saveWiiFitSettings() } }
             .onChange(of: wiiFitSelectedProfile) { _, _ in Task { await saveWiiFitSettings() } }
+    }
+}
+
+/// ViewModifier for TensorTonic change handlers
+struct TensorTonicChangeHandlers: ViewModifier {
+    @Binding var tensorTonicUserId: String
+    @Binding var tensorTonicSessionToken: String
+    let saveTensorTonicSettings: () async -> Void
+
+    func body(content: Content) -> some View {
+        content
+            .onChange(of: tensorTonicUserId) { _, _ in Task { await saveTensorTonicSettings() } }
+            .onChange(of: tensorTonicSessionToken) { _, _ in Task { await saveTensorTonicSettings() } }
     }
 }
 

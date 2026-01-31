@@ -291,6 +291,44 @@ public extension WiiFitDataSourceProtocol {
     }
 }
 
+/// Protocol for TensorTonic data source
+public protocol TensorTonicDataSourceProtocol: DataSourceRepositoryProtocol {
+    /// Fetches current TensorTonic statistics
+    func fetchStats() async throws -> TensorTonicStats?
+
+    /// Fetches activity heatmap data for a date range
+    func fetchHeatmap(from startDate: Date, to endDate: Date) async throws -> [TensorTonicHeatmapEntry]
+
+    /// Tests connection to TensorTonic API
+    func testConnection() async throws -> Bool
+
+    // MARK: - Cache Methods (optional, for stale-while-revalidate pattern)
+
+    /// Returns cached stats without fetching from remote (for instant display)
+    func fetchCachedStats() async throws -> TensorTonicStats?
+
+    /// Returns cached heatmap without fetching from remote
+    func fetchCachedHeatmap(from startDate: Date, to endDate: Date) async throws -> [TensorTonicHeatmapEntry]
+
+    /// Returns true if there's any cached data available
+    func hasCachedData() async throws -> Bool
+}
+
+// Default implementations for non-cached TensorTonic data sources
+public extension TensorTonicDataSourceProtocol {
+    func fetchCachedStats() async throws -> TensorTonicStats? {
+        nil
+    }
+
+    func fetchCachedHeatmap(from startDate: Date, to endDate: Date) async throws -> [TensorTonicHeatmapEntry] {
+        []
+    }
+
+    func hasCachedData() async throws -> Bool {
+        false
+    }
+}
+
 /// Result of a Wii Fit sync operation
 public struct WiiFitSyncResult: Sendable {
     /// Measurements synced

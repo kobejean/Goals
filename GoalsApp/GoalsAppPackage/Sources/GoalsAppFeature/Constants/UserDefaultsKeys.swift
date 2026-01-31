@@ -33,10 +33,15 @@ public enum UserDefaultsKeys {
     public static let atCoderInsightsTimeRange = "atCoderInsightsTimeRange"
     public static let zoteroInsightsTimeRange = "zoteroInsightsTimeRange"
     public static let wiiFitInsightsTimeRange = "wiiFitInsightsTimeRange"
+    public static let tensorTonicInsightsTimeRange = "tensorTonicInsightsTimeRange"
 
     // Wii Fit settings
     public static let wiiFitIPAddress = "wiiFitIPAddress"
     public static let wiiFitSelectedProfile = "wiiFitSelectedProfile"
+
+    // TensorTonic settings
+    public static let tensorTonicUserId = "tensorTonicUserId"
+    public static let tensorTonicSessionToken = "tensorTonicSessionToken"
 
     /// Returns the shared UserDefaults if available, otherwise standard
     public static var shared: UserDefaults {
@@ -154,6 +159,22 @@ public extension UserDefaults {
         set {
             set(newValue, forKey: UserDefaultsKeys.wiiFitSelectedProfile)
             UserDefaults.shared.set(newValue, forKey: UserDefaultsKeys.wiiFitSelectedProfile)
+        }
+    }
+
+    var tensorTonicUserId: String? {
+        get { string(forKey: UserDefaultsKeys.tensorTonicUserId) }
+        set {
+            set(newValue, forKey: UserDefaultsKeys.tensorTonicUserId)
+            UserDefaults.shared.set(newValue, forKey: UserDefaultsKeys.tensorTonicUserId)
+        }
+    }
+
+    var tensorTonicSessionToken: String? {
+        get { string(forKey: UserDefaultsKeys.tensorTonicSessionToken) }
+        set {
+            set(newValue, forKey: UserDefaultsKeys.tensorTonicSessionToken)
+            UserDefaults.shared.set(newValue, forKey: UserDefaultsKeys.tensorTonicSessionToken)
         }
     }
 }

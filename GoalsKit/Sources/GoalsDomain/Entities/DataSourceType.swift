@@ -26,6 +26,9 @@ public enum DataSourceType: String, Codable, Sendable, CaseIterable {
     /// Wii Fit body measurements and exercise data
     case wiiFit
 
+    /// TensorTonic AI/ML problem-solving statistics
+    case tensorTonic
+
     /// Display name for the data source
     public var displayName: String {
         switch self {
@@ -45,6 +48,8 @@ public enum DataSourceType: String, Codable, Sendable, CaseIterable {
             return "Nutrition"
         case .wiiFit:
             return "Wii Fit"
+        case .tensorTonic:
+            return "TensorTonic"
         }
     }
 
@@ -67,6 +72,8 @@ public enum DataSourceType: String, Codable, Sendable, CaseIterable {
             return "fork.knife"
         case .wiiFit:
             return "scalemass.fill"
+        case .tensorTonic:
+            return "brain.head.profile"
         }
     }
 
@@ -89,6 +96,8 @@ public enum DataSourceType: String, Codable, Sendable, CaseIterable {
             return "Photo-based nutrition tracking with AI analysis"
         case .wiiFit:
             return "Body measurements and exercise data from Nintendo Wii Fit"
+        case .tensorTonic:
+            return "AI/ML problem-solving progress from TensorTonic"
         }
     }
 }

@@ -11,4 +11,5 @@ public enum DataSourceError: Error, Sendable {
     case parseError(String)
     case connectionFailed(String)
     case unauthorized  // 401/403 - invalid API key or permissions
+    case rateLimited   // 429 - rate limit exceeded
 }

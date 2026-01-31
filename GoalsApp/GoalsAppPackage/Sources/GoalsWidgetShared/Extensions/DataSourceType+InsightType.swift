@@ -16,6 +16,7 @@ extension DataSourceType {
         case .zotero: return .zotero
         case .nutrition: return .nutrition
         case .wiiFit: return .wiiFit
+        case .tensorTonic: return .tensorTonic
         }
     }
 }
@@ -33,6 +34,7 @@ extension InsightType {
         case .zotero: return .zotero
         case .nutrition: return .nutrition
         case .wiiFit: return .wiiFit
+        case .tensorTonic: return .tensorTonic
         }
     }
 }

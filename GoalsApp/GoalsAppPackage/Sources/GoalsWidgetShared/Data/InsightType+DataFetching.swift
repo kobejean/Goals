@@ -14,6 +14,7 @@ extension InsightType {
         .zotero: ZoteroInsightProvider.self,
         .nutrition: NutritionInsightProvider.self,
         .wiiFit: WiiFitInsightProvider.self,
+        .tensorTonic: TensorTonicInsightProvider.self,
     ]
 
     /// Convenience method that creates a shared container and fetches insight data.

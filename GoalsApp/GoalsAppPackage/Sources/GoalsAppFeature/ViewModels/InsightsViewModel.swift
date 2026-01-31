@@ -25,6 +25,7 @@ public final class InsightsViewModel {
     public let zotero: ZoteroInsightsViewModel
     public let nutrition: NutritionInsightsViewModel
     public let wiiFit: WiiFitInsightsViewModel
+    public let tensorTonic: TensorTonicInsightsViewModel
 
     // MARK: - Card Ordering
 
@@ -47,6 +48,7 @@ public final class InsightsViewModel {
         zoteroDataSource: ZoteroDataSource,
         nutritionRepository: NutritionRepositoryProtocol,
         wiiFitDataSource: WiiFitDataSource,
+        tensorTonicDataSource: TensorTonicDataSource,
         taskCachingService: TaskCachingService? = nil
     ) {
         self.typeQuicker = TypeQuickerInsightsViewModel(
@@ -79,6 +81,10 @@ public final class InsightsViewModel {
         )
         self.wiiFit = WiiFitInsightsViewModel(
             dataSource: wiiFitDataSource,
+            goalRepository: goalRepository
+        )
+        self.tensorTonic = TensorTonicInsightsViewModel(
+            dataSource: tensorTonicDataSource,
             goalRepository: goalRepository
         )
 
@@ -124,6 +130,9 @@ public final class InsightsViewModel {
             },
             .wiiFit: makeCardConfig(type: .wiiFit, from: wiiFit) {
                 AnyView(WiiFitInsightsDetailView(viewModel: self.wiiFit))
+            },
+            .tensorTonic: makeCardConfig(type: .tensorTonic, from: tensorTonic) {
+                AnyView(TensorTonicInsightsDetailView(viewModel: self.tensorTonic))
             }
         ]
     }
@@ -202,6 +211,7 @@ public final class InsightsViewModel {
             group.addTask { await self.load(self.zotero, isThrottled: isThrottled) }
             group.addTask { await self.load(self.nutrition, isThrottled: isThrottled) }
             group.addTask { await self.load(self.wiiFit, isThrottled: isThrottled) }
+            group.addTask { await self.load(self.tensorTonic, isThrottled: isThrottled) }
         }
 
         if !isThrottled {
