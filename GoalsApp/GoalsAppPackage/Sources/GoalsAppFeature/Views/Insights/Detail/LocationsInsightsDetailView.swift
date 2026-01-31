@@ -1,6 +1,7 @@
 import SwiftUI
 import Charts
 import MapKit
+import GoalsCore
 import GoalsDomain
 import GoalsWidgetShared
 
@@ -164,25 +165,12 @@ struct LocationsInsightsDetailView: View {
     // MARK: - Schedule Chart Data Conversion
 
     /// Convert filtered summaries to InsightDurationRangeData for the schedule chart
+    /// Sessions crossing the 4 AM boundary are split across multiple days.
     private var scheduleChartData: InsightDurationRangeData {
-        let dataPoints = filteredSummaries.compactMap { summary -> DurationRangeDataPoint? in
-            let segments = summary.sessions.compactMap { session -> DurationSegment? in
-                // Use referenceDate for active sessions
-                let endDate = session.endDate ?? viewModel.referenceDate
-
-                // Skip if session started after reference date
-                guard session.startDate <= viewModel.referenceDate else { return nil }
-
-                return DurationSegment(
-                    startTime: session.startDate,
-                    endTime: endDate,
-                    color: session.locationColor.swiftUIColor,
-                    label: session.locationName
-                )
-            }
-            guard !segments.isEmpty else { return nil }
-            return DurationRangeDataPoint(date: summary.date, segments: segments)
-        }
+        // Use batch conversion with day boundary handling
+        let dataPoints = filteredSummaries.toDurationRangeDataPoints(
+            referenceDate: viewModel.referenceDate
+        )
 
         // Calculate date range for last 7 days with padding
         let calendar = Calendar.current
@@ -195,7 +183,8 @@ struct LocationsInsightsDetailView: View {
             dataPoints: dataPoints,
             defaultColor: .cyan,
             dateRange: DateRange(start: paddedStart, end: paddedEnd),
-            useSimpleHours: true
+            useSimpleHours: true,
+            boundaryHour: DayBoundaryConfig.locations.boundaryHour
         )
     }
 

@@ -1,6 +1,8 @@
 import Foundation
 import SwiftUI
 import GoalsDomain
+import GoalsCore
+import GoalsWidgetShared
 
 /// Metric options for Sleep charts
 public enum SleepMetric: String, CaseIterable, Sendable {
@@ -176,5 +178,59 @@ extension SleepRangeDataPoint {
             color: color
         )
         return DurationRangeDataPoint(date: date, segments: [segment])
+    }
+}
+
+// MARK: - Batch Conversion with Day Boundary Handling
+
+public extension Array where Element == SleepRangeDataPoint {
+    /// Convert to duration range data points with proper day boundary handling
+    ///
+    /// Sleep sessions that cross the 4 PM boundary will be split across multiple days.
+    /// The 4 PM boundary ensures overnight sleep (e.g., 10 PM to 7 AM) stays together
+    /// in a single logical day, since both times fall between consecutive 4 PM boundaries.
+    ///
+    /// Example of a split: An afternoon nap from 2 PM to 6 PM would be split as:
+    /// - [2 PM - 4 PM] in day N (before boundary, counts as previous logical day)
+    /// - [4 PM - 6 PM] in day N+1 (after boundary, counts as current logical day)
+    ///
+    /// - Parameters:
+    ///   - color: Color to use for the sleep segments
+    ///   - boundaryConfig: Day boundary configuration (defaults to .sleep which uses 4 PM)
+    /// - Returns: Array of DurationRangeDataPoint with sessions properly split at boundaries
+    func toDurationRangeDataPoints(
+        color: Color = .indigo,
+        boundaryConfig: DayBoundaryConfig = .sleep
+    ) -> [DurationRangeDataPoint] {
+        // Collect all sleep sessions and split them at boundaries
+        var segmentsByLogicalDay: [Date: [DurationSegment]] = [:]
+
+        for dataPoint in self {
+            guard let bedtime = dataPoint.bedtime, let wakeTime = dataPoint.wakeTime else {
+                continue
+            }
+
+            // Split the sleep session at day boundaries
+            let splitSegments = DayBoundarySplitter.split(
+                startTime: bedtime,
+                endTime: wakeTime,
+                original: dataPoint,
+                config: boundaryConfig
+            )
+
+            for segment in splitSegments {
+                let durationSegment = DurationSegment(
+                    startTime: segment.startTime,
+                    endTime: segment.endTime,
+                    color: color
+                )
+                segmentsByLogicalDay[segment.logicalDay, default: []].append(durationSegment)
+            }
+        }
+
+        // Convert to DurationRangeDataPoint array sorted by date
+        return segmentsByLogicalDay.map { date, segments in
+            DurationRangeDataPoint(date: date, segments: segments)
+        }.sorted { $0.date < $1.date }
     }
 }

@@ -41,19 +41,23 @@ public struct DurationSegment: Identifiable, Sendable {
     public let endTime: Date
     public let color: Color
     public let label: String?
+    /// Hour offset for day boundary handling (24 for segments assigned to previous logical day)
+    public let hourOffset: Double
 
     public init(
         id: UUID = UUID(),
         startTime: Date,
         endTime: Date,
         color: Color,
-        label: String? = nil
+        label: String? = nil,
+        hourOffset: Double = 0
     ) {
         self.id = id
         self.startTime = startTime
         self.endTime = endTime
         self.color = color
         self.label = label
+        self.hourOffset = hourOffset
     }
 
     /// Start time as hours relative to midnight (negative for PM, e.g., -2 for 10 PM)
@@ -77,19 +81,21 @@ public struct DurationSegment: Identifiable, Sendable {
     }
 
     /// Start time as simple hour of day (0-24 scale, for daytime activities)
+    /// Includes hourOffset for segments assigned to previous logical day
     public var startHour: Double {
         let calendar = Calendar.current
         let components = calendar.dateComponents([.hour, .minute], from: startTime)
-        guard let hour = components.hour, let minute = components.minute else { return 0 }
-        return Double(hour) + Double(minute) / 60.0
+        guard let hour = components.hour, let minute = components.minute else { return hourOffset }
+        return Double(hour) + Double(minute) / 60.0 + hourOffset
     }
 
     /// End time as simple hour of day (0-24 scale, for daytime activities)
+    /// Includes hourOffset for segments assigned to previous logical day
     public var endHour: Double {
         let calendar = Calendar.current
         let components = calendar.dateComponents([.hour, .minute], from: endTime)
-        guard let hour = components.hour, let minute = components.minute else { return 0 }
-        return Double(hour) + Double(minute) / 60.0
+        guard let hour = components.hour, let minute = components.minute else { return hourOffset }
+        return Double(hour) + Double(minute) / 60.0 + hourOffset
     }
 }
 
@@ -111,17 +117,20 @@ public struct InsightDurationRangeData: Sendable {
     public let defaultColor: Color
     public let dateRange: DateRange?  // Optional fixed X-axis range
     public let useSimpleHours: Bool   // Use 0-24 hour scale (for daytime tasks) vs midnight-centered (for sleep)
+    public let boundaryHour: Int      // Day boundary hour for Y-axis minimum (4 for tasks/locations, 16 for sleep)
 
     public init(
         dataPoints: [DurationRangeDataPoint],
         defaultColor: Color,
         dateRange: DateRange? = nil,
-        useSimpleHours: Bool = false
+        useSimpleHours: Bool = false,
+        boundaryHour: Int = 4
     ) {
         self.dataPoints = dataPoints
         self.defaultColor = defaultColor
         self.dateRange = dateRange
         self.useSimpleHours = useSimpleHours
+        self.boundaryHour = boundaryHour
     }
 }
 

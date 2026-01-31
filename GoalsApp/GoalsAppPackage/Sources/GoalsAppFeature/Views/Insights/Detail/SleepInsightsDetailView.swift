@@ -1,5 +1,6 @@
 import SwiftUI
 import Charts
+import GoalsCore
 import GoalsDomain
 import GoalsWidgetShared
 
@@ -215,15 +216,15 @@ struct SleepInsightsDetailView: View {
     // MARK: - Sleep Schedule Chart Data
 
     /// Convert filtered range data to InsightDurationRangeData for the schedule chart
+    /// Sleep sessions that cross the 4 PM boundary will be properly split across multiple days.
     private var sleepScheduleChartData: InsightDurationRangeData {
-        let dataPoints = filteredRangeData.compactMap { point -> DurationRangeDataPoint? in
-            point.toDurationRangeDataPoint(color: .indigo)
-        }
+        let dataPoints = filteredRangeData.toDurationRangeDataPoints(color: .indigo)
 
         return InsightDurationRangeData(
             dataPoints: dataPoints,
             defaultColor: .indigo,
-            useSimpleHours: false  // Use overnight scale (-6 to +12)
+            useSimpleHours: false,  // Use overnight scale (-6 to +12)
+            boundaryHour: DayBoundaryConfig.sleep.boundaryHour
         )
     }
 

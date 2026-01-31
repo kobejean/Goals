@@ -247,17 +247,20 @@ public struct ScheduleChart: View {
 
         guard !allValues.isEmpty else {
             // Default domain based on coordinate system
-            return data.useSimpleHours ? 6...18 : -2...8
+            let boundaryHour = Double(data.boundaryHour)
+            return data.useSimpleHours ? boundaryHour...(boundaryHour + 14) : -2...8
         }
 
-        let minValue = allValues.min() ?? (data.useSimpleHours ? 6.0 : -2.0)
-        let maxValue = allValues.max() ?? (data.useSimpleHours ? 18.0 : 8.0)
+        let minValue = allValues.min() ?? (data.useSimpleHours ? Double(data.boundaryHour) : -2.0)
+        let maxValue = allValues.max() ?? (data.useSimpleHours ? Double(data.boundaryHour) + 14 : 8.0)
 
         if style == .full {
             // Add padding and round to nice values for full mode
-            // Allow values > 24 for tasks that cross midnight
-            let paddedMin = max(data.useSimpleHours ? 0 : -12, floor(minValue) - 1)
-            let paddedMax = min(data.useSimpleHours ? 30 : 14, ceil(maxValue) + 1)
+            // Use boundary hour as minimum for simple hours mode (e.g., 4 AM for tasks)
+            // Allow values > 24 for tasks that cross into next morning (before boundary)
+            let boundaryHour = Double(data.boundaryHour)
+            let paddedMin = max(data.useSimpleHours ? boundaryHour : -12, floor(minValue) - 1)
+            let paddedMax = min(data.useSimpleHours ? boundaryHour + 24 : 14, ceil(maxValue) + 1)
             return paddedMin...paddedMax
         } else {
             // Add small padding for compact mode (minimum 0.5 to avoid zero-height domain)

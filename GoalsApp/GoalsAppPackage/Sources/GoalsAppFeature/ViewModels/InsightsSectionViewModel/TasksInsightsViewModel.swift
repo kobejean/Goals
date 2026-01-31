@@ -130,10 +130,11 @@ public final class TasksInsightsViewModel: InsightsSectionViewModel {
     }
 
     /// Get duration range data points for a time range (limited to 30 for readability)
+    /// Sessions that cross the 4 AM boundary will be properly split across multiple days.
     public func filteredRangeData(for timeRange: TimeRange) -> [DurationRangeDataPoint] {
         let filtered = filteredDailySummaries(for: timeRange)
         let dataToShow = filtered.count > 30 ? Array(filtered.suffix(30)) : filtered
-        return dataToShow.map { $0.toDurationRangeDataPoint(referenceDate: referenceDate) }
+        return dataToShow.toDurationRangeDataPoints(referenceDate: referenceDate)
     }
 
     // MARK: - Data Loading

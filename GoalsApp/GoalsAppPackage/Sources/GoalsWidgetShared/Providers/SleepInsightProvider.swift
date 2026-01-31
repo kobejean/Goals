@@ -1,6 +1,7 @@
 import Foundation
 import SwiftData
 import SwiftUI
+import GoalsCore
 import GoalsData
 import GoalsDomain
 
@@ -29,11 +30,8 @@ public final class SleepInsightProvider: BaseInsightProvider<SleepDailySummary> 
         // Limit to last 14 entries for duration range chart readability
         let recentData = Array(sleepData.suffix(14))
 
-        let rangeDataPoints = recentData.compactMap { summary -> DurationRangeDataPoint? in
-            guard let bedtime = summary.bedtime, let wakeTime = summary.wakeTime else { return nil }
-            let segment = DurationSegment(startTime: bedtime, endTime: wakeTime, color: type.color)
-            return DurationRangeDataPoint(date: summary.date, segments: [segment])
-        }
+        // Use batch conversion with day boundary handling
+        let rangeDataPoints = recentData.toDurationRangeDataPoints(color: type.color)
 
         guard !rangeDataPoints.isEmpty else { return (nil, nil) }
 
@@ -43,7 +41,8 @@ public final class SleepInsightProvider: BaseInsightProvider<SleepDailySummary> 
         let durationRangeData = InsightDurationRangeData(
             dataPoints: rangeDataPoints,
             defaultColor: type.color,
-            useSimpleHours: false
+            useSimpleHours: false,
+            boundaryHour: DayBoundaryConfig.sleep.boundaryHour
         )
 
         let summary = InsightSummary(

@@ -22,6 +22,7 @@ let package = Package(
         .target(
             name: "GoalsWidgetShared",
             dependencies: [
+                .product(name: "GoalsCore", package: "GoalsKit"),
                 .product(name: "GoalsDomain", package: "GoalsKit"),
                 .product(name: "GoalsData", package: "GoalsKit"),
             ]

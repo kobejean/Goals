@@ -1,6 +1,7 @@
 import Foundation
 import SwiftData
 import SwiftUI
+import GoalsCore
 import GoalsData
 import GoalsDomain
 
@@ -42,15 +43,15 @@ public final class LocationInsightProvider: BaseInsightProvider<LocationDailySum
             return day >= rangeStart && day <= rangeEnd
         }
 
-        let rangeDataPoints = recentData.map { summary in
-            summary.toDurationRangeDataPoint(referenceDate: referenceDate)
-        }
+        // Use batch conversion with day boundary handling
+        let rangeDataPoints = recentData.toDurationRangeDataPoints(referenceDate: referenceDate)
 
         let durationRangeData = InsightDurationRangeData(
             dataPoints: rangeDataPoints,
             defaultColor: type.color,
             dateRange: dateRange,
-            useSimpleHours: true
+            useSimpleHours: true,
+            boundaryHour: DayBoundaryConfig.locations.boundaryHour
         )
 
         // Calculate today's hours using referenceDate for active sessions
