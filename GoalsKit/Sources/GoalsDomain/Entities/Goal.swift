@@ -23,6 +23,9 @@ public struct Goal: Sendable, Equatable, UUIDIdentifiable, Codable {
     public var isArchived: Bool
     public var color: GoalColor
 
+    /// Direction for progress tracking (increase or decrease toward target)
+    public var direction: GoalDirection
+
     // Per-task tracking (for .tasks data source)
     public var taskId: UUID?
 
@@ -40,6 +43,7 @@ public struct Goal: Sendable, Equatable, UUIDIdentifiable, Codable {
         deadline: Date? = nil,
         isArchived: Bool = false,
         color: GoalColor = .blue,
+        direction: GoalDirection = .increase,
         taskId: UUID? = nil
     ) {
         self.id = id
@@ -55,18 +59,48 @@ public struct Goal: Sendable, Equatable, UUIDIdentifiable, Codable {
         self.deadline = deadline
         self.isArchived = isArchived
         self.color = color
+        self.direction = direction
         self.taskId = taskId
     }
 
     /// Progress percentage (0.0 to 1.0)
     public var progress: Double {
-        guard targetValue > 0 else { return 0 }
-        return min(currentValue / targetValue, 1.0)
+        switch direction {
+        case .increase:
+            // Progress increases as currentValue approaches targetValue from below
+            guard targetValue > 0 else { return 0 }
+            return min(currentValue / targetValue, 1.0)
+
+        case .decrease:
+            // Progress increases as currentValue approaches targetValue from above
+            // Example: current=80kg, target=70kg, starting=90kg (assumed as 2x target)
+            // We calculate progress as how far we've come from a reasonable starting point
+            guard targetValue > 0 else { return 0 }
+
+            // If already at or below target, goal is achieved
+            if currentValue <= targetValue {
+                return 1.0
+            }
+
+            // Assume starting point is 2x target (or current if higher)
+            // This gives a reasonable progress range
+            let assumedStart = max(currentValue, targetValue * 2)
+            let totalDistance = assumedStart - targetValue
+            let progressMade = assumedStart - currentValue
+
+            guard totalDistance > 0 else { return 0 }
+            return min(progressMade / totalDistance, 1.0)
+        }
     }
 
     /// Returns true if the goal has been achieved
     public var isAchieved: Bool {
-        progress >= 1.0
+        switch direction {
+        case .increase:
+            return currentValue >= targetValue
+        case .decrease:
+            return currentValue <= targetValue
+        }
     }
 }
 

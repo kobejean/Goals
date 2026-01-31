@@ -10,8 +10,8 @@ public actor WiiFitDataSource: WiiFitDataSourceProtocol, CacheableDataSource {
 
     public nonisolated var availableMetrics: [MetricInfo] {
         [
-            MetricInfo(key: "weight", name: "Weight", unit: "kg", icon: "scalemass.fill"),
-            MetricInfo(key: "bmi", name: "BMI", unit: "", icon: "figure.stand"),
+            MetricInfo(key: "weight", name: "Weight", unit: "kg", icon: "scalemass.fill", direction: .decrease),
+            MetricInfo(key: "bmi", name: "BMI", unit: "", icon: "figure.stand", direction: .decrease),
             MetricInfo(key: "balance", name: "Balance", unit: "%", icon: "figure.stand.line.dotted.figure.stand"),
             MetricInfo(key: "calories", name: "Calories", unit: "kcal", icon: "flame.fill"),
             MetricInfo(key: "duration", name: "Exercise Time", unit: "min", icon: "timer"),

@@ -25,6 +25,9 @@ public final class GoalModel {
     public var isArchived: Bool = false
     public var colorRawValue: String = "blue"
 
+    /// Direction for progress tracking (increase or decrease toward target)
+    public var directionRawValue: String = "increase"
+
     // Per-task tracking (for .tasks data source)
     public var taskId: UUID?
 
@@ -42,6 +45,7 @@ public final class GoalModel {
         deadline: Date? = nil,
         isArchived: Bool = false,
         colorRawValue: String = "blue",
+        directionRawValue: String = "increase",
         taskId: UUID? = nil
     ) {
         self.id = id
@@ -57,6 +61,7 @@ public final class GoalModel {
         self.deadline = deadline
         self.isArchived = isArchived
         self.colorRawValue = colorRawValue
+        self.directionRawValue = directionRawValue
         self.taskId = taskId
     }
 }
@@ -80,6 +85,7 @@ public extension GoalModel {
             deadline: deadline,
             isArchived: isArchived,
             color: GoalColor(rawValue: colorRawValue) ?? .blue,
+            direction: GoalDirection(rawValue: directionRawValue) ?? .increase,
             taskId: taskId
         )
     }
@@ -100,6 +106,7 @@ public extension GoalModel {
             deadline: goal.deadline,
             isArchived: goal.isArchived,
             colorRawValue: goal.color.rawValue,
+            directionRawValue: goal.direction.rawValue,
             taskId: goal.taskId
         )
     }
@@ -117,6 +124,7 @@ public extension GoalModel {
         deadline = goal.deadline
         isArchived = goal.isArchived
         colorRawValue = goal.color.rawValue
+        directionRawValue = goal.direction.rawValue
         taskId = goal.taskId
     }
 }

@@ -18,6 +18,7 @@ public struct CreateGoalUseCase: Sendable {
         unit: String,
         deadline: Date? = nil,
         color: GoalColor = .blue,
+        direction: GoalDirection = .increase,
         taskId: UUID? = nil
     ) async throws -> Goal {
         let goal = Goal(
@@ -30,6 +31,7 @@ public struct CreateGoalUseCase: Sendable {
             unit: unit,
             deadline: deadline,
             color: color,
+            direction: direction,
             taskId: taskId
         )
         return try await goalRepository.create(goal)

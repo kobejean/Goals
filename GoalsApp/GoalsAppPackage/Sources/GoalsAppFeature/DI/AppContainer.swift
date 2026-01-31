@@ -32,8 +32,9 @@ public final class AppContainer {
             .anki: ankiDataSource,
             .zotero: zoteroDataSource,
             .wiiFit: wiiFitDataSource,
-            .tensorTonic: tensorTonicDataSource
-            // Note: nutrition is excluded - it doesn't expose metrics for goals
+            .tensorTonic: tensorTonicDataSource,
+            .nutrition: nutritionDataSource,
+            .locations: locationsDataSource
         ]
     }
 
@@ -160,6 +161,8 @@ public final class AppContainer {
     public let zoteroDataSource: ZoteroDataSource
     public let wiiFitDataSource: WiiFitDataSource
     public let tensorTonicDataSource: TensorTonicDataSource
+    public let nutritionDataSource: NutritionDataSource
+    public let locationsDataSource: LocationsDataSource
     public let geminiDataSource: GeminiDataSource
 
     // MARK: - Caching Services
@@ -277,6 +280,8 @@ public final class AppContainer {
         self.zoteroDataSource = ZoteroDataSource(modelContainer: modelContainer)
         self.wiiFitDataSource = WiiFitDataSource(modelContainer: modelContainer)
         self.tensorTonicDataSource = TensorTonicDataSource(modelContainer: modelContainer)
+        self.nutritionDataSource = NutritionDataSource(nutritionRepository: nutritionRepository)
+        self.locationsDataSource = LocationsDataSource(locationRepository: locationRepository)
         self.geminiDataSource = GeminiDataSource()
 
         // Initialize caching services
@@ -308,7 +313,9 @@ public final class AppContainer {
                 .anki: ankiDataSource,
                 .zotero: zoteroDataSource,
                 .wiiFit: wiiFitDataSource,
-                .tensorTonic: tensorTonicDataSource
+                .tensorTonic: tensorTonicDataSource,
+                .nutrition: nutritionDataSource,
+                .locations: locationsDataSource
             ]
         )
         self.badgeEvaluationUseCase = BadgeEvaluationUseCase(

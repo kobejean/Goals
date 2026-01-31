@@ -183,7 +183,8 @@ public struct CreateGoalView: View {
     }
 
     private var availableDataSources: [DataSourceType] {
-        [.typeQuicker, .atCoder, .healthKitSleep, .tasks]
+        // Return data sources that have available metrics (registered in AppContainer)
+        DataSourceType.allCases.filter { !container.availableMetrics(for: $0).isEmpty }
     }
 
     private var isValid: Bool {
@@ -229,6 +230,7 @@ public struct CreateGoalView: View {
                 targetValue: target,
                 unit: metric.unit,
                 color: color,
+                direction: metric.direction,
                 taskId: taskId
             )
             // Configure data source and sync to populate the initial value
