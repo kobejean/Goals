@@ -52,3 +52,25 @@ actor PreviewTaskRepository: TaskRepositoryProtocol {
     func deleteSession(id: UUID) async throws {}
     func createSession(_ session: TaskSession) async throws -> TaskSession { session }
 }
+
+/// Mock location repository for previews
+actor PreviewLocationRepository: LocationRepositoryProtocol {
+    func fetchAllLocations() async throws -> [LocationDefinition] { [] }
+    func fetchActiveLocations() async throws -> [LocationDefinition] { [] }
+    func fetchLocation(id: UUID) async throws -> LocationDefinition? { nil }
+    func createLocation(_ location: LocationDefinition) async throws -> LocationDefinition { location }
+    func updateLocation(_ location: LocationDefinition) async throws -> LocationDefinition { location }
+    func deleteLocation(id: UUID) async throws {}
+    func fetchActiveSession() async throws -> LocationSession? { nil }
+    func fetchSessions(for date: Date) async throws -> [LocationSession] { [] }
+    func fetchSessions(locationId: UUID, from: Date, to: Date) async throws -> [LocationSession] { [] }
+    func fetchSessions(from: Date, to: Date) async throws -> [LocationSession] { [] }
+    func startSession(locationId: UUID, at: Date) async throws -> LocationSession { LocationSession(locationId: locationId) }
+    func endSession(id: UUID, at: Date) async throws -> LocationSession { LocationSession(locationId: UUID()) }
+    func confirmSession(id: UUID) async throws -> LocationSession { LocationSession(locationId: UUID()) }
+    func deleteSession(id: UUID) async throws {}
+    func createSession(_ session: LocationSession) async throws -> LocationSession { session }
+    func addEntries(_ entries: [LocationEntry]) async throws {}
+    func fetchEntries(sessionId: UUID) async throws -> [LocationEntry] { [] }
+    func pruneOldEntries(olderThan: Date) async throws {}
+}

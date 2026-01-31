@@ -82,6 +82,7 @@ public final class AppContainer {
 
     private var _insightsViewModel: InsightsViewModel?
     private var _tasksViewModel: TasksViewModel?
+    private var _locationsViewModel: LocationsViewModel?
 
     /// Shared InsightsViewModel - persists across navigation
     public var insightsViewModel: InsightsViewModel {
@@ -93,13 +94,15 @@ public final class AppContainer {
             atCoderDataSource: atCoderDataSource,
             sleepDataSource: healthKitSleepDataSource,
             taskRepository: taskRepository,
+            locationRepository: locationRepository,
             goalRepository: goalRepository,
             ankiDataSource: ankiDataSource,
             zoteroDataSource: zoteroDataSource,
             nutritionRepository: nutritionRepository,
             wiiFitDataSource: wiiFitDataSource,
             tensorTonicDataSource: tensorTonicDataSource,
-            taskCachingService: taskCachingService
+            taskCachingService: taskCachingService,
+            locationCachingService: locationCachingService
         )
         _insightsViewModel = vm
         return vm
@@ -118,6 +121,19 @@ public final class AppContainer {
         return vm
     }
 
+    /// Shared LocationsViewModel - persists across navigation
+    public var locationsViewModel: LocationsViewModel {
+        if let existing = _locationsViewModel {
+            return existing
+        }
+        let vm = LocationsViewModel(
+            locationRepository: locationRepository,
+            locationTrackingService: locationTrackingService
+        )
+        _locationsViewModel = vm
+        return vm
+    }
+
     // MARK: - Model Container
 
     public let modelContainer: ModelContainer
@@ -128,6 +144,7 @@ public final class AppContainer {
     public let badgeRepository: BadgeRepositoryProtocol
     public let taskRepository: TaskRepositoryProtocol
     public let nutritionRepository: NutritionRepositoryProtocol
+    public let locationRepository: LocationRepositoryProtocol
 
     // MARK: - Networking
 
@@ -148,6 +165,12 @@ public final class AppContainer {
     // MARK: - Caching Services
 
     public let taskCachingService: TaskCachingService
+
+    // MARK: - Location Services
+
+    public let locationManager: LocationManager
+    public let locationTrackingService: LocationTrackingService
+    public let locationCachingService: LocationCachingService
 
     // MARK: - Use Cases
 
@@ -239,6 +262,9 @@ public final class AppContainer {
 
         self.nutritionRepository = SwiftDataNutritionRepository(modelContainer: modelContainer)
 
+        let localLocationRepo = SwiftDataLocationRepository(modelContainer: modelContainer)
+        self.locationRepository = CloudBackedLocationRepository(local: localLocationRepo, syncQueue: cloudSyncQueue)
+
         // Initialize networking
         self.httpClient = HTTPClient()
 
@@ -256,6 +282,17 @@ public final class AppContainer {
         // Initialize caching services
         self.taskCachingService = TaskCachingService(
             taskRepository: taskRepository,
+            modelContainer: modelContainer
+        )
+
+        // Initialize location services
+        self.locationManager = LocationManager()
+        self.locationTrackingService = LocationTrackingService(
+            locationManager: locationManager,
+            locationRepository: locationRepository
+        )
+        self.locationCachingService = LocationCachingService(
+            locationRepository: locationRepository,
             modelContainer: modelContainer
         )
 

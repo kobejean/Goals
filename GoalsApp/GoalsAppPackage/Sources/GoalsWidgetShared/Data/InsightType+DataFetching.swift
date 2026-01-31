@@ -10,6 +10,7 @@ extension InsightType {
         .atCoder: AtCoderInsightProvider.self,
         .sleep: SleepInsightProvider.self,
         .tasks: TasksInsightProvider.self,
+        .locations: LocationInsightProvider.self,
         .anki: AnkiInsightProvider.self,
         .zotero: ZoteroInsightProvider.self,
         .nutrition: NutritionInsightProvider.self,

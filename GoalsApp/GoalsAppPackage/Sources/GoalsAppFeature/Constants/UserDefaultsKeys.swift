@@ -29,6 +29,7 @@ public enum UserDefaultsKeys {
     public static let typeQuickerInsightsTimeRange = "typeQuickerInsightsTimeRange"
     public static let sleepInsightsTimeRange = "sleepInsightsTimeRange"
     public static let tasksInsightsTimeRange = "tasksInsightsTimeRange"
+    public static let locationsInsightsTimeRange = "locationsInsightsTimeRange"
     public static let ankiInsightsTimeRange = "ankiInsightsTimeRange"
     public static let atCoderInsightsTimeRange = "atCoderInsightsTimeRange"
     public static let zoteroInsightsTimeRange = "zoteroInsightsTimeRange"

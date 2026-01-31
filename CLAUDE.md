@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-Goals is an iOS app for tracking personal goals linked to external data sources (TypeQuicker for typing metrics, AtCoder for competitive programming stats, Anki for spaced repetition, Zotero for research reading, Tasks for time tracking, Sleep for health, Nutrition for meal tracking). Built with Swift 6.1+, SwiftUI, and SwiftData. Targets iOS 18.0+. Includes home screen widgets with CloudKit backup support.
+Goals is an iOS app for tracking personal goals linked to external data sources (TypeQuicker for typing metrics, AtCoder for competitive programming stats, Anki for spaced repetition, Zotero for research reading, Tasks for time tracking, Sleep for health, Nutrition for meal tracking, Locations for automatic geofence-based time tracking). Built with Swift 6.1+, SwiftUI, and SwiftData. Targets iOS 18.0+. Includes home screen widgets with CloudKit backup support.
 
 ## Build & Test Commands
 
@@ -71,8 +71,9 @@ Widget types:
 ### Dependency Injection
 `AppContainer` (in GoalsAppFeature) manages all dependencies:
 - Creates ModelContainer with SwiftData schema (main store + cache store)
-- Instantiates repositories (Goal, Task, Badge, Nutrition), data sources, use cases
-- Provides lazy `insightsViewModel` and `tasksViewModel` properties
+- Instantiates repositories (Goal, Task, Badge, Nutrition, Location), data sources, use cases
+- Provides lazy `insightsViewModel`, `tasksViewModel`, and `locationsViewModel` properties
+- Manages location services (LocationManager, LocationTrackingService)
 - Manages cloud backup services (CloudKitBackupService, CloudSyncQueue)
 - Use `AppContainer.preview()` for tests and SwiftUI previews
 
@@ -87,8 +88,16 @@ External data sources with transparent caching:
 Local data sources (no caching wrapper needed):
 - `TasksDataSource` - Uses TaskRepository directly
 - `NutritionRepository` - SwiftData persistence for meal tracking
+- `LocationRepository` - SwiftData persistence for geofence-based location tracking
 
 All cached sources use `DataCache` backed by SwiftData's `CachedDataEntry` model.
+
+### Location Services
+The app includes automatic location tracking via Core Location geofencing:
+- `LocationManager` - Wrapper around CLLocationManager for region monitoring and high-frequency tracking
+- `LocationTrackingService` - Orchestrates tracking, connects LocationManager with repository
+- `LocationCachingService` - Caches location data for widget access
+- Sessions auto-start/stop when entering/exiting configured location regions
 
 For comprehensive documentation on data flow, caching, persistence, and concurrency, see [`docs/DATA_ARCHITECTURE.md`](docs/DATA_ARCHITECTURE.md).
 
@@ -125,6 +134,7 @@ For comprehensive documentation on data flow, caching, persistence, and concurre
 | Data sources | `GoalsKit/Sources/GoalsData/DataSources/` |
 | Cached data sources | `GoalsKit/Sources/GoalsData/DataSources/Cached/` |
 | Caching layer | `GoalsKit/Sources/GoalsData/Caching/` |
+| Location services | `GoalsKit/Sources/GoalsData/Location/` |
 | Cloud sync | `GoalsKit/Sources/GoalsData/CloudSync/` |
 | Build config | `GoalsApp/Config/*.xcconfig` |
 | Entitlements | `GoalsApp/Config/GoalsApp.entitlements` |

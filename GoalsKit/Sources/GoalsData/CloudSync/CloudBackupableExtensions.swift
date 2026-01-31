@@ -89,6 +89,64 @@ extension TaskSession: CloudBackupable {
     }
 }
 
+// MARK: - LocationDefinition + CloudBackupable
+
+extension LocationDefinition: CloudBackupable {
+    public static var recordType: String { "LocationDefinition" }
+
+    public var cloudRecord: CKRecord {
+        let record = CKRecord(recordType: Self.recordType, recordID: cloudRecordID)
+        do {
+            let encoder = JSONEncoder()
+            encoder.dateEncodingStrategy = .iso8601
+            let data = try encoder.encode(self)
+            record["payload"] = data as CKRecordValue
+            record["updatedAt"] = updatedAt as CKRecordValue
+        } catch {
+            // Will be handled by the sync service
+        }
+        return record
+    }
+
+    public static func from(record: CKRecord) throws -> LocationDefinition {
+        guard let data = record["payload"] as? Data else {
+            throw CloudBackupError.missingPayload
+        }
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .iso8601
+        return try decoder.decode(LocationDefinition.self, from: data)
+    }
+}
+
+// MARK: - LocationSession + CloudBackupable
+
+extension LocationSession: CloudBackupable {
+    public static var recordType: String { "LocationSession" }
+
+    public var cloudRecord: CKRecord {
+        let record = CKRecord(recordType: Self.recordType, recordID: cloudRecordID)
+        do {
+            let encoder = JSONEncoder()
+            encoder.dateEncodingStrategy = .iso8601
+            let data = try encoder.encode(self)
+            record["payload"] = data as CKRecordValue
+            record["updatedAt"] = updatedAt as CKRecordValue
+        } catch {
+            // Will be handled by the sync service
+        }
+        return record
+    }
+
+    public static func from(record: CKRecord) throws -> LocationSession {
+        guard let data = record["payload"] as? Data else {
+            throw CloudBackupError.missingPayload
+        }
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .iso8601
+        return try decoder.decode(LocationSession.self, from: data)
+    }
+}
+
 // MARK: - EarnedBadge + CloudBackupable
 
 extension EarnedBadge: CloudBackupable {

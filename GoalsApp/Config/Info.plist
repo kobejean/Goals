@@ -42,7 +42,12 @@
     <array>
         <string>remote-notification</string>
         <string>fetch</string>
+        <string>location</string>
     </array>
+    <key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
+    <string>Goals uses your location to automatically track time spent at configured locations like home, office, or gym.</string>
+    <key>NSLocationWhenInUseUsageDescription</key>
+    <string>Goals uses your location to automatically track time spent at configured locations.</string>
     <key>BGTaskSchedulerPermittedIdentifiers</key>
     <array>
         <string>com.kobejean.goals.refresh</string>

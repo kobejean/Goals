@@ -59,7 +59,7 @@ The Goals app uses a layered architecture with clean separation of concerns:
 
 ## Data Sources
 
-The app integrates with 7 data sources:
+The app integrates with 8 data sources:
 
 | Source | Type | Protocol/API | Description |
 |--------|------|--------------|-------------|
@@ -70,6 +70,7 @@ The app integrates with 7 data sources:
 | **Tasks** | Local SwiftData | On-device | Time tracking (daily duration, session count) |
 | **HealthKit Sleep** | iOS Framework | HealthKit | Sleep data (duration, stages, efficiency) |
 | **Nutrition** | Local SwiftData | On-device | Meal tracking (calories, macros, photos via Gemini AI) |
+| **Locations** | Local SwiftData + Core Location | On-device geofencing | Automatic location-based time tracking (entry/exit, duration) |
 
 ### Data Source Protocols
 
@@ -134,6 +135,22 @@ public protocol DataSourceRepositoryProtocol: Sendable {
 - **Metrics**: Calories, protein, carbohydrates, fat, daily totals
 - **Features**: Photo-based entry via Gemini AI analysis, thumbnail storage
 - **Auth**: None (local data), Gemini API key for photo analysis
+
+#### Locations
+- **Location**: `GoalsKit/Sources/GoalsData/Location/` and `GoalsKit/Sources/GoalsData/Persistence/Repositories/SwiftDataLocationRepository.swift`
+- **Storage**: Local SwiftData (`LocationDefinitionModel`, `LocationSessionModel`, `LocationEntryModel`)
+- **Metrics**: Total duration at location, visit count, average visit duration
+- **Features**:
+  - Automatic session start/stop via Core Location geofencing (region monitoring)
+  - High-frequency location tracking (every 10 seconds) during active sessions
+  - Manual session override via UI toggle
+  - Automatic location switching when entering a new region
+  - Map view showing configured locations with radii
+- **Auth**: Location permission ("Always" for background geofencing)
+- **Components**:
+  - `LocationManager`: CLLocationManager wrapper for region monitoring and location updates
+  - `LocationTrackingService`: Orchestrates tracking, connects manager with repository
+  - `LocationCachingService`: Caches location data for widget access
 
 ---
 
@@ -374,6 +391,9 @@ public enum SharedStorage {
 | `TaskSessionModel` | Individual task sessions | User Data |
 | `EarnedBadgeModel` | Badges earned by users | User Data |
 | `NutritionEntryModel` | Nutrition entries with nutrients and photo data | User Data |
+| `LocationDefinitionModel` | Location definitions (name, coordinates, radius) | User Data |
+| `LocationSessionModel` | Location visit sessions (start/end times) | User Data |
+| `LocationEntryModel` | High-frequency location entries during sessions | User Data |
 | `TypeQuickerStatsModel` | Cached TypeQuicker daily stats | Cached Data |
 | `AtCoderContestResultModel` | Cached AtCoder contest results | Cached Data |
 | `AtCoderSubmissionModel` | Cached AtCoder submissions | Cached Data |
@@ -384,6 +404,7 @@ public enum SharedStorage {
 | `SleepDailySummaryModel` | Cached sleep daily summaries | Cached Data |
 | `TaskDailySummaryModel` | Cached task daily summaries | Cached Data |
 | `NutritionDailySummaryModel` | Cached nutrition daily summaries | Cached Data |
+| `LocationDailySummaryModel` | Cached location daily summaries | Cached Data |
 
 ---
 
@@ -439,6 +460,28 @@ public protocol NutritionRepositoryProtocol: Sendable {
     func updateEntry(_ entry: NutritionEntry) async throws
     func deleteEntry(id: UUID) async throws
 }
+
+// LocationRepositoryProtocol
+public protocol LocationRepositoryProtocol: Sendable {
+    // Location definitions
+    func fetchAllLocations() async throws -> [LocationDefinition]
+    func fetchActiveLocations() async throws -> [LocationDefinition]
+    func createLocation(_ location: LocationDefinition) async throws -> LocationDefinition
+    func updateLocation(_ location: LocationDefinition) async throws -> LocationDefinition
+    func deleteLocation(id: UUID) async throws
+
+    // Sessions
+    func fetchActiveSession() async throws -> LocationSession?
+    func fetchSessions(for date: Date) async throws -> [LocationSession]
+    func fetchSessions(locationId: UUID, from: Date, to: Date) async throws -> [LocationSession]
+    func startSession(locationId: UUID, at: Date) async throws -> LocationSession
+    func endSession(id: UUID, at: Date) async throws -> LocationSession
+
+    // High-frequency entries
+    func addEntries(_ entries: [LocationEntry]) async throws
+    func fetchEntries(sessionId: UUID) async throws -> [LocationEntry]
+    func pruneOldEntries(olderThan: Date) async throws
+}
 ```
 
 ### Repository Implementations (GoalsData)
@@ -451,6 +494,7 @@ public protocol NutritionRepositoryProtocol: Sendable {
 | `TaskRepositoryProtocol` | `SwiftDataTaskRepository` | `CloudBackedTaskRepository` |
 | `BadgeRepositoryProtocol` | `SwiftDataBadgeRepository` | `CloudBackedBadgeRepository` |
 | `NutritionRepositoryProtocol` | `SwiftDataNutritionRepository` | — |
+| `LocationRepositoryProtocol` | `SwiftDataLocationRepository` | `CloudBackedLocationRepository` |
 
 All SwiftData repositories are `@MainActor` isolated and use `ModelContainer.mainContext`.
 
@@ -561,6 +605,56 @@ Goal progress updated
 └──────────────────────┘
 ```
 
+### Location Tracking Flow (Geofence → Session → UI)
+
+```
+User enters monitored region
+       │
+       ▼
+┌──────────────────────┐
+│ CLLocationManager    │
+│ didEnterRegion       │
+└──────────────────────┘
+       │
+       ▼
+┌──────────────────────┐
+│ LocationManager      │
+│ onRegionEvent        │
+└──────────────────────┘
+       │
+       ▼
+┌────────────────────────┐
+│ LocationTrackingService │
+│ handleRegionEnter()    │
+└────────────────────────┘
+       │
+       ├──────────────────────────────┐
+       ▼                              ▼
+┌──────────────────┐         ┌──────────────────┐
+│ LocationRepository│         │ Start high-freq  │
+│ .startSession()  │         │ location tracking│
+└──────────────────┘         └──────────────────┘
+       │                              │
+       ▼                              ▼
+┌──────────────────┐         ┌──────────────────┐
+│ SwiftData        │         │ LocationEntry    │
+│ (LocationSession)│         │ (every 10 sec)   │
+└──────────────────┘         └──────────────────┘
+       │
+       ▼
+┌──────────────────────┐
+│ LocationsViewModel   │
+│ (via @Observable)    │
+└──────────────────────┘
+       │
+       ▼
+┌──────────────────────┐
+│ UI Updates           │
+│ (active session,     │
+│  timer, map marker)  │
+└──────────────────────┘
+```
+
 ---
 
 ## Dependency Injection
@@ -589,6 +683,7 @@ public final class AppContainer {
     public let badgeRepository: BadgeRepositoryProtocol
     public let taskRepository: TaskRepositoryProtocol
     public let nutritionRepository: NutritionRepositoryProtocol
+    public let locationRepository: LocationRepositoryProtocol
 
     // Caching
     public let dataCache: DataCache
@@ -604,6 +699,11 @@ public final class AppContainer {
 
     // Caching Services
     public let taskCachingService: TaskCachingService
+    public let locationCachingService: LocationCachingService
+
+    // Location Services
+    public let locationManager: LocationManager
+    public let locationTrackingService: LocationTrackingService
 
     // Use Cases
     public let createGoalUseCase: CreateGoalUseCase
@@ -618,6 +718,7 @@ public final class AppContainer {
     // ViewModels (lazily created, persist for app lifetime)
     public var insightsViewModel: InsightsViewModel { ... }
     public var tasksViewModel: TasksViewModel { ... }
+    public var locationsViewModel: LocationsViewModel { ... }
 }
 ```
 
@@ -717,9 +818,17 @@ public final class CloudBackedGoalRepository: GoalRepositoryProtocol {
 | `SwiftDataTaskRepository` | SwiftData mainContext access |
 | `SwiftDataBadgeRepository` | SwiftData mainContext access |
 | `SwiftDataNutritionRepository` | SwiftData mainContext access |
+| `SwiftDataLocationRepository` | SwiftData mainContext access |
 | `TasksDataSource` | Uses TaskRepository |
+| `LocationTrackingService` | Coordinates location state with UI |
 | `AppContainer` | UI state coordination |
 | ViewModels | UI state management |
+
+### Non-Actor Thread Safety
+
+| Component | Isolation | Reason |
+|-----------|-----------|--------|
+| `LocationManager` | `NSLock` + `@unchecked Sendable` | CLLocationManager must be accessed from consistent thread; uses NSLock for internal state |
 
 ### Swift 6 Strict Concurrency
 
@@ -749,6 +858,7 @@ public struct SyncDataSourcesUseCase: Sendable {
 | DataCache | `GoalsKit/Sources/GoalsData/Caching/DataCache.swift` |
 | CacheableRecord | `GoalsKit/Sources/GoalsDomain/Caching/CacheableRecord.swift` |
 | Caching Strategies | `GoalsKit/Sources/GoalsData/Caching/Strategies/` |
+| Location Services | `GoalsKit/Sources/GoalsData/Location/` |
 | Unified Schema | `GoalsKit/Sources/GoalsData/Persistence/UnifiedSchema.swift` |
 | SwiftData Models | `GoalsKit/Sources/GoalsData/Persistence/Models/` |
 | Repository Implementations | `GoalsKit/Sources/GoalsData/Persistence/Repositories/` |

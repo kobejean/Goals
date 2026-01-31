@@ -12,6 +12,10 @@ public enum UnifiedSchema {
         TaskDefinitionModel.self,
         TaskSessionModel.self,
         NutritionEntryModel.self,
+        LocationDefinitionModel.self,
+        LocationSessionModel.self,
+        LocationEntryModel.self,
+        LocationDailySummaryModel.self,
 
         // Cached external data models
         TypeQuickerStatsModel.self,

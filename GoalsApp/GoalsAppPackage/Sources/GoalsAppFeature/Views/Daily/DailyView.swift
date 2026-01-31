@@ -4,6 +4,7 @@ import GoalsDomain
 /// Sections available in the Daily tab
 public enum DailySection: String, CaseIterable, Identifiable {
     case tasks
+    case locations
     case nutrition
 
     public var id: String { rawValue }
@@ -12,6 +13,8 @@ public enum DailySection: String, CaseIterable, Identifiable {
         switch self {
         case .tasks:
             return "Tasks"
+        case .locations:
+            return "Locations"
         case .nutrition:
             return "Nutrition"
         }
@@ -21,6 +24,8 @@ public enum DailySection: String, CaseIterable, Identifiable {
         switch self {
         case .tasks:
             return "timer"
+        case .locations:
+            return "location.fill"
         case .nutrition:
             return "fork.knife"
         }
@@ -50,6 +55,8 @@ public struct DailyView: View {
                 switch selectedSection {
                 case .tasks:
                     TasksSectionView()
+                case .locations:
+                    LocationsSectionView()
                 case .nutrition:
                     NutritionSectionView()
                 }

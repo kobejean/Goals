@@ -8,6 +8,7 @@ public enum InsightType: String, CaseIterable, Codable, Sendable {
     case atCoder
     case sleep
     case tasks
+    case locations
     case anki
     case zotero
     case nutrition
@@ -15,7 +16,7 @@ public enum InsightType: String, CaseIterable, Codable, Sendable {
     case tensorTonic
 
     /// Default order for insight cards
-    public static let defaultOrder: [InsightType] = [.typeQuicker, .atCoder, .sleep, .tasks, .anki, .zotero, .nutrition, .wiiFit, .tensorTonic]
+    public static let defaultOrder: [InsightType] = [.typeQuicker, .atCoder, .sleep, .tasks, .locations, .anki, .zotero, .nutrition, .wiiFit, .tensorTonic]
 
     /// Display title for the insight type
     public var displayTitle: String {
@@ -24,6 +25,7 @@ public enum InsightType: String, CaseIterable, Codable, Sendable {
         case .atCoder: return "AtCoder"
         case .sleep: return "Sleep"
         case .tasks: return "Tasks"
+        case .locations: return "Locations"
         case .anki: return "Anki"
         case .zotero: return "Zotero"
         case .nutrition: return "Nutrition"
@@ -39,6 +41,7 @@ public enum InsightType: String, CaseIterable, Codable, Sendable {
         case .atCoder: return "chevron.left.forwardslash.chevron.right"
         case .sleep: return "bed.double.fill"
         case .tasks: return "timer"
+        case .locations: return "location.fill"
         case .anki: return "rectangle.stack"
         case .zotero: return "books.vertical"
         case .nutrition: return "fork.knife"
@@ -55,6 +58,7 @@ public enum InsightType: String, CaseIterable, Codable, Sendable {
         case .atCoder: return Self.brandGreen
         case .sleep: return .indigo
         case .tasks: return .orange
+        case .locations: return .blue
         case .anki: return .red
         case .zotero: return .purple
         case .nutrition: return .teal
@@ -89,6 +93,7 @@ extension InsightType: AppEnum {
             .atCoder: DisplayRepresentation(title: "AtCoder"),
             .sleep: DisplayRepresentation(title: "Sleep"),
             .tasks: DisplayRepresentation(title: "Tasks"),
+            .locations: DisplayRepresentation(title: "Locations"),
             .anki: DisplayRepresentation(title: "Anki"),
             .zotero: DisplayRepresentation(title: "Zotero"),
             .nutrition: DisplayRepresentation(title: "Nutrition"),

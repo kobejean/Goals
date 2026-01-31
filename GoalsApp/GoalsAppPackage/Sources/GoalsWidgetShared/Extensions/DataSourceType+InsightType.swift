@@ -12,6 +12,7 @@ extension DataSourceType {
         case .atCoder: return .atCoder
         case .healthKitSleep: return .sleep
         case .tasks: return .tasks
+        case .locations: return .locations
         case .anki: return .anki
         case .zotero: return .zotero
         case .nutrition: return .nutrition
@@ -30,6 +31,7 @@ extension InsightType {
         case .atCoder: return .atCoder
         case .sleep: return .healthKitSleep
         case .tasks: return .tasks
+        case .locations: return .locations
         case .anki: return .anki
         case .zotero: return .zotero
         case .nutrition: return .nutrition

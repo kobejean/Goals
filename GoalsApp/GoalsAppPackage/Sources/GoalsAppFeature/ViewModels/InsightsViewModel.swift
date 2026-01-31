@@ -21,6 +21,7 @@ public final class InsightsViewModel {
     public let atCoder: AtCoderInsightsViewModel
     public let sleep: SleepInsightsViewModel
     public let tasks: TasksInsightsViewModel
+    public let locations: LocationsInsightsViewModel
     public let anki: AnkiInsightsViewModel
     public let zotero: ZoteroInsightsViewModel
     public let nutrition: NutritionInsightsViewModel
@@ -43,13 +44,15 @@ public final class InsightsViewModel {
         atCoderDataSource: AtCoderDataSource,
         sleepDataSource: HealthKitSleepDataSource,
         taskRepository: TaskRepositoryProtocol,
+        locationRepository: LocationRepositoryProtocol,
         goalRepository: GoalRepositoryProtocol,
         ankiDataSource: AnkiDataSource,
         zoteroDataSource: ZoteroDataSource,
         nutritionRepository: NutritionRepositoryProtocol,
         wiiFitDataSource: WiiFitDataSource,
         tensorTonicDataSource: TensorTonicDataSource,
-        taskCachingService: TaskCachingService? = nil
+        taskCachingService: TaskCachingService? = nil,
+        locationCachingService: LocationCachingService? = nil
     ) {
         self.typeQuicker = TypeQuickerInsightsViewModel(
             dataSource: typeQuickerDataSource,
@@ -67,6 +70,11 @@ public final class InsightsViewModel {
             taskRepository: taskRepository,
             goalRepository: goalRepository,
             taskCachingService: taskCachingService
+        )
+        self.locations = LocationsInsightsViewModel(
+            locationRepository: locationRepository,
+            goalRepository: goalRepository,
+            locationCachingService: locationCachingService
         )
         self.anki = AnkiInsightsViewModel(
             dataSource: ankiDataSource,
@@ -118,6 +126,9 @@ public final class InsightsViewModel {
             },
             .tasks: makeCardConfig(type: .tasks, from: tasks) {
                 AnyView(TasksInsightsDetailView(viewModel: self.tasks))
+            },
+            .locations: makeCardConfig(type: .locations, from: locations) {
+                AnyView(LocationsInsightsDetailView(viewModel: self.locations))
             },
             .anki: makeCardConfig(type: .anki, from: anki) {
                 AnyView(AnkiInsightsDetailView(viewModel: self.anki))
@@ -207,6 +218,7 @@ public final class InsightsViewModel {
             group.addTask { await self.load(self.atCoder, isThrottled: isThrottled) }
             group.addTask { await self.load(self.sleep, isThrottled: isThrottled) }
             group.addTask { await self.load(self.tasks, isThrottled: isThrottled) }
+            group.addTask { await self.load(self.locations, isThrottled: isThrottled) }
             group.addTask { await self.load(self.anki, isThrottled: isThrottled) }
             group.addTask { await self.load(self.zotero, isThrottled: isThrottled) }
             group.addTask { await self.load(self.nutrition, isThrottled: isThrottled) }
