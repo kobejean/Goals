@@ -71,12 +71,13 @@ public final class TasksInsightProvider: BaseInsightProvider<TaskDailySummary> {
             trend: trend
         )
 
-        // Build activity data
+        // Build activity data with dominant task color per day
         let targetHours = goals.targetValue(for: "dailyDuration").map { $0 / 60.0 } ?? 4.0
         let activityDays = dailySummaries.map { summary in
             let hours = summary.totalDuration / 3600.0
             let intensity = min(hours / targetHours, 1.0)
-            return InsightActivityDay(date: summary.date, color: type.color, intensity: intensity)
+            let dominantColor = dominantTaskColor(for: summary) ?? type.color
+            return InsightActivityDay(date: summary.date, color: dominantColor, intensity: intensity)
         }
 
         let activityData = InsightActivityData(days: activityDays, emptyColor: .gray.opacity(0.2))
@@ -98,5 +99,21 @@ public final class TasksInsightProvider: BaseInsightProvider<TaskDailySummary> {
             return "\(h)h"
         }
         return "\(h)h \(m)m"
+    }
+
+    /// Find the color of the dominant task (most time spent) for a day
+    private static func dominantTaskColor(for summary: TaskDailySummary) -> Color? {
+        guard !summary.sessions.isEmpty else { return nil }
+
+        // Group sessions by task and sum durations
+        var durationByTask: [UUID: (duration: TimeInterval, color: Color)] = [:]
+        for session in summary.sessions {
+            let existing = durationByTask[session.taskId]
+            let newDuration = (existing?.duration ?? 0) + session.duration
+            durationByTask[session.taskId] = (newDuration, session.taskColor.swiftUIColor)
+        }
+
+        // Find task with maximum duration
+        return durationByTask.values.max(by: { $0.duration < $1.duration })?.color
     }
 }

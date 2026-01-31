@@ -71,12 +71,13 @@ public final class LocationInsightProvider: BaseInsightProvider<LocationDailySum
             trend: trend
         )
 
-        // Build activity data
+        // Build activity data with dominant location color per day
         let targetHours = goals.targetValue(for: "dailyDuration").map { $0 / 60.0 } ?? 4.0
         let activityDays = dailySummaries.map { summary in
             let hours = summary.totalDuration / 3600.0
             let intensity = min(hours / targetHours, 1.0)
-            return InsightActivityDay(date: summary.date, color: type.color, intensity: intensity)
+            let dominantColor = dominantLocationColor(for: summary) ?? type.color
+            return InsightActivityDay(date: summary.date, color: dominantColor, intensity: intensity)
         }
 
         let activityData = InsightActivityData(days: activityDays, emptyColor: .gray.opacity(0.2))
@@ -98,5 +99,21 @@ public final class LocationInsightProvider: BaseInsightProvider<LocationDailySum
             return "\(h)h"
         }
         return "\(h)h \(m)m"
+    }
+
+    /// Find the color of the dominant location (most time spent) for a day
+    private static func dominantLocationColor(for summary: LocationDailySummary) -> Color? {
+        guard !summary.sessions.isEmpty else { return nil }
+
+        // Group sessions by location and sum durations
+        var durationByLocation: [UUID: (duration: TimeInterval, color: Color)] = [:]
+        for session in summary.sessions {
+            let existing = durationByLocation[session.locationId]
+            let newDuration = (existing?.duration ?? 0) + session.duration
+            durationByLocation[session.locationId] = (newDuration, session.locationColor.swiftUIColor)
+        }
+
+        // Find location with maximum duration
+        return durationByLocation.values.max(by: { $0.duration < $1.duration })?.color
     }
 }

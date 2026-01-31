@@ -68,16 +68,6 @@ public extension Array where Element == TaskDailySummary {
                     config: boundaryConfig
                 )
 
-                #if DEBUG
-                if splitSegments.count > 0 {
-                    let formatter = DateFormatter()
-                    formatter.dateFormat = "MMM d HH:mm"
-                    for seg in splitSegments {
-                        print("[DayBoundary] Session \(formatter.string(from: session.startDate)) - \(formatter.string(from: endDate)) → logicalDay: \(formatter.string(from: seg.logicalDay))")
-                    }
-                }
-                #endif
-
                 let calendar = Calendar.current
                 for segment in splitSegments {
                     // Check if segment belongs to previous logical day (times before boundary)
