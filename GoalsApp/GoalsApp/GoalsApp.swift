@@ -32,29 +32,32 @@ struct GoalsApp: App {
     }
 
     private func handleScenePhaseChange(_ phase: ScenePhase) {
-        guard let container = container else { return }
+        guard let _ = container else { return }
 
         switch phase {
         case .active:
+            // TODO: Re-enable BGM player when ready
             // Resume BGM when app becomes active
-            if container.bgmPlayer.state == .stopped {
-                do {
-                    try container.bgmPlayer.play(playlist: [
-                        .init(.bowlingResults, loopCount: 5),
-                        .init(.tennisResults, loopCount: 3),
-                        .init(.golfCourseSelect, loopCount: 5),
-                        .init(.golfGameResults, loopCount: 3),
-                        .init(.konohaNoHiru, loopCount: 2)
-					].shuffled())
-                } catch {
-                    print("Failed to play BGM: \(error)")
-                }
-            } else {
-                container.bgmPlayer.resumeWithFadeIn()
-            }
+            // if container.bgmPlayer.state == .stopped {
+            //     do {
+            //         try container.bgmPlayer.play(playlist: [
+            //             .init(.bowlingResults, loopCount: 5),
+            //             .init(.tennisResults, loopCount: 3),
+            //             .init(.golfCourseSelect, loopCount: 5),
+            //             .init(.golfGameResults, loopCount: 3),
+            //             .init(.konohaNoHiru, loopCount: 2)
+            //         ].shuffled())
+            //     } catch {
+            //         print("Failed to play BGM: \(error)")
+            //     }
+            // } else {
+            //     container.bgmPlayer.resumeWithFadeIn()
+            // }
+            break
         case .inactive, .background:
             // Fade out BGM when app goes to background
-            container.bgmPlayer.fadeOutAndPause()
+            // container.bgmPlayer.fadeOutAndPause()
+            break
         @unknown default:
             break
         }
