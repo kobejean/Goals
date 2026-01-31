@@ -19,6 +19,7 @@ public final class LocationsInsightsViewModel: InsightsSectionViewModel {
     public private(set) var locations: [LocationDefinition] = []
     public private(set) var sessions: [LocationSession] = []
     public private(set) var goals: [Goal] = []
+    public private(set) var todayPath: [PathEntry] = []
     public private(set) var errorMessage: String?
     public private(set) var fetchStatus: InsightFetchStatus = .idle
 
@@ -171,14 +172,16 @@ public final class LocationsInsightsViewModel: InsightsSectionViewModel {
         let startDate = TimeRange.all.startDate(from: endDate)
 
         do {
-            // Load locations and sessions in parallel
+            // Load locations, sessions, goals, and today's path in parallel
             async let locationsResult = locationRepository.fetchActiveLocations()
             async let sessionsResult = locationRepository.fetchSessions(from: startDate, to: endDate)
             async let goalsResult = goalRepository.fetch(dataSource: .locations)
+            async let pathResult = locationRepository.fetchPathEntries(for: Date())
 
             locations = try await locationsResult
             sessions = try await sessionsResult
             goals = try await goalsResult
+            todayPath = try await pathResult
 
             // Update reference date after loading
             referenceDate = Date()
@@ -189,6 +192,15 @@ public final class LocationsInsightsViewModel: InsightsSectionViewModel {
         } catch {
             errorMessage = "Failed to load location data: \(error.localizedDescription)"
             fetchStatus = .error
+        }
+    }
+
+    /// Reload today's path data (for refresh)
+    public func reloadTodayPath() async {
+        do {
+            todayPath = try await locationRepository.fetchPathEntries(for: Date())
+        } catch {
+            // Silent failure for path reload
         }
     }
 

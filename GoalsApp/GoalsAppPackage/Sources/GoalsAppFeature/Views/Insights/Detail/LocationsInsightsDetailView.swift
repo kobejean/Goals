@@ -1,5 +1,6 @@
 import SwiftUI
 import Charts
+import MapKit
 import GoalsDomain
 import GoalsWidgetShared
 
@@ -22,6 +23,11 @@ struct LocationsInsightsDetailView: View {
                 } else if filteredSummaries.isEmpty {
                     noDataInRangeView
                 } else {
+                    // Today's path section (only show if path tracking has data)
+                    if !viewModel.todayPath.isEmpty {
+                        todayPathSection
+                    }
+
                     scheduleChartSection
                     locationDistributionSection
                 }
@@ -104,6 +110,36 @@ struct LocationsInsightsDetailView: View {
         }
         .frame(maxWidth: .infinity)
         .padding(.vertical, 40)
+    }
+
+    private var todayPathSection: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack {
+                Text("Today's Path")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+
+                Spacer()
+
+                Button {
+                    Task {
+                        await viewModel.reloadTodayPath()
+                    }
+                } label: {
+                    Image(systemName: "arrow.clockwise")
+                        .font(.caption)
+                }
+                .buttonStyle(.plain)
+                .foregroundStyle(.secondary)
+            }
+
+            PathMapView(
+                pathEntries: viewModel.todayPath,
+                locations: viewModel.locations
+            )
+
+            PathStatsView(pathEntries: viewModel.todayPath)
+        }
     }
 
     private var scheduleChartSection: some View {
